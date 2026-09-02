@@ -1,0 +1,923 @@
+<script id="fa-app">
+(function(){
+"use strict";
+
+/* ══ 1. Sorgente canonica della pagina ═══════════════════════════════
+   Catturata ORA, mentre i contenitori sono ancora vuoti come li ho
+   scritti: è il sorgente della pagina, non il DOM già renderizzato.
+   Da qui si ricostruisce il documento da ripubblicare.               */
+const SRC={};
+for(const id of ["fa-font","fa-css1","fa-css2","fa-root","fa-app"]){
+  const el=document.getElementById(id);
+  SRC[id]=el?el.outerHTML:"";
+}
+const jsonSafe=o=>JSON.stringify(o).replace(/</g,"\\u003c");
+function pageHTML(shared,players,meta){
+  const data='<script id="fa-data">window.PLAYERS='+jsonSafe(players)
+    +';window.CAL='+jsonSafe(window.CAL)
+    +';window.RIG='+jsonSafe(RIG)
+    +';window.HIST='+jsonSafe(HIST)
+    +';window.SHARED='+jsonSafe(shared)
+    +';window.LISTMETA='+jsonSafe(meta)+';<\/script>';
+  return '<!doctype html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+    +"<title>Sala d'Asta Fantacalcio</title>\n"+SRC["fa-font"]+"\n"+SRC["fa-css1"]+"\n"+SRC["fa-css2"]
+    +"\n</head>\n<body>\n"+SRC["fa-root"]+"\n"+data+"\n"+SRC["fa-app"]+"\n</body>\n</html>";
+}
+
+/* ══ 2. Dati ════════════════════════════════════════════════════════ */
+const ROLES=["P","D","C","A"];
+const ROLENAME={P:"Portieri",D:"Difensori",C:"Centrocampisti",A:"Attaccanti"};
+/* quanto ogni ruolo Mantra spinge in avanti */
+const MENT={Por:0,Dc:1,Dd:2,Ds:2,B:2.5,M:3,E:4,C:4.5,W:6.5,T:6.5,A:7.5,Pc:8};
+const MENTNAME={Por:"portiere",Dc:"difensore centrale",Dd:"terzino destro",Ds:"terzino sinistro",
+  B:"braccetto",M:"mediano",E:"esterno",C:"centrocampista centrale",W:"ala",T:"trequartista",
+  A:"attaccante di supporto",Pc:"punta centrale"};
+const KEY="fanta-asta-2627";
+const KEY_LOCAL=KEY+"-mio";
+const KEY_SOLO=KEY+"-solo";
+const KEY_MIRROR=KEY+"-specchio";
+
+let PL=(window.PLAYERS||[]).map(a=>({id:a[0],r:a[1],rm:a[2],n:a[3],s:a[4],q:a[5],f:a[6],v:a[7]}));
+let LISTMETA=window.LISTMETA||{name:"Quotazioni ufficiali 2026/27",when:null,count:PL.length};
+let byId=new Map(PL.map(p=>[p.id,p]));
+const CAL=window.CAL||{teams:[],fix:[],dates:[]};
+const RIG=window.RIG||{};   // id -> [gerarchia, confermato da entrambe le fonti]
+/* statistiche 2025/26, agganciate per Id: [Pv,Mv,Fm,Gf,Gs,Rp,Rc,R+,R-,Ass,Amm,Esp,Au] */
+const HIST=window.HIST||{};
+let _hmed=null;   // mediane di ruolo dell'anno scorso, ricalcolate a ogni listone
+const CALTEAMS=CAL.teams, CALIDX=new Map(CALTEAMS.map((t,i)=>[t,i]));
+
+const DEF={
+  teams:[{id:1,name:"Squadra 1"},{id:2,name:"Squadra 2"},{id:3,name:"Squadra 3"},{id:4,name:"Squadra 4"},
+         {id:5,name:"Squadra 5"},{id:6,name:"Squadra 6"},{id:7,name:"Squadra 7"},{id:8,name:"Squadra 8"}],
+  budget:500, slots:{P:3,D:8,C:8,A:6}, plan:{P:7,D:19,C:32,A:42},
+  assign:{}, log:[], rev:0, stats:{}, votiMeta:{}, out:{}
+};
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+/* stato condiviso: quello pubblicato nella pagina */
+let S=Object.assign(clone(DEF), window.SHARED||{});
+/* stato privato di chi guarda: squadra scelta, obiettivi, prezzi max */
+let ME={myTeam:null, targets:{}};
+try{ const r=localStorage.getItem(KEY_LOCAL); if(r) ME=Object.assign(ME,JSON.parse(r)); }catch(e){}
+function saveMe(){ try{ localStorage.setItem(KEY_LOCAL,JSON.stringify(ME)); }catch(e){} }
+
+/* ══ 3. Pubblicazione / persistenza ═════════════════════════════════ */
+let artifact=null, mode="attesa", readOnly=false, pubTimer=null, pubBusy=false, dirty=false;
+function setSync(){
+  const el=document.getElementById("sync");
+  if(readOnly){ el.className="synced ro"; el.textContent="sola lettura"; return; }
+  if(mode==="attesa"){ el.className="synced busy"; el.textContent="collegamento…"; return; }
+  if(mode==="condivisa"){
+    el.className="synced "+(pubBusy||dirty?"busy":"live");
+    el.textContent=pubBusy||dirty?"salvataggio…":"condivisa";
+  } else { el.className="synced"; el.textContent="solo qui"; }
+}
+function saveSolo(){ try{ localStorage.setItem(KEY_SOLO,JSON.stringify(S)); }catch(e){} }
+
+/* Specchio locale di ogni modifica: se un salvataggio non arriva mai alla
+   pagina condivisa, al rientro ce ne accorgiamo invece di perderlo in
+   silenzio. rev è un timestamp, così regge anche fra dispositivi diversi. */
+function mirror(){
+  try{ localStorage.setItem(KEY_MIRROR,JSON.stringify({rev:S.rev,at:Date.now(),
+    lega:{budget:S.budget,slots:S.slots,plan:S.plan,teams:S.teams}})); }catch(e){}
+}
+function persist(){
+  if(readOnly) return;
+  S.rev=Math.max((S.rev||0)+1, Date.now());
+  mirror();
+  dirty=true; setSync();
+  // La capability di condivisione non risponde mai durante il primo giro dello
+  // script: finché non sappiamo dove salvare teniamo la modifica in sospeso,
+  // e initStore la manda dove va appena lo scopre.
+  if(mode==="attesa") return;
+  if(mode==="locale"){ saveSolo(); dirty=false; setSync(); return; }
+  clearTimeout(pubTimer);
+  pubTimer=setTimeout(doPublish,2200);   // raggruppa le chiamate ravvicinate
+}
+async function doPublish(){
+  if(!artifact||readOnly||pubBusy) return;
+  pubBusy=true; dirty=false; setSync();
+  try{
+    const pr=document.getElementById("price"), tm=document.getElementById("team");
+    sessionStorage.setItem("fa-ui",JSON.stringify({tab:curTab(),q:document.getElementById("q").value,
+      sel:sel?sel.id:null, price:pr?pr.value:null, team:tm?tm.value:null}));
+  }catch(e){}
+  try{
+    await artifact.publish(pageHTML(S,rawPlayers(),LISTMETA));
+  }catch(err){
+    const c=err&&err.code;
+    if(c==="conflict"){ /* un'altra vista ha pubblicato: il visore ricarica da solo */ }
+    else if(c==="not_writer"||c==="not_granted"){ goReadOnly(); }
+    else if(c==="rate_limited"){ dirty=true; setTimeout(doPublish,6000); }
+    else { dirty=true; toast("Salvataggio non riuscito, riprovo"); setTimeout(doPublish,5000); }
+  } finally {
+    pubBusy=false; setSync();
+    // una modifica arrivata mentre pubblicavo non deve restare indietro
+    if(dirty){ clearTimeout(pubTimer); pubTimer=setTimeout(doPublish,1200); }
+  }
+}
+/* Impostazioni di lega rimaste indietro su questo dispositivo. Confronta solo
+   crediti/slot/piano/nomi: le assegnazioni registrate nel frattempo dagli altri
+   non vengono mai toccate. */
+let pending=null;
+function checkPending(){
+  pending=null;
+  if(readOnly||mode!=="condivisa") return;
+  try{
+    const m=JSON.parse(localStorage.getItem(KEY_MIRROR)||"null");
+    if(!m||!m.lega||!(m.rev>(S.rev||0))) return;
+    const diff=[];
+    if(m.lega.budget!==S.budget) diff.push("crediti "+m.lega.budget);
+    if(JSON.stringify(m.lega.slots)!==JSON.stringify(S.slots)) diff.push("slot per reparto");
+    if(JSON.stringify(m.lega.plan)!==JSON.stringify(S.plan)) diff.push("piano di spesa");
+    if(JSON.stringify((m.lega.teams||[]).map(t=>t.name))!==JSON.stringify(S.teams.map(t=>t.name))) diff.push("nomi delle squadre");
+    if(diff.length) pending={m:m,diff:diff};
+  }catch(e){}
+}
+function applyPending(){
+  if(!pending) return;
+  const L=pending.m.lega;
+  S.budget=L.budget; S.slots=L.slots; S.plan=L.plan;
+  if(L.teams&&L.teams.length===S.teams.length)
+    S.teams.forEach((t,i)=>{ if(L.teams[i]&&L.teams[i].name) t.name=L.teams[i].name; });
+  pending=null; persist(); renderAll(); toast("Impostazioni riapplicate e in salvataggio");
+}
+function dropPending(){
+  pending=null;
+  try{ localStorage.removeItem(KEY_MIRROR); }catch(e){}
+  renderBanner();
+}
+function goReadOnly(){
+  readOnly=true; document.body.classList.add("readonly"); setSync(); renderBanner();
+}
+function rawPlayers(){ return PL.map(p=>[p.id,p.r,p.rm,p.n,p.s,p.q,p.f,p.v]); }
+
+async function initStore(){
+  try{ artifact = window.claude && claude.use ? await claude.use("artifact") : null; }catch(e){ artifact=null; }
+  if(artifact){
+    mode="condivisa";
+    checkPending();
+    if(dirty) doPublish();          // pubblica subito quello che è cambiato nell'attesa
+  } else {
+    mode="locale";
+    // Non sovrascrivere lo stato condiviso della pagina con una copia locale
+    // vecchia, né con quella appena modificata da chi sta guardando.
+    if(!window.SHARED && !dirty){
+      try{ const r=localStorage.getItem(KEY_SOLO); if(r) S=Object.assign(clone(DEF),JSON.parse(r)); }catch(e){}
+    }
+    if(dirty){ saveSolo(); dirty=false; }
+    renderAll();
+  }
+  setSync(); renderBanner(); renderSetup();
+}
+
+/* ══ 4. Derivate ════════════════════════════════════════════════════ */
+function meId(){
+  if(ME.myTeam && S.teams.some(t=>t.id===ME.myTeam)) return ME.myTeam;
+  return S.teams.length?S.teams[0].id:0;
+}
+const isMine=tid=>ME.myTeam===tid;
+const totalSlots=()=>ROLES.reduce((a,r)=>a+S.slots[r],0);
+function roster(tid){
+  const out={P:[],D:[],C:[],A:[]};
+  for(const pid in S.assign){ const a=S.assign[pid]; if(a.team===tid){
+    const p=byId.get(+pid)||a.snap; if(p) out[p.r].push({p,price:a.price}); } }
+  for(const r of ROLES) out[r].sort((a,b)=>b.price-a.price||a.p.n.localeCompare(b.p.n));
+  return out;
+}
+function stats(tid){
+  const R=roster(tid); let spent=0,count=0; const perRole={};
+  for(const r of ROLES){ const s=R[r].reduce((a,x)=>a+x.price,0); perRole[r]={spent:s,count:R[r].length}; spent+=s; count+=R[r].length; }
+  const left=S.budget-spent, slotsLeft=totalSlots()-count;
+  return {R,spent,count,left,slotsLeft,perRole,max:slotsLeft>0?Math.max(0,left-(slotsLeft-1)):0};
+}
+const teamName=tid=>{const t=S.teams.find(x=>x.id===tid);return t?t.name:"?";};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const curTab=()=>document.querySelector('.tabs button[aria-selected="true"]').dataset.tab;
+
+let toastT;
+function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("on"),2100); }
+
+/* ══ 5. Convenienza e forze delle squadre (ricalcolate dal listone) ══ */
+let FORCEQ={};   // forze dalle quotazioni: il punto di partenza
+let _fsig="", _FORCE=null;
+function recompute(){
+  byId=new Map(PL.map(p=>[p.id,p]));
+  _hmed=null;                       // le mediane di ruolo dipendono dal listone in uso
+  // convenienza: scostamento dall'FVM atteso per fascia di prezzo, per ruolo
+  for(const role of ROLES){
+    const rs=PL.filter(p=>p.r===role&&p.q>0&&p.f>0);
+    if(rs.length<8){ rs.forEach(p=>p.v=1); continue; }
+    const xs=rs.map(p=>Math.log(p.q)), ys=rs.map(p=>Math.log(p.f));
+    const n=xs.length, mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
+    let num=0,den=0;
+    for(let i=0;i<n;i++){ num+=(xs[i]-mx)*(ys[i]-my); den+=(xs[i]-mx)**2; }
+    const a=den?num/den:1, b=my-a*mx;
+    rs.forEach(p=>{ p.v=Math.round(p.f/Math.exp(a*Math.log(p.q)+b)*100)/100; });
+    PL.filter(p=>p.r===role&&!(p.q>0&&p.f>0)).forEach(p=>p.v=1);
+  }
+  // Titolarità dedotta dalle quotazioni: dentro squadra e ruolo, chi è quotato
+  // di più è chi il mercato si aspetta in campo. Si ricalcola a ogni listone.
+  const K={P:1,D:4,C:4,A:2};
+  const squadre=[...new Set(PL.map(p=>p.s))];
+  for(const t of squadre) for(const role of ROLES){
+    const grp=PL.filter(p=>p.s===t&&p.r===role).sort((a,b)=>b.q-a.q||b.f-a.f);
+    grp.forEach((p,i)=>{ p.rank=i+1; });
+  }
+  for(const p of PL){
+    const k=K[p.r]||4;
+    p.tit = (p.rank<=k&&p.q>=4)?1 : (p.rank<=k+3&&p.q>=3)?2 : (p.q>=2)?3 : 4;
+  }
+  // Mentalità: quanto il ruolo Mantra è orientato in avanti. Media dei codici,
+  // non massimo: un "C;T" sta davvero a metà fra i due, e un "Dd;E" pure.
+  for(const p of PL){
+    const cs=(p.rm||"").split(";").map(x=>x.trim()).filter(x=>x in MENT);
+    p.off = cs.length ? cs.reduce((a,x)=>a+MENT[x],0)/cs.length : null;
+    p.mn  = p.off===null ? null : Math.max(0,Math.min(1,(p.off-1)/4));
+  }
+  // valore atteso dentro il ruolo, su scala logaritmica: conserva le distanze vere
+  for(const role of ROLES){
+    const grp=PL.filter(p=>p.r===role);
+    if(!grp.length) continue;
+    const lo=Math.log(Math.max(1,Math.min(...grp.map(p=>p.f||1))));
+    const hi=Math.log(Math.max(1,Math.max(...grp.map(p=>p.f||1))));
+    const d=(hi-lo)||1;
+    grp.forEach(p=>{ p.val=(Math.log(Math.max(1,p.f||1))-lo)/d; });
+  }
+  // forze: attacco e difesa dalle quotazioni della rosa
+  const top=(t,roles,k)=>PL.filter(p=>p.s===t&&roles.includes(p.r)).map(p=>p.q).sort((x,y)=>y-x).slice(0,k).reduce((a,b)=>a+b,0);
+  const raw={};
+  for(const t of CALTEAMS) raw[t]={att:top(t,["A"],3)+0.8*top(t,["C"],4), dif:1.4*top(t,["P"],1)+0.7*top(t,["D"],4)};
+  const zf=key=>{
+    const v=CALTEAMS.map(t=>raw[t][key]);
+    const m=v.reduce((a,b)=>a+b,0)/v.length;
+    const sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/v.length)||1;
+    return x=>(x-m)/sd;
+  };
+  const za=zf("att"), zd=zf("dif");
+  FORCEQ={};
+  for(const t of CALTEAMS) FORCEQ[t]={att:za(raw[t].att), dif:zd(raw[t].dif)};
+  _fsig="";                       // le forze vanno rifuse col nuovo listone
+}
+recompute();
+
+/* ══ 6. Calendario ══════════════════════════════════════════════════ */
+const ABBR=t=>({Atalanta:"ATA",Bologna:"BOL",Cagliari:"CAG",Como:"COM",Fiorentina:"FIO",Frosinone:"FRO",
+  Genoa:"GEN",Inter:"INT",Juventus:"JUV",Lazio:"LAZ",Lecce:"LEC",Milan:"MIL",Monza:"MON",Napoli:"NAP",
+  Parma:"PAR",Roma:"ROM",Sassuolo:"SAS",Torino:"TOR",Udinese:"UDI",Venezia:"VEN"}[t]||t.slice(0,3).toUpperCase());
+function fixtures(team,from,span){
+  const i=CALIDX.get(team); if(i===undefined) return [];
+  const row=CAL.fix[i]||[], out=[];
+  for(let g=from; g<from+span && g<=38; g++){
+    const c=row[g-1]; if(!c) continue;
+    out.push({g, opp:CALTEAMS[Math.abs(c)-1], home:c>0});
+  }
+  return out;
+}
+/* difficoltà 1 (facile) … 5 (proibitiva) per una singola partita */
+/* ══ Forze delle squadre: dalle quotazioni ai risultati ══════════════
+   Misurato sulla serie A 2025/26 vera (28 giornate, 280 partite):
+
+   · la forza di una squadra è persistente — correlazione fra il girone di
+     andata e quello di ritorno 0,58 in attacco e 0,55 in difesa;
+   · la FORMA invece non esiste. Lo scarto dal proprio livello non ha memoria
+     da una giornata all'altra: r = −0,06 sui gol fatti, −0,09 sui subiti, e
+     lo stesso a due, tre e cinque giornate di distanza. Pesando di più le
+     partite recenti si prevede PEGGIO, in modo monotono: con emivita 10
+     giornate −3,2% contro la media di lega, con emivita 2 addirittura +7,8%,
+     cioè peggio che non sapere niente. Per questo qui tutte le giornate
+     pesano uguale e non c'è nessun fattore forma.
+
+   Il livello stimato dai risultati va però smorzato, altrimenti sulle prime
+   giornate insegue il caso: la stima grezza fra la 3ª e l'8ª sbaglia il 34%
+   più che non sapere niente. Le quotazioni fanno da punto di partenza e i
+   risultati prendono peso n/(n+10) — a dieci giornate contano metà, come
+   l'ottimo misurato per lo smorzamento (k fra 8 e 12).                    */
+const FORZA_K=10;
+/* gol fatti e subiti per squadra e giornata, ricavati dai voti già caricati:
+   non serve importare nient'altro */
+function golDaiVoti(){
+  const out={};
+  for(const g of giornateGiocate()){
+    const V=S.stats[g]||{};
+    const gio={};
+    for(const pid in V){
+      const p=byId.get(+pid)||((S.assign[pid]||{}).snap); if(!p||!p.s) continue;
+      const a=V[pid];
+      const t=gio[p.s]||(gio[p.s]={gf:0,gs:0,au:0});
+      t.gf+=a[2]||0; t.gs+=a[3]||0; t.au+=a[6]||0;
+    }
+    for(const t in gio){
+      const f=fixtures(t,g,1)[0]; if(!f) continue;
+      const avv=gio[f.opp];
+      out[t]=out[t]||[];
+      out[t].push({g:g, casa:f.home, avv:f.opp,
+        gf:gio[t].gf + (avv?avv.au:0),        // gli autogol avversari sono gol nostri
+        gs:gio[t].gs});
+    }
+  }
+  return out;
+}
+/* attacco e difesa moltiplicativi stimati dai risultati, poi mescolati
+   con le quotazioni secondo quante giornate ci sono */
+function calcForze(){
+  const F={};
+  for(const t of CALTEAMS) F[t]={att:(FORCEQ[t]||{att:0}).att, dif:(FORCEQ[t]||{dif:0}).dif, n:0, dati:false};
+  const R=golDaiVoti();
+  const squadre=CALTEAMS.filter(t=>R[t]&&R[t].length);
+  // se una squadra manca dai voti (turno rinviato, file parziale) resta sulle
+  // sue quotazioni invece di far saltare tutto il calcolo
+  if(squadre.length<Math.max(8,CALTEAMS.length-4)) return F;
+  let tot=0,np=0;
+  for(const t of squadre) for(const x of R[t]){ tot+=x.gf; np++; }
+  const mu=np?tot/np:1.3;
+  const att={}, dif={}; let hf=1.15;
+  for(const t of squadre){ att[t]=1; dif[t]=1; }
+  for(let it=0; it<20; it++){
+    for(const t of squadre){
+      let nf=0,df=0,ns=0,ds=0;
+      for(const x of R[t]){
+        nf+=x.gf; df+=mu*dif[x.avv]*(x.casa?hf:1);
+        ns+=x.gs; ds+=mu*att[x.avv]*(x.casa?1:hf);
+      }
+      if(df>0) att[t]=Math.max(0.25,Math.min(3,nf/df));
+      if(ds>0) dif[t]=Math.max(0.25,Math.min(3,ns/ds));
+    }
+    let nh=0,dh=0;
+    for(const t of squadre) for(const x of R[t]) if(x.casa){ nh+=x.gf; dh+=mu*att[t]*dif[x.avv]; }
+    if(dh>0) hf=Math.max(0.9,Math.min(1.5,nh/dh));
+  }
+  /* dai moltiplicatori agli scarti standard, così la scala resta quella di prima */
+  const z=(vals)=>{ const v=Object.values(vals);
+    const m=v.reduce((a,b)=>a+b,0)/v.length;
+    const sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/v.length)||1;
+    return x=>(x-m)/sd; };
+  const za=z(att), zd=z(dif);
+  for(const t of squadre){
+    const n=R[t].length, w=n/(n+FORZA_K);
+    const q=FORCEQ[t]||{att:0,dif:0};
+    F[t]={ att:(1-w)*q.att + w*za(att[t]),
+           dif:(1-w)*q.dif - w*zd(dif[t]),   // dif alta = subisce poco: il segno si gira
+           n:n, w:w, dati:true };
+  }
+  return F;
+}
+function forze(){
+  const sig=giornateGiocate().join(",")+"|"+PL.length+"|"+(S.rev||0);
+  if(sig!==_fsig){ _fsig=sig; _FORCE=calcForze(); }
+  return _FORCE;
+}
+const FORCE=new Proxy({},{get:(_,k)=>forze()[k]});
+function fixDiff(opp,off,home){
+  const F=forze()[opp]; if(!F) return 3;
+  const z = off ? F.dif : F.att;         // a chi attacca pesa la difesa avversaria
+  const d = 3 + z*1.05 - (home?0.35:-0.15);
+  return Math.max(1,Math.min(5,d));
+}
+const isOff=role=>role==="C"||role==="A";
+/* appetibilità 1…5, 5 = calendario più morbido */
+function calScore(team,role,from,span){
+  const fx=fixtures(team,from,span); if(!fx.length) return null;
+  const off=isOff(role);
+  return 6 - fx.reduce((a,f)=>a+fixDiff(f.opp,off,f.home),0)/fx.length;
+}
+function fixStrip(team,role,from,span){
+  const off=isOff(role);
+  return '<div class="fixstrip">'+fixtures(team,from,span).map(f=>{
+    const d=Math.round(fixDiff(f.opp,off,f.home));
+    const lab=f.home?ABBR(f.opp):ABBR(f.opp);
+    return `<span class="fix d${d}${f.home?"":" away"}" title="Giornata ${f.g} — ${f.home?"in casa contro":"in trasferta a"} ${esc(f.opp)}">${lab}</span>`;
+  }).join("")+"</div>";
+}
+const scoreCol=s=>s>=3.4?"var(--ok)":s<=2.75?"var(--crit)":"var(--muted)";
+
+/* ══ 6c. Rendimento: voti di giornata già giocati ═══════════════════
+   S.stats = { "3": { idGiocatore: [voto, sv, gf, gs, rp, rs, au, amm, esp, ass] } }
+   Il fantavoto segue lo schema classico: gol +3, assist +1, rigore parato +3,
+   rigore sbagliato −3, autogol −2, ammonizione −0,5, espulsione −1, gol subito −1.
+   La colonna Rf del file non viene sommata: i rigori segnati sono già dentro Gf,
+   e sommarli conterebbe due volte lo stesso gol.                              */
+const fvOf=a=>a[0] + 3*a[2] - a[3] + 3*a[4] - 3*a[5] - 2*a[6] - 0.5*a[7] - a[8] + a[9];
+const giornateGiocate=()=>Object.keys(S.stats||{}).map(Number).sort((a,b)=>a-b);
+/* La scheda, il listone e gli ordinamenti chiedono le stesse statistiche
+   migliaia di volte per render: si calcolano una volta e si tengono finché
+   i voti non cambiano. */
+let _ssig="", _scache=new Map();
+function statFor(id){
+  const sig=Object.keys(S.stats||{}).join(",")+"|"+(S.rev||0);
+  if(sig!==_ssig){ _ssig=sig; _scache=new Map(); }
+  if(_scache.has(id)) return _scache.get(id);
+  const v=statCalc(id); _scache.set(id,v); return v;
+}
+function statCalc(id){
+  const gs=giornateGiocate(); if(!gs.length) return null;
+  let pres=0,sv=0,sumV=0,nV=0,sumF=0,gf=0,ass=0,amm=0,esp=0,sub=0,rp=0,rs=0,au=0,cs=0,conBonus=0;
+  const serie=[];
+  for(const g of gs){
+    const a=S.stats[g][id]; if(!a){ serie.push(null); continue; }
+    const fv=fvOf(a);
+    pres++; sumF+=fv;
+    serie.push({g:g,fv:fv,v:a[0],sv:a[1],gf:a[2],sub:a[3],rp:a[4],rs:a[5],au:a[6],amm:a[7],esp:a[8],ass:a[9]});
+    if(a[1]) sv++; else { sumV+=a[0]; nV++; }
+    gf+=a[2]; sub+=a[3]; rp+=a[4]; rs+=a[5]; au+=a[6]; amm+=a[7]; esp+=a[8]; ass+=a[9];
+    if(a[3]===0) cs++;                       // porta inviolata, ha senso solo per i portieri
+    if(a[2]||a[9]||a[4]) conBonus++;         // giornate in cui ha portato un bonus
+  }
+  if(!pres) return {pres:0,su:gs.length,serie:serie};
+  const ok=serie.filter(Boolean);
+  const best=ok.reduce((a,x)=>!a||x.fv>a.fv?x:a,null);
+  const worst=ok.reduce((a,x)=>!a||x.fv<a.fv?x:a,null);
+  const mv=nV?sumV/nV:null;
+  const fm=sumF/pres;
+  return {pres:pres,su:gs.length,sv:sv,mv:mv,fm:fm,
+          gf:gf,ass:ass,amm:amm,esp:esp,sub:sub,rp:rp,rs:rs,au:au,cs:cs,
+          conBonus:conBonus,
+          bonus:(3*gf+ass+3*rp)/pres,               // quanto aggiunge al voto, per presenza
+          malus:(sub+0.5*amm+esp+2*au+3*rs)/pres,   // quanto toglie, per presenza
+          scarto:mv===null?null:fm-mv,              // il vero valore aggiunto oltre la pagella
+          best:best,worst:worst,serie:serie};
+}
+/* forma: fantamedia delle ultime N presenze contro quella di tutta la stagione */
+function formaOf(id,n){
+  const st=statFor(id); if(!st||st.pres<2) return null;
+  const ok=st.serie.filter(Boolean);
+  const k=n||3;
+  // se le ultime N presenze sono tutte le sue presenze, il confronto è con
+  // sé stesso e darebbe sempre zero: la forma esiste solo da lì in poi
+  if(ok.length<=k) return null;
+  const last=ok.slice(-k);
+  if(last.length<2) return null;
+  const fmLast=last.reduce((a,x)=>a+x.fv,0)/last.length;
+  return {fm:fmLast, delta:fmLast-st.fm, n:last.length};
+}
+const fmCol=f=>f>=7?"var(--ok)":f<=5.5?"var(--crit)":"var(--muted)";
+
+/* ══ 6b. Titolarità, rigori, appetibilità ═══════════════════════════ */
+const TITLAB={1:"titolare",2:"ballottaggio",3:"panchina",4:"fuori lista"};
+const TITW={1:1,2:0.6,3:0.25,4:0.05};
+const rigOf=p=>RIG[p.id]||null;
+
+/* ── Titolarità: dalla stima ai fatti ────────────────────────────────
+   Finché non ci sono voti, la titolarità è dedotta dalle quotazioni.
+   Man mano che le giornate entrano, il campo ha l'ultima parola: conta
+   quante volte è sceso davvero in campo. Una presenza con voto vale una
+   titolarità piena, una senza voto — cioè uno spezzone di partita — vale
+   un terzo. La fiducia nei dati cresce con le giornate e diventa piena
+   alla sesta: prima di allora una panchina isolata non deve ribaltare il
+   giudizio, dopo sei giornate le quotazioni di agosto non contano più.  */
+const TITFULL=6;
+
+/* ── La stagione scorsa ──────────────────────────────────────────────
+   Gli Id del file statistiche coincidono con quelli del listone, quindi
+   l'aggancio è esatto e non passa da confronti di nomi. 376 giocatori su
+   518 hanno una stagione alle spalle: gli altri sono arrivi nuovi, e per
+   loro semplicemente non sappiamo.                                     */
+const HK=["pv","mv","fm","gf","gs","rp","rc","rpiu","rmeno","ass","amm","esp","au","sq"];
+function annoScorso(id){
+  const a=HIST[id]; if(!a||!a[0]) return null;
+  const o={}; HK.forEach((k,i)=>o[k]=a[i]||0);
+  o.su=38;
+  o.bonus=(3*o.gf+o.ass+3*o.rp)/o.pv;          // quanto aggiungeva al voto, per presenza
+  o.scarto=o.fm-o.mv;                          // il valore oltre la pagella
+  o.cart=(o.amm+2*o.esp)/o.pv;                 // rischio cartellini per presenza
+  return o;
+}
+/* mediane di ruolo fra chi ha giocato almeno 15 partite: servono a dire
+   se un numero è alto o basso senza costringere a saperlo a memoria */
+function medieRuolo(){
+  if(_hmed) return _hmed;
+  _hmed={};
+  for(const r of ROLES){
+    const v=PL.filter(p=>p.r===r).map(p=>annoScorso(p.id)).filter(h=>h&&h.pv>=15);
+    const med=arr=>{ if(!arr.length) return null; const s=[...arr].sort((a,b)=>a-b);
+      return s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2; };
+    _hmed[r]={n:v.length, fm:med(v.map(h=>h.fm)), mv:med(v.map(h=>h.mv)),
+              bonus:med(v.map(h=>h.bonus)), cart:med(v.map(h=>h.cart)), pv:med(v.map(h=>h.pv))};
+  }
+  return _hmed;
+}
+/* posizione nel ruolo, fra chi ha giocato almeno 15 partite */
+function rangoFm(p){
+  const h=annoScorso(p.id); if(!h||h.pv<15) return null;
+  const v=PL.filter(x=>x.r===p.r).map(x=>({id:x.id,h:annoScorso(x.id)}))
+    .filter(x=>x.h&&x.h.pv>=15).sort((a,b)=>b.h.fm-a.h.fm);
+  const i=v.findIndex(x=>x.id===p.id);
+  return i<0?null:{pos:i+1, su:v.length};
+}
+/* presenze dell'anno scorso tradotte in titolarità 0..1:
+   30 partite su 38 è un titolare pieno, sotto le 6 è uno che non gioca */
+const titStorica=h=>Math.max(0,Math.min(1,(h.pv-6)/24));
+
+function titFatti(id){
+  const st=statFor(id);
+  if(!st||!st.su) return null;
+  const pieno=(st.pres||0)-(st.sv||0), spezzoni=st.sv||0;
+  return {su:st.su, pres:st.pres||0, pieno:pieno, sv:spezzoni,
+          quota:Math.max(0,Math.min(1,(pieno+0.35*spezzoni)/st.su))};
+}
+/* peso 0..1 con cui la titolarità entra negli indici */
+/* Il punto di partenza mette insieme due cose che non sanno la stessa cosa:
+   la quotazione, che guarda avanti e conosce il mercato estivo, e le presenze
+   dell'anno scorso, che guardano indietro ma sono un fatto. Pesano 60 e 40:
+   la correlazione fra quotazione e presenze è 0,50, cioè ciascuna delle due
+   dice qualcosa che l'altra non dice. */
+function titPrior(p){
+  const base=TITW[p.tit||3];
+  const h=annoScorso(p.id);
+  if(!h) return base;
+  return 0.6*base + 0.4*titStorica(h);
+}
+function titW(p){
+  if(isOut(p.id)) return 0;
+  const base=titPrior(p);
+  const f=titFatti(p.id);
+  if(!f) return base;
+  const fid=Math.min(1,f.su/TITFULL);
+  return (1-fid)*base + fid*f.quota;
+}
+const titLiv=w=>w>=0.75?1:w>=0.45?2:w>=0.12?3:4;
+/* stato mostrato: livello, se viene dai fatti, e la frase che lo spiega */
+function titStato(p){
+  if(isOut(p.id)) return {w:0, liv:4, dati:false, out:true, breve:"indisponibile", nota:"segnato indisponibile"};
+  const w=titW(p), f=titFatti(p.id), h=annoScorso(p.id);
+  if(!f){
+    const liv=h?titLiv(w):(p.tit||3);
+    return {w:w, liv:liv, dati:false, out:false, storico:!!h,
+      breve: h ? TITLAB[liv]+" · "+h.pv+" pres. nel 25/26" : TITLAB[liv],
+      nota: h ? TITLAB[liv]+" · quotazioni e "+h.pv+" presenze nel 2025/26"
+              : TITLAB[p.tit||3]+" secondo le quotazioni"};
+  }
+  const liv=titLiv(w);
+  const pezzi=f.pieno+" "+(f.pieno===1?"partita giocata":"partite giocate")
+    +(f.sv?" e "+f.sv+" spezzone"+(f.sv===1?"":"i"):"")+" su "+f.su;
+  return {w:w, liv:liv, dati:true, out:false, storico:!!annoScorso(p.id),
+          breve:TITLAB[liv]+" · "+f.pres+" su "+f.su, nota:TITLAB[liv]+" · "+pezzi};
+}
+function titDot(p){
+  const t=titStato(p);
+  return `<span class="tdot t${t.liv}${t.dati?" reale":""}" title="${esc(t.nota)}"></span>`;
+}
+/* ── Indisponibili: infortuni e squalifiche, le uniche cose che nessun
+      file ci dà e che decidono la giornata. Le segna chi tiene l'asta.  */
+const isOut=id=>!!(S.out&&S.out[id]);
+function toggleOut(id){
+  if(readOnly) return;
+  S.out=Object.assign({},S.out||{});
+  if(S.out[id]) delete S.out[id]; else S.out[id]=1;
+  persist(); renderAll();
+}
+const outBadge=p=>isOut(p.id)?`<span class="outb" title="Segnato indisponibile: infortunato o squalificato">OUT</span>`:"";
+function rigBadge(p){
+  const e=rigOf(p); if(!e) return "";
+  const [rank,both]=e;
+  const t=`${rank}º rigorista${both?", confermato da entrambe le fonti":", indicato da una sola fonte"}`;
+  return `<span class="rig${rank===1?" first":""}${both?"":" soft"}" title="${t}">R${rank>1?rank:""}</span>`;
+}
+/* Mentalità: una parola al posto delle sigle, misurata DENTRO il ruolo.
+   Un esterno è il massimo dello spingere per un difensore, non per un
+   centrocampista; e fra gli attaccanti spingono tutti, quindi lì non si mostra. */
+const MENTCUT={D:[1.5,3.0], C:[3.75,5.5]};   // soglie sensate dentro ogni ruolo
+function mentLabel(p){
+  const cut=MENTCUT[p.r];
+  if(!cut||p.off===null||p.off===undefined) return null;   // portieri e attaccanti: spingono tutti
+  if(p.off<=cut[0]) return {k:"cop",t:"copertura"};
+  if(p.off<cut[1])  return {k:"equ",t:"equilibrata"};
+  return {k:"off",t:"offensiva"};
+}
+function mentChip(p){
+  const m=mentLabel(p); if(!m) return "";
+  const codes=(p.rm||"").split(";").map(x=>x.trim()).filter(x=>x in MENTNAME).map(x=>MENTNAME[x]);
+  return `<span class="ment ${m.k}" title="${esc(codes.join(", ")||m.t)}">${m.t}</span>`;
+}
+/* 0–100: quanto vale volerlo, mettendo insieme le cose che il prezzo non dice.
+   Ai difensori 8 punti dei 35 del valore passano alla mentalità: è l'unico ruolo
+   in cui, a parità di prezzo, spingere in avanti rende più di quanto il listino
+   lasci intendere (correlazione +0,29 col residuo, contro +0,01 dei centrocampisti). */
+function appetParts(p,from,span){
+  const cs=calScore(p.s,p.r,from,span);
+  const e=rigOf(p);
+  const rb=e?({1:1,2:0.55}[e[0]]||0.3):0;
+  const cal=cs===null?0.5:(cs-1)/4;
+  const dif = p.r==="D" && p.mn!==undefined && p.mn!==null;
+  const out=[
+    {k:"titolarità", v:40*titW(p), max:40, nota:titStato(p).breve},
+    {k:"valore nel ruolo", v:(dif?27:35)*(p.val||0), max:dif?27:35, nota:"FVM "+(p.f||0)},
+    {k:"calendario", v:15*cal, max:15, nota:cs===null?"non disponibile":cs.toFixed(1)+" su 5"},
+    {k:"rigori", v:10*rb, max:10, nota:e?(e[0]+"º rigorista"):"non tira"}
+  ];
+  if(dif) out.push({k:"mentalità", v:8*p.mn, max:8, nota:(mentLabel(p)||{}).t||""});
+  return out;
+}
+function appet(p,from,span){
+  return Math.round(appetParts(p,from,span).reduce((a,x)=>a+x.v,0));
+}
+const appetCol=s=>s>=75?"var(--ok)":s<=45?"var(--crit)":"var(--muted)";
+function appetCell(p,from,span){
+  const s=appet(p,from,span);
+  return `<div class="app"><div class="abar"><span style="width:${s}%;background:${appetCol(s)}"></span></div>`
+    +`<span class="an" style="color:${appetCol(s)}">${s}</span></div>`;
+}
+
+/* ══ 6d. Prezzo atteso e stato del mercato ══════════════════════════
+   Le quotazioni del listone sono un indice, non un prezzo: sommate fanno
+   circa metà dei crediti che girano in una lega. Il prezzo atteso li
+   trasforma in crediti veri, tarati su QUESTA lega — budget, numero di
+   squadre, slot per reparto e piano di spesa.
+
+   Come: i crediti di ogni reparto (budget × squadre × piano%) si spartiscono
+   fra i giocatori che verranno davvero presi (i migliori squadre×slot per
+   quotazione). Ognuno parte da 1 credito — il minimo per portarselo a casa —
+   e il resto va in proporzione a quanto la sua quotazione supera quella del
+   giocatore "da un credito", preso all'85% della lista: l'ultimo sesto di
+   ogni reparto in asta va via a prezzo di base, e il modello lo rispetta.
+   L'esponente 0,7 smorza la punta: senza, il primo attaccante si mangerebbe
+   un terzo del budget, che non è quello che succede in un'asta vera.        */
+/* L'esponente dice quanto il prezzo si concentra sui primi. È tarato sui prezzi
+   medi delle aste vere di questo listone (fantacalcio-online.com): Lautaro 84,
+   Malen 80, Thuram 71, Ramos 70, Hojlund 70 — il modello li ricostruisce entro
+   il 5%. Sui portieri vale 1: in porta gioca uno solo dei tre, quindi i crediti
+   del reparto si concentrano su di lui invece di distribuirsi. */
+const PRICE_ALPHA={P:1.0,D:0.5,C:0.5,A:0.5}, PRICE_CUT=0.85;
+const byQdesc=(a,b)=>(b.q-a.q)||(b.f-a.f)||a.n.localeCompare(b.n);
+/* distribuisce `crediti` sul pool, dal più caro al meno caro */
+function spreadCredits(pool, crediti, out){
+  const n=pool.length; if(!n) return out;
+  const alpha=PRICE_ALPHA[pool[0].r]||0.5;
+  const repl=pool[Math.min(n-1,Math.max(0,Math.round(n*PRICE_CUT)-1))].q;
+  const w=p=>Math.pow(Math.max(0,p.q-repl),alpha);
+  const tot=pool.reduce((a,p)=>a+w(p),0);
+  const extra=Math.max(0,crediti-n);
+  for(const p of pool) out.set(p.id, tot>0 ? 1+w(p)/tot*extra : 1+extra/n);
+  return out;
+}
+let _psig="", _PS=new Map(), _PD=new Map(), _PDon=false;
+function priceSig(){
+  return [PL.length,S.budget,S.teams.length,S.rev,Object.keys(S.assign).length,
+          ROLES.map(r=>S.slots[r]+":"+(S.plan[r]||0)).join(",")].join("|");
+}
+function buildPrices(){
+  const T=S.teams.length||1;
+  // il piano di spesa è modificabile a mano e non sempre fa 100: qui va normalizzato,
+  // altrimenti i prezzi coprirebbero solo una parte dei crediti della lega
+  const psum=ROLES.reduce((a,r)=>a+Math.max(0,S.plan[r]||0),0);
+  const quotaPiano=r=>psum>0?Math.max(0,S.plan[r]||0)/psum:(S.slots[r]||0)/(totalSlots()||1);
+  /* ── listino: come sarebbe se l'asta cominciasse adesso ── */
+  _PS=new Map();
+  for(const r of ROLES){
+    const arr=PL.filter(p=>p.r===r).sort(byQdesc);
+    const n=Math.min(T*(S.slots[r]||0),arr.length);
+    spreadCredits(arr.slice(0,n), S.budget*T*quotaPiano(r), _PS);
+  }
+  /* ── prezzo di adesso: crediti ancora in mano alle squadre, spartiti
+        fra i giocatori ancora liberi che entreranno nelle rose ── */
+  const preso=new Set(Object.keys(S.assign).map(Number));
+  let crediti=0, slotTot=0; const slotR={P:0,D:0,C:0,A:0};
+  for(const t of S.teams){
+    const st=stats(t.id);
+    // i crediti di una squadra già al completo non possono più muovere il mercato
+    if(st.slotsLeft>0) crediti+=Math.max(0,st.left);
+    for(const r of ROLES){ const k=Math.max(0,(S.slots[r]||0)-st.perRole[r].count); slotR[r]+=k; slotTot+=k; }
+  }
+  _PD=new Map(); _PDon=false;
+  if(!slotTot) return;
+  const pool={}; let valTot=0; const valR={};
+  for(const r of ROLES){
+    pool[r]=PL.filter(p=>p.r===r&&!preso.has(p.id)).sort(byQdesc).slice(0,slotR[r]);
+    valR[r]=pool[r].reduce((a,p)=>a+(_PS.get(p.id)||1),0);
+    valTot+=valR[r];
+  }
+  const extra=Math.max(0,crediti-slotTot);
+  for(const r of ROLES){
+    if(!pool[r].length) continue;
+    const quota = valTot>0 ? valR[r]/valTot : slotR[r]/slotTot;
+    spreadCredits(pool[r], pool[r].length + quota*extra, _PD);
+  }
+  _PDon=preso.size>0;
+}
+function prices(){ const k=priceSig(); if(k!==_psig){ _psig=k; buildPrices(); } return _PS; }
+/* prezzo di listino: quanto dovrebbe costare in questa lega */
+function attesa(id){ const v=prices().get(id); return v?Math.max(1,Math.round(v)):1; }
+/* prezzo di adesso: null se non è più in gioco (già preso o fuori dai posti rimasti) */
+function attesaOra(id){ prices(); if(!_PDon) return null; const v=_PD.get(id); return v?Math.max(1,Math.round(v)):null; }
+/* quanto la lega sta pagando sopra o sotto il listino */
+function mercato(){
+  prices();
+  let pagato=0, atteso=0, n=0;
+  for(const pid in S.assign){ const a=S.assign[pid]; pagato+=a.price; atteso+=attesa(+pid); n++; }
+  if(n<4||atteso<=0) return null;
+  return {n:n, pagato:pagato, atteso:atteso, infl:pagato/atteso-1};
+}
+const inflCol=i=>i>=0.12?"var(--crit)":i<=-0.12?"var(--ok)":"var(--muted)";
+/* etichetta affare/salasso su un prezzo pagato */
+function dealTag(pid,price){
+  const a=attesa(pid); if(!a) return "";
+  const d=price/a-1;
+  if(d<=-0.3) return `<span class="deal ok" title="pagato ${price} contro un listino di ${a}">affare</span>`;
+  if(d>=0.45) return `<span class="deal bad" title="pagato ${price} contro un listino di ${a}">salasso</span>`;
+  return "";
+}
+
+/* ══ 6e. Scarsità ═══════════════════════════════════════════════════
+   Verso la fine dell'asta i prezzi non li fa il valore dei giocatori, li fa
+   quanti sono rimasti e quante squadre devono ancora coprire quel ruolo.
+   Offerta = titolari ancora liberi. Domanda = quanti titolari le squadre
+   devono ancora prendere, non gli slot totali: le ultime caselle di ogni
+   reparto si riempiono con giocatori da un credito e non muovono il mercato.
+   Il rapporto fra le due è la pressione: sopra 1 c'è più gente che cerca di
+   quanti ce ne siano, ed è il momento in cui i prezzi partono.            */
+const TITSTART={P:1,D:4,C:4,A:2};        // quanti titolari servono davvero per reparto
+function fasciaPrezzo(id){
+  const a=attesa(id), b=S.budget||500;
+  return a>=0.08*b?"top":a>=0.03*b?"medio":"basso";
+}
+function scarsita(){
+  const out={};
+  for(const r of ROLES){
+    const liberi=PL.filter(p=>p.r===r&&!S.assign[p.id]&&!isOut(p.id));
+    const tit=liberi.filter(p=>titStato(p).liv===1);
+    const fasce={top:0,medio:0,basso:0};
+    for(const p of tit) fasce[fasciaPrezzo(p.id)]++;
+    let domanda=0, slot=0, mieiTit=0, mieiSlot=0;
+    const me=meId();
+    for(const t of S.teams){
+      const R=roster(t.id);
+      const presi=R[r].length;
+      const presiTit=R[r].filter(x=>byId.get(x.p.id)&&titStato(byId.get(x.p.id)).liv===1).length;
+      const mancaSlot=Math.max(0,(S.slots[r]||0)-presi);
+      const mancaTit=Math.min(mancaSlot,Math.max(0,(TITSTART[r]||1)-presiTit));
+      domanda+=mancaTit; slot+=mancaSlot;
+      if(t.id===me){ mieiTit=mancaTit; mieiSlot=mancaSlot; }
+    }
+    out[r]={liberi:liberi.length, tit:tit.length, fasce:fasce,
+            domanda:domanda, slot:slot, mieiTit:mieiTit, mieiSlot:mieiSlot,
+            press: tit.length>0 ? domanda/tit.length : (domanda?Infinity:0)};
+  }
+  return out;
+}
+const pressLab=v=>v===Infinity?"nessuno rimasto":v>=1.6?"altissima":v>=1?"alta":v>=0.6?"normale":"bassa";
+const pressCol=v=>v>=1?"var(--crit)":v>=0.6?"var(--warn)":"var(--ok)";
+/* quanti giocatori equivalenti restano liberi: stesso ruolo, prezzo atteso
+   entro il 30%, e almeno la stessa titolarità */
+function alternative(p){
+  const a=attesa(p.id), liv=titStato(p).liv;
+  const alt=PL.filter(x=>x.r===p.r && x.id!==p.id && !S.assign[x.id] && !isOut(x.id)
+      && titStato(x).liv<=liv
+      && attesa(x.id)>=a*0.7 && attesa(x.id)<=a*1.3)
+    .sort((x,y)=>appet(y,gFrom(),gSpan())-appet(x,gFrom(),gSpan()));
+  return alt;
+}
+
+/* ══ 6f. Riepilogo d'asta e giudizio delle rose ═════════════════════
+   Nessun modello linguistico qui dentro: la pagina non ha rete. Il giudizio
+   è calcolato dagli stessi indici che hai visto durante l'asta, e le frasi
+   nascono da soglie sui numeri. Il pregio è che è verificabile: ogni voce
+   del voto dice da dove viene.                                          */
+
+/* prezzo atteso anche per chi non è nel listone in uso: si stima dalla
+   quotazione registrata al momento dell'acquisto, sulla curva del suo ruolo */
+function attesaSnap(p){
+  if(byId.has(p.id)) return attesa(p.id);
+  const P=prices();
+  const stessi=PL.filter(x=>x.r===p.r&&P.has(x.id)).sort((a,b)=>a.q-b.q);
+  if(!stessi.length) return 1;
+  let vicino=stessi[0];
+  for(const x of stessi){ if(Math.abs(x.q-p.q)<=Math.abs(vicino.q-p.q)) vicino=x; }
+  return Math.max(1,Math.round(P.get(vicino.id)));
+}
+/* l'undici migliore possibile con i moduli ammessi */
+function undiciTipo(tid){
+  const R=roster(tid), from=gFrom(), span=gSpan();
+  const val=x=>byId.has(x.p.id)?appet(byId.get(x.p.id),from,span):35;   // senza dati, valore prudente
+  const ord={}; for(const r of ROLES) ord[r]=R[r].map(x=>x.p).sort((a,b)=>val({p:b})-val({p:a}));
+  let best=null;
+  for(const mod in MODULI){
+    const [d,c,a]=MODULI[mod];
+    const need={P:1,D:d,C:c,A:a};
+    if(ROLES.some(r=>ord[r].length<need[r])) continue;
+    const xi=ROLES.flatMap(r=>ord[r].slice(0,need[r]));
+    const somma=xi.reduce((s,p)=>s+val({p:p}),0);
+    if(!best||somma>best.somma) best={mod:mod,xi:xi,somma:somma};
+  }
+  if(!best){ const xi=ROLES.flatMap(r=>ord[r]).slice(0,11); best={mod:"—",xi:xi,somma:xi.reduce((s,p)=>s+val({p:p}),0)}; }
+  best.media=best.xi.length?best.somma/best.xi.length:0;
+  best.resto=ROLES.flatMap(r=>R[r].map(x=>x.p)).filter(p=>!best.xi.includes(p));
+  best.mediaResto=best.resto.length?best.resto.reduce((s,p)=>s+val({p:p}),0)/best.resto.length:0;
+  return best;
+}
+const clamp01=x=>Math.max(0,Math.min(1,x));
+/* rapporto medio fra prezzi attesi e prezzi pagati su tutta la lega */
+let _mlSig="", _ml=1;
+function mediaLega(){
+  const sig=priceSig();
+  if(sig===_mlSig) return _ml;
+  let pag=0, att=0;
+  for(const pid in S.assign){
+    const a=S.assign[pid], p=byId.get(+pid)||a.snap; if(!p) continue;
+    pag+=a.price; att+=attesaSnap(p);
+  }
+  _mlSig=sig; _ml=pag>0?att/pag:1;
+  return _ml;
+}
+function giudizio(tid){
+  const R=roster(tid), st=stats(tid), from=gFrom(), span=gSpan();
+  const tutti=ROLES.flatMap(r=>R[r].map(x=>({p:x.p,price:x.price})));
+  if(!tutti.length) return null;
+  const u=undiciTipo(tid);
+  const noti=tutti.filter(x=>byId.has(x.p.id));
+  const cop=tutti.length?noti.length/tutti.length:0;
+
+  /* quanto ha pagato rispetto ai prezzi attesi */
+  const pagato=tutti.reduce((a,x)=>a+x.price,0);
+  const atteso=tutti.reduce((a,x)=>a+attesaSnap(x.p),0);
+  /* Il confronto va normalizzato sulla lega: i prezzi attesi sono tarati sui
+     giocatori che il modello si aspetta vengano comprati, e ogni asta ne prende
+     comunque una manciata fuori da quella lista. Senza normalizzare risulterebbe
+     che hanno pagato troppo tutti, che non vuol dire niente. Così il confronto è
+     con gli altri undici, che è la domanda vera: chi ha comprato meglio? */
+  const M=mediaLega();
+  const resa=(pagato>0?atteso/pagato:1)/(M||1);
+
+  /* titolarità e rigoristi */
+  const liv=p=>byId.has(p.id)?titStato(byId.get(p.id)).liv:3;
+  const titolari=tutti.filter(x=>liv(x.p)===1).length;
+  const panchinari=tutti.filter(x=>liv(x.p)>=3).length;
+  const rig=tutti.filter(x=>byId.has(x.p.id)&&rigOf(byId.get(x.p.id))&&rigOf(byId.get(x.p.id))[0]===1).length;
+  const portiereTit=R.P.some(x=>liv(x.p)===1);
+
+  /* rischi: quanto pesa il giocatore più caro, e quanto la rosa dipende da un club */
+  const caro=tutti.reduce((m,x)=>x.price>m.price?x:m,tutti[0]);
+  const concentr=S.budget>0?caro.price/S.budget:0;
+  const perClub={}; for(const x of u.xi) perClub[x.s]=(perClub[x.s]||0)+1;
+  const clubMax=Object.entries(perClub).sort((a,b)=>b[1]-a[1])[0]||["",0];
+
+  /* calendario delle prossime giornate per l'undici */
+  const cs=u.xi.map(p=>calScore(p.s,p.r,from,span)).filter(x=>x!==null);
+  const cal=cs.length?cs.reduce((a,b)=>a+b,0)/cs.length:null;
+
+  /* fantamedia della stagione scorsa dell'undici, dove c'è */
+  const fmv=u.xi.map(p=>annoScorso(p.id)).filter(h=>h&&h.pv>=15).map(h=>h.fm);
+  const fmXI=fmv.length>=6?fmv.reduce((a,b)=>a+b,0)/fmv.length:null;
+
+  /* spesa per reparto contro il piano */
+  const dev={};
+  for(const r of ROLES){
+    const q=pagato?st.perRole[r].spent/pagato*100:0;
+    dev[r]={reale:Math.round(q), piano:S.plan[r]||0, d:Math.round(q-(S.plan[r]||0))};
+  }
+
+  const parti=[
+    {k:"undici tipo", v:40*clamp01((u.media-45)/40), max:40, nota:u.mod+" · appetibilità media "+u.media.toFixed(0)},
+    {k:"profondità",  v:15*clamp01((u.mediaResto-30)/35), max:15, nota:"i 14 di scorta valgono "+u.mediaResto.toFixed(0)},
+    {k:"prezzi pagati", v:20*clamp01((resa-0.82)/0.36), max:20,
+     nota:(resa>=1?"ha comprato il "+Math.round((resa-1)*100)+"% meglio della media della lega"
+                  :"ha pagato il "+Math.round((1/resa-1)*100)+"% più della media della lega")},
+    {k:"titolari veri", v:15*clamp01((titolari-6)/9), max:15, nota:titolari+" su "+tutti.length},
+    {k:"rigoristi", v:Math.min(5,rig*2.5), max:5, nota:rig?rig+" primi rigoristi":"nessun rigorista"},
+    {k:"rischio", v:5*clamp01(1-(Math.max(0,concentr-0.22)/0.25)-(Math.max(0,clubMax[1]-4)/5)), max:5,
+     nota:(concentr>=0.25?Math.round(concentr*100)+"% del budget su "+caro.p.n:"spesa distribuita")
+        +(clubMax[1]>=5?" · "+clubMax[1]+" dall'"+clubMax[0]:"")}
+  ];
+  const voto=Math.round(parti.reduce((a,x)=>a+x.v,0));
+
+  /* ── le frasi: solo cose che i numeri dicono davvero ── */
+  const pro=[], contro=[];
+  if(u.media>=72) pro.push(`undici tipo da ${u.media.toFixed(0)} di appetibilità media, roba da primi posti`);
+  else if(u.media>=62) pro.push(`undici tipo solido, ${u.media.toFixed(0)} di appetibilità media`);
+  if(resa>=1.1) pro.push(`ha comprato meglio di tutti: ${Math.round((resa-1)*100)}% sopra la media della lega nel rapporto fra valore e crediti spesi`);
+  if(titolari>=14) pro.push(`${titolari} titolari veri su ${tutti.length}: può ruotare senza perderci`);
+  if(rig>=2) pro.push(`${rig} primi rigoristi in rosa`);
+  if(fmXI!==null&&fmXI>=6.6) pro.push(`l'undici ha una fantamedia 25/26 di ${fmXI.toFixed(2)}`);
+  if(u.mediaResto>=55) pro.push(`panchina vera: anche i 14 di scorta valgono ${u.mediaResto.toFixed(0)}`);
+  if(cal!==null&&cal>=3.4) pro.push(`calendario morbido all'inizio (${cal.toFixed(1)} su 5)`);
+  if(portiereTit&&R.P.length>=2&&dev.P.reale<=8) pro.push(`portiere titolare senza svenarsi (${dev.P.reale}% del budget)`);
+
+  if(u.media<58) contro.push(`undici tipo sotto la media della lega (${u.media.toFixed(0)})`);
+  if(resa<=0.9) contro.push(`ha pagato il ${Math.round((1/resa-1)*100)}% più della media della lega per lo stesso valore: circa ${Math.round(pagato-pagato*resa)} crediti buttati`);
+  if(titolari<=9) contro.push(`solo ${titolari} titolari veri: ${panchinari} di questi 25 rischiano di non giocare mai`);
+  if(!portiereTit) contro.push(`nessun portiere dato per titolare`);
+  if(rig===0) contro.push(`nessun rigorista di prima scelta`);
+  if(concentr>=0.28) contro.push(`${Math.round(concentr*100)}% del budget su un solo giocatore (${caro.p.n}, ${caro.price}): se si fa male è finita`);
+  if(clubMax[1]>=5) contro.push(`${clubMax[1]} degli undici vengono dalla stessa squadra (${clubMax[0]}): rosa legata a come gira quel club`);
+  if(u.mediaResto<=40) contro.push(`panchina povera (${u.mediaResto.toFixed(0)}): un infortunio e la formazione si scopre`);
+  if(cal!==null&&cal<=2.7) contro.push(`avvio di calendario duro (${cal.toFixed(1)} su 5)`);
+  for(const r of ROLES){
+    if(dev[r].d>=14) contro.push(`${ROLENAME[r].toLowerCase()}: ${dev[r].reale}% del budget contro il ${dev[r].piano}% del piano`);
+    if(dev[r].d<=-12&&r!=="P") contro.push(`${ROLENAME[r].toLowerCase()} tirati via: ${dev[r].reale}% del budget contro il ${dev[r].piano}%`);
+  }
+  if(cop<0.9) contro.push(`${tutti.length-noti.length} giocatori non sono nel listone in uso: per loro il giudizio va a stima`);
+
+  return {voto:voto, parti:parti, pro:pro, contro:contro, xi:u.xi, mod:u.mod,
+          media:u.media, mediaResto:u.mediaResto, pagato:pagato, atteso:atteso, resa:resa,
+          titolari:titolari, rig:rig, caro:caro, concentr:concentr, club:clubMax,
+          cal:cal, fmXI:fmXI, dev:dev, cop:cop, n:tutti.length};
+}
+/* la classifica dei giudizi, calcolata una volta sola per render */
+function giudizi(){
+  return S.teams.map(t=>({t:t, g:giudizio(t.id)})).filter(x=>x.g)
+    .sort((a,b)=>b.g.voto-a.g.voto);
+}
+const votoCol=v=>v>=70?"var(--ok)":v>=55?"var(--warn)":"var(--crit)";
+</script>

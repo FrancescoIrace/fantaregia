@@ -1,0 +1,715 @@
+
+/* ══ 13. Lega e dati ════════════════════════════════════════════════ */
+function renderSetup(){
+  // Non ridisegnare un gruppo di campi mentre ci si sta scrivendo dentro:
+  // sostituire l'input sotto le dita azzera quello che l'utente sta digitando.
+  const busy=id=>{ const el=document.getElementById(id); const a=document.activeElement;
+    return el&&a&&a!==document.body&&el.contains(a); };
+  if(!busy("teamedit"))
+  document.getElementById("teamedit").innerHTML=S.teams.map((t,i)=>`
+    <div class="row">
+      <span class="mono" style="color:var(--muted);font-size:12px;width:18px">${i+1}</span>
+      <input type="text" data-tname="${t.id}" value="${esc(t.name)}" maxlength="28"${readOnly?" disabled":""}>
+      <label class="mineradio"><input type="radio" name="mine" data-mine="${t.id}"${isMine(t.id)?" checked":""}> mia</label>
+    </div>`).join("");
+  const bud=document.getElementById("budget");
+  if(document.activeElement!==bud) bud.value=S.budget;
+  if(!busy("slotgrid"))
+  document.getElementById("slotgrid").innerHTML=ROLES.map(r=>`
+    <div><label class="fl" style="color:var(--r${r})">${r}</label>
+    <input type="number" min="0" max="20" data-slot="${r}" value="${S.slots[r]}"${readOnly?" disabled":""}></div>`).join("");
+  if(!busy("plangrid"))
+  document.getElementById("plangrid").innerHTML=ROLES.map(r=>`
+    <div><label class="fl" style="color:var(--r${r})">${r} %</label>
+    <input type="number" min="0" max="100" data-plan="${r}" value="${S.plan[r]}"${readOnly?" disabled":""}></div>`).join("");
+  renderSetupLabels();
+  renderVotiPanel();
+  document.getElementById("backupnote").textContent = mode==="condivisa"
+    ? "L'asta è salvata nella pagina stessa: chiunque apra questo link vede lo stesso tabellone. L'esportazione serve solo come copia di sicurezza."
+    : "L'asta è salvata nel browser di questo dispositivo. Esporta prima di chiudere se vuoi riprenderla altrove.";
+}
+
+function renderVotiPanel(){
+  const gs=giornateGiocate();
+  document.getElementById("votiinfo").innerHTML = gs.length
+    ? `${gs.length===1?"Caricata <b>1</b> giornata":`Caricate <b>${gs.length}</b> giornate`}${S.votiMeta&&S.votiMeta.sheet?` dal foglio <b>${esc(S.votiMeta.sheet)}</b>`:""}. Il rendimento reale compare nel listone e nella scheda <b>Rendimento</b>.${gs.length<5?" Con così poche partite i numeri non dicono ancora molto.":""}`
+    : "Nessuna giornata caricata. Carica le pagelle di una giornata già giocata per vedere presenze, medie, gol e assist.";
+  document.getElementById("votigiornate").innerHTML = gs.length
+    ? `<div class="glist">${gs.map(g=>`<span class="gpill">g${g} <button class="wr" data-delg="${g}" title="Rimuovi la giornata ${g}">✕</button></span>`).join("")}</div>`
+    : "";
+}
+/* Le etichette calcolate del pannello si aggiornano da sole: non toccano
+   gli input, quindi si possono ridisegnare anche mentre uno sta scrivendo. */
+function renderSetupLabels(){
+  const sum=ROLES.reduce((a,r)=>a+(+S.plan[r]||0),0);
+  const cr=ROLES.map(r=>`${r} ${Math.round(S.budget*S.plan[r]/100)}`).join(" · ");
+  document.getElementById("plansum").innerHTML=`Totale <b>${sum}%</b>${sum!==100?' <span class="tag warn">non fa 100</span>':""} — in crediti: ${cr}`;
+  const when=LISTMETA.when?new Date(LISTMETA.when).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"}):null;
+  document.getElementById("listinfo").innerHTML=
+    `In uso: <b>${esc(LISTMETA.name)}</b> — ${PL.length} giocatori${when?`, caricato il ${when}`:""}.`;
+}
+/* Tutto tranne il pannello impostazioni: si usa quando la modifica arriva
+   proprio da lì, così gli input non vengono sostituiti sotto le dita. */
+function renderDerived(){
+  renderBoard(); renderScarsi(); renderTeams(); renderPlan(); renderLog(); renderList();
+  renderRose(); renderRiepilogo(); renderGiornata(); renderTitolari(); renderBalance(); renderRendimento(); renderPick(); renderSetupLabels(); renderBanner();
+}
+
+/* ══ 14. Import di un listone aggiornato ════════════════════════════ */
+let xlsxLoading=null;
+function loadXLSX(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(xlsxLoading) return xlsxLoading;
+  xlsxLoading=new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload=()=>res(window.XLSX);
+    s.onerror=()=>rej(new Error("non riesco a caricare il lettore di file xlsx. Salva il listone in csv dal foglio di calcolo e ricaricalo"));
+    document.head.appendChild(s);
+  });
+  return xlsxLoading;
+}
+const HEAD={id:["id"],r:["r","ruolo"],rm:["rm","ruolo mantra","ruolim"],n:["nome","giocatore"],
+  s:["squadra","team"],q:["qt.a","qta","qt a","quotazione","qt.a m","valore"],f:["fvm","fvm m"]};
+function pickCols(row){
+  const low=row.map(c=>String(c==null?"":c).trim().toLowerCase());
+  const find=keys=>{ for(const k of keys){ const i=low.indexOf(k); if(i>=0) return i; } return -1; };
+  return {id:find(HEAD.id),r:find(HEAD.r),rm:find(HEAD.rm),n:find(HEAD.n),s:find(HEAD.s),q:find(HEAD.q),f:find(HEAD.f)};
+}
+function rowsToPlayers(rows){
+  let hi=-1,cols=null;
+  for(let i=0;i<Math.min(12,rows.length);i++){
+    const c=pickCols(rows[i]||[]);
+    if(c.n>=0&&c.s>=0&&c.q>=0&&c.r>=0){ hi=i; cols=c; break; }
+  }
+  if(hi<0) throw new Error("non trovo le colonne Nome, Squadra, R e Qt.A");
+  const out=[], seen=new Set();
+  for(let i=hi+1;i<rows.length;i++){
+    const row=rows[i]||[];
+    const name=String(row[cols.n]==null?"":row[cols.n]).trim();
+    const team=String(row[cols.s]==null?"":row[cols.s]).trim();
+    const role=String(row[cols.r]==null?"":row[cols.r]).trim().toUpperCase().charAt(0);
+    const q=Math.round(Number(row[cols.q]));
+    if(!name||!team||!ROLES.includes(role)||!(q>=0)) continue;
+    let id=cols.id>=0?parseInt(row[cols.id]):NaN;
+    if(!(id>0)){ id=0; const key=name+"|"+team; for(let k=0;k<key.length;k++) id=(id*31+key.charCodeAt(k))|0; id=Math.abs(id)%900000+100000; }
+    if(seen.has(id)) continue;
+    seen.add(id);
+    const f=cols.f>=0?Math.round(Number(row[cols.f])):0;
+    out.push({id:id,r:role,rm:cols.rm>=0?String(row[cols.rm]||"").trim():"",n:name,s:team,q:q,f:(f>0?f:Math.max(1,q)),v:1});
+  }
+  if(out.length<50) throw new Error("ho letto solo "+out.length+" giocatori: il file non sembra un listone");
+  return out;
+}
+function parseCSV(txt,sep){
+  const rows=[]; let row=[], cell="", q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){
+      if(c==='"'){ if(txt[i+1]==='"'){ cell+='"'; i++; } else q=false; }
+      else cell+=c;
+    } else if(c==='"'){ q=true; }
+    else if(c===sep){ row.push(cell.trim()); cell=""; }
+    else if(c==="\n"){ row.push(cell.trim()); rows.push(row); row=[]; cell=""; }
+    else if(c!=="\r"){ cell+=c; }
+  }
+  row.push(cell.trim());
+  if(row.length>1||row[0]) rows.push(row);
+  return rows;
+}
+async function importFile(file){
+  const box=document.getElementById("importlog");
+  box.innerHTML=`<div class="impok">Leggo ${esc(file.name)}…</div>`;
+  try{
+    let rows;
+    if(/\.csv$/i.test(file.name)){
+      const txt=await file.text();
+      const head=txt.split(/\r?\n/).slice(0,20).join("\n").replace(/"[^"]*"/g,"");
+      const nsemi=(head.match(/;/g)||[]).length, ntab=(head.match(/\t/g)||[]).length, ncom=(head.match(/,/g)||[]).length;
+      const sep=nsemi>=ncom&&nsemi>=ntab?";":(ntab>=ncom?"\t":",");
+      rows=parseCSV(txt,sep);
+    } else {
+      const X=await loadXLSX();
+      const wb=X.read(await file.arrayBuffer(),{type:"array"});
+      const sh=wb.Sheets["Tutti"]||wb.Sheets[wb.SheetNames[0]];
+      rows=X.utils.sheet_to_json(sh,{header:1,raw:true});
+    }
+    const np=rowsToPlayers(rows);
+    // i giocatori già assegnati ma spariti dal nuovo listone restano, marcati
+    const newIds=new Set(np.map(p=>p.id));
+    let kept=0;
+    for(const pid in S.assign){
+      if(!newIds.has(+pid)){
+        const snap=S.assign[pid].snap||byId.get(+pid);
+        if(snap){ np.push({id:snap.id,r:snap.r,rm:"",n:snap.n,s:snap.s,q:snap.q,f:snap.q,v:1,out:true}); kept++; }
+      }
+    }
+    const before=PL.length;
+    PL=np; LISTMETA={name:file.name,when:Date.now(),count:np.length};
+    recompute();
+    document.getElementById("lteam").innerHTML=`<option value="">Tutte</option>`+
+      [...new Set(PL.map(p=>p.s))].sort().map(t=>`<option>${esc(t)}</option>`).join("");
+    sel=null; persist(); renderAll();
+    const noCal=[...new Set(PL.map(p=>p.s))].filter(t=>!CALIDX.has(t));
+    box.innerHTML=`<div class="impok">Listone aggiornato: ${np.length-kept} giocatori (prima erano ${before}).`
+      +(kept?` ${kept} già assegnati non sono più in lista e restano segnati a parte.`:"")
+      +(noCal.length?` Attenzione: ${esc(noCal.join(", "))} non ${noCal.length>1?"compaiono":"compare"} nel calendario, quindi per loro l'indice partite resta vuoto.`:"")
+      +`</div>`;
+  }catch(err){
+    box.innerHTML=`<div class="imperr">Non sono riuscito a leggere il file: ${esc(err.message||err)}.</div>`;
+  }
+}
+
+/* ══ 14b. Import dei voti di giornata ═══════════════════════════════ */
+function parseVoti(X, wb, sheetName){
+  const sh=wb.Sheets[sheetName];
+  if(!sh) throw new Error("nel file non c'è il foglio "+sheetName);
+  const rows=X.utils.sheet_to_json(sh,{header:1,raw:true});
+  const out={}, info={}; let rfSospetto=0, righe=0, squadra="";
+  for(const raw of rows){
+    const c=(raw||[]).map(x=>x===undefined?"":x);
+    // riga con il solo nome della squadra: apre un blocco
+    if(typeof c[0]==="string" && c[0] && !c[1] && c[0].length<26 && !/^voti|file|www|iscritti/i.test(c[0])){ squadra=c[0].trim(); continue; }
+    if(typeof c[0]!=="number") continue;      // intestazioni e note legali
+    if(String(c[1]||"").toUpperCase()==="ALL") continue;   // allenatori
+    const id=Math.round(c[0]);
+    const txt=String(c[3]==null?"":c[3]).trim();
+    if(!txt) continue;
+    const sv=/\*/.test(txt)?1:0;
+    const voto=parseFloat(txt.replace("*","").replace(",","."));
+    if(!isFinite(voto)) continue;
+    const num=i=>{ const v=parseFloat(c[i]); return isFinite(v)?v:0; };
+    const gf=num(4), rf=num(8);
+    if(rf>gf) rfSospetto++;      // i rigori segnati devono già essere dentro Gf
+    out[id]=[voto,sv,gf,num(5),num(6),num(7),num(9),num(10),num(11),num(12)];
+    info[id]={n:String(c[2]||"").trim(), s:squadra};
+    righe++;
+  }
+  if(righe<80) throw new Error("ho letto solo "+righe+" giocatori: il file non sembra quello dei voti");
+  return {voti:out, info:info, righe:righe, rfSospetto:rfSospetto};
+}
+function giornataDa(wb, X){
+  for(const nm of wb.SheetNames){
+    const rows=X.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false});
+    for(let i=0;i<4&&i<rows.length;i++){
+      const m=String((rows[i]||[])[0]||"").match(/(\d{1,2})\s*[ªa°]?\s*giornata/i);
+      if(m) return parseInt(m[1]);
+    }
+  }
+  return null;
+}
+let votiWB=null, votiBatch=null;
+/* Un file solo: si sceglie giornata e foglio a mano. Più file insieme: la
+   giornata viene letta dal titolo di ognuno e si caricano tutte in un colpo,
+   che è quello che serve quando si resta indietro di qualche turno. */
+async function pickVoti(files){
+  const box=document.getElementById("votilog");
+  votiWB=null; votiBatch=null;
+  document.getElementById("votiapply").disabled=true;
+  box.innerHTML=`<div class="impok">Leggo ${files.length===1?esc(files[0].name):files.length+" file"}…</div>`;
+  try{
+    const X=await loadXLSX();
+    const letti=[];
+    for(const f of files){
+      try{
+        const wb=X.read(await f.arrayBuffer(),{type:"array"});
+        letti.push({name:f.name, wb:wb, g:giornataDa(wb,X)});
+      }catch(e){ letti.push({name:f.name, err:e.message||String(e)}); }
+    }
+    const ok=letti.filter(x=>x.wb);
+    if(!ok.length) throw new Error(letti[0]&&letti[0].err?letti[0].err:"nessun file leggibile");
+    const sel=document.getElementById("votisheet");
+    const pref=(S.votiMeta&&S.votiMeta.sheet)||"Fantacalcio";
+    sel.innerHTML=ok[0].wb.SheetNames.map(n=>`<option${n===pref?" selected":""}>${esc(n)}</option>`).join("");
+    document.getElementById("votiapply").disabled=false;
+    if(files.length===1&&ok.length===1){
+      votiWB=ok[0].wb;
+      if(ok[0].g) document.getElementById("votig").value=ok[0].g;
+      document.getElementById("votiapply").textContent="Aggiungi";
+      box.innerHTML=`<div class="impok">File pronto: ${votiWB.SheetNames.length} fogli di voti${ok[0].g?`, giornata ${ok[0].g}`:", giornata da indicare"}. Scegli il foglio che usa la tua lega e conferma.</div>`;
+      return;
+    }
+    /* più file: servono le giornate riconosciute, e niente doppioni */
+    const senza=ok.filter(x=>!x.g);
+    const buoni=ok.filter(x=>x.g);
+    const visti=new Map();
+    for(const x of buoni) visti.set(x.g,x);          // a parità di giornata vince l'ultimo
+    votiBatch=[...visti.values()].sort((a,b)=>a.g-b.g);
+    document.getElementById("votiapply").textContent=`Aggiungi ${votiBatch.length} giornate`;
+    const gia=votiBatch.filter(x=>S.stats&&S.stats[x.g]).map(x=>x.g);
+    box.innerHTML=`<div class="impok">
+      Pronte <b>${votiBatch.length}</b> giornate: ${votiBatch.map(x=>"g"+x.g).join(", ")}.
+      ${gia.length?`<br>Sostituiranno quelle già caricate: ${gia.map(g=>"g"+g).join(", ")}.`:""}
+      ${senza.length?`<br><b>Fuori:</b> ${senza.map(x=>esc(x.name)).join(", ")} — non riesco a leggere la giornata dal titolo, ${senza.length===1?"caricalo":"caricali"} singolarmente.`:""}
+      ${letti.filter(x=>x.err).length?`<br><b>Illeggibili:</b> ${letti.filter(x=>x.err).map(x=>esc(x.name)).join(", ")}.`:""}
+      <br>Scegli il foglio che usa la tua lega e conferma: vale per tutte.</div>`;
+  }catch(err){
+    votiWB=null; votiBatch=null; document.getElementById("votiapply").disabled=true;
+    box.innerHTML=`<div class="imperr">Non sono riuscito a leggere: ${esc(err.message||err)}.</div>`;
+  }
+}
+function applyVotiBatch(){
+  const box=document.getElementById("votilog");
+  const X=window.XLSX, sheet=document.getElementById("votisheet").value;
+  const righe=[]; let stats=Object.assign({},S.stats||{});
+  for(const x of votiBatch){
+    try{
+      const r=parseVoti(X,x.wb,sheet);
+      const fuori=Object.keys(r.voti).filter(id=>!byId.has(+id)).length;
+      stats[x.g]=r.voti;
+      righe.push(`<li>g${x.g} — ${r.righe} con voto, ${r.righe-fuori} nel listone${r.rfSospetto?`, <b>${r.rfSospetto} righe con più rigori che gol</b>`:""}</li>`);
+    }catch(err){ righe.push(`<li>g${x.g} — <b>non caricata:</b> ${esc(err.message||err)}</li>`); }
+  }
+  S.stats=stats;
+  S.votiMeta=Object.assign({},S.votiMeta||{},{sheet:sheet});
+  persist(); renderAll();
+  box.innerHTML=`<div class="impok">Caricate dal foglio <b>${esc(sheet)}</b>:<ul style="margin:6px 0 0 18px">${righe.join("")}</ul></div>`;
+  votiBatch=null; votiWB=null;
+  document.getElementById("votiapply").disabled=true;
+  document.getElementById("votiapply").textContent="Aggiungi";
+  document.getElementById("votifile").value="";
+}
+function applyVoti(){
+  const box=document.getElementById("votilog");
+  if(votiBatch&&votiBatch.length) return applyVotiBatch();
+  if(!votiWB) return;
+  const g=parseInt(document.getElementById("votig").value);
+  const sheet=document.getElementById("votisheet").value;
+  if(!(g>=1&&g<=38)) return toast("Indica una giornata fra 1 e 38");
+  try{
+    const X=window.XLSX;
+    const r=parseVoti(X,votiWB,sheet);
+    const fuori=Object.keys(r.voti).filter(id=>!byId.has(+id))
+      .map(id=>r.info[id]).filter(x=>x&&x.n)
+      .sort((a,b)=>(a.s||"").localeCompare(b.s||"")||a.n.localeCompare(b.n));
+    const noti=r.righe-fuori.length;
+    const gia=S.stats && S.stats[g];
+    S.stats=Object.assign({},S.stats||{}); S.stats[g]=r.voti;
+    S.votiMeta=Object.assign({},S.votiMeta||{},{sheet:sheet});
+    persist(); renderAll();
+    box.innerHTML=`<div class="impok">Giornata ${g} ${gia?"sostituita":"caricata"} dal foglio <b>${esc(sheet)}</b>:
+      ${r.righe} giocatori con voto, ${noti} riconosciuti nel listone.
+      ${r.rfSospetto?`<br><b>Attenzione:</b> ${r.rfSospetto} righe hanno più rigori segnati che gol totali. Controlla i bonus di quei giocatori.`:""}
+      </div>
+      ${fuori.length?`<div class="fuorilista">
+        <div class="fl-h">${fuori.length} ${fuori.length===1?"giocatore non è":"giocatori non sono"} nel listone in uso e ${fuori.length===1?"resta fuori":"restano fuori"} dai conteggi</div>
+        <div class="fl-b">${fuori.map(x=>`<span class="fl-p"><b>${esc(x.n)}</b>${x.s?` <span class="pteam">${esc(x.s)}</span>`:""}</span>`).join("")}</div>
+        <p class="hint" style="margin-top:8px">Sono giocatori che hanno preso un voto ma non compaiono nelle quotazioni caricate — di solito perché sono arrivati dopo, o perché il tuo listone è più vecchio del file dei voti. Caricando un listone aggiornato rientrano da soli.</p>
+      </div>`:""}`;
+    votiWB=null; document.getElementById("votiapply").disabled=true;
+    document.getElementById("votifile").value="";
+  }catch(err){
+    box.innerHTML=`<div class="imperr">${esc(err.message||err)}</div>`;
+  }
+}
+function removeGiornata(g){
+  if(!S.stats||!S.stats[g]) return;
+  const c=Object.assign({},S.stats); delete c[g]; S.stats=c;
+  persist(); renderAll(); toast("Giornata "+g+" rimossa");
+}
+
+/* ══ 15. Eventi ═════════════════════════════════════════════════════ */
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button"); if(!t) return;
+  if(t.dataset.i!==undefined&&t.closest("#results")) return choose(+t.dataset.i);
+  if(t.id==="doassign"){
+    if(!sel||readOnly) return;
+    const tid=+document.getElementById("team").value;
+    const price=parseInt(document.getElementById("price").value);
+    if(!(price>=0)) return toast("Inserisci un prezzo valido");
+    const st=stats(tid);
+    if(st.slotsLeft<=0) return toast(`${teamName(tid)} ha la rosa completa`);
+    if(st.perRole[sel.r].count>=S.slots[sel.r]) return toast(`${teamName(tid)}: reparto ${sel.r} già pieno`);
+    if(price>st.max) return toast(`${teamName(tid)} può offrire al massimo ${st.max}`);
+    const nm=sel.n; assign(sel.id,tid,price); sel=null; renderPick();
+    qEl().focus(); toast(`${nm} → ${teamName(tid)} per ${price}`);
+  }
+  if(t.id==="freeit"&&sel&&!readOnly){ free(sel.id); renderPick(); toast("Giocatore liberato"); }
+  if(t.id==="startoggle"&&sel){
+    if(ME.targets[sel.id]) delete ME.targets[sel.id]; else ME.targets[sel.id]={max:sel.q};
+    saveMe(); renderPick(); renderList();
+  }
+  if(t.id==="modo"||t.closest("#modo")) return setModo(!modoAsta());
+  if(t.id==="roopen") return tutteRose(true);
+  if(t.id==="roclose") return tutteRose(false);
+  if(t.id==="expxlsx") return esportaXlsx();
+  if(t.id==="expprint") return stampaRiepilogo();
+  if(t.id==="planmed"&&!readOnly){
+    S.plan={P:7,D:19,C:32,A:42};
+    persist(); renderAll(); toast("Piano impostato sulla mediana delle aste vere");
+    return;
+  }
+  if(t.id==="undo"&&!readOnly){
+    if(!S.log.length) return toast("Niente da annullare");
+    const l=S.log[0], p=byId.get(l.pid)||(S.assign[l.pid]||{}).snap;
+    free(l.pid); toast("Annullato: "+(p?p.n:""));
+  }
+  if(t.dataset.free&&!readOnly){ free(+t.dataset.free); toast("Giocatore liberato"); }
+  if(t.id==="pclose") return closePlayer();
+  if(t.id==="cclose") return closeSwap();
+  if(t.dataset.swap!==undefined) return openSwap(t.dataset.swap);
+  if(t.dataset.put!==undefined) return putInSlot(+t.dataset.put);
+  if(t.dataset.pstar!==undefined){
+    const id=+t.dataset.pstar;
+    if(ME.targets[id]) delete ME.targets[id]; else ME.targets[id]={max:(byId.get(id)||{}).q||0};
+    saveMe(); renderList(); openPlayer(id); return;
+  }
+  if(t.dataset.pfree!==undefined){ if(!readOnly){ free(+t.dataset.pfree); closePlayer(); toast("Giocatore liberato"); } return; }
+  if(t.dataset.pout!==undefined){
+    if(readOnly) return;
+    const id=+t.dataset.pout; const era=isOut(id);
+    toggleOut(id); openPlayer(id);
+    toast(era?"Rientrato fra i disponibili":"Segnato indisponibile");
+    return;
+  }
+  if(t.dataset.pcall!==undefined){
+    if(readOnly) return;
+    const p=byId.get(+t.dataset.pcall); if(!p) return;
+    sel=p; closePlayer();
+    const b=document.querySelector('.tabs button[data-tab="asta"]'); if(b) b.click();
+    renderPick();
+    const pr=document.getElementById("price"); if(pr){ pr.focus(); pr.select(); }
+    return;
+  }
+  if(t.id==="votiapply"){ if(!readOnly) applyVoti(); return; }
+  if(t.dataset.delg!==undefined){ if(!readOnly) removeGiornata(+t.dataset.delg); return; }
+  if(t.id==="pfix") return applyPending();
+  if(t.id==="pdrop") return dropPending();
+  if(t.dataset.bmv!==undefined){
+    const [i,d]=t.dataset.bmv.split(":").map(Number), L=lineup(curG), j=i+d;
+    if(j>=0&&j<L.bench.length){ const x=L.bench[i]; L.bench[i]=L.bench[j]; L.bench[j]=x; saveMe(); renderGiornata(); }
+    return;
+  }
+  if(t.dataset.star){
+    const id=+t.dataset.star;
+    if(ME.targets[id]) delete ME.targets[id]; else ME.targets[id]={max:(byId.get(id)||{}).q||0};
+    saveMe(); renderList(); if(sel&&sel.id===id) renderPick();
+  }
+});
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(el.id==="q") return search();
+  if(el.dataset.pmax!==undefined){
+    const id=+el.dataset.pmax, val=parseInt(el.value);
+    if(val>=0) ME.targets[id]=Object.assign(ME.targets[id]||{},{max:val});
+    else if(ME.targets[id]) ME.targets[id].max=0;
+    saveMe(); renderList(); return;
+  }
+  if(el.dataset.max!==undefined){
+    const id=+el.dataset.max, val=parseInt(el.value);
+    if(val>=0) ME.targets[id]=Object.assign(ME.targets[id]||{},{max:val});
+    else if(ME.targets[id]) ME.targets[id].max=0;
+    saveMe(); return;
+  }
+  if(["lq","lmin","lmax","gfrom","gspan"].includes(el.id)) renderList();
+  if(el.id==="price") renderOfferta();
+  if(el.id==="roq") renderRose();
+  if(el.id==="tq") renderTitolari();
+  if(el.id==="rq") renderRendimento();
+  if(["cfrom","cspan"].includes(el.id)) renderCal();
+});
+document.addEventListener("toggle",e=>{
+  const d=e.target;
+  if(d&&d.dataset&&d.dataset.rose!==undefined&&!roQ()) toggleRosa(+d.dataset.rose,d.open);
+},true);
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.id==="filein"&&el.files&&el.files[0]) return importFile(el.files[0]);
+  if(el.id==="votifile"&&el.files&&el.files.length) return pickVoti([...el.files]);
+  if(el.id==="restorein"&&el.files&&el.files[0]){
+    if(readOnly) return;
+    const f=el.files[0]; el.value="";
+    f.text().then(txt=>{ try{ applyBackup(txt); }catch(err){ toast("Backup non valido: "+(err.message||"")); } });
+    return;
+  }
+  if(el.dataset.mine!==undefined&&el.checked){
+    ME.myTeam=+el.dataset.mine; saveMe(); renderAll(); renderBanner();
+  }
+  if(el.dataset.lineup!==undefined){
+    const [r,i]=el.dataset.lineup.split(":"), id=parseInt(el.value)||null;
+    const L=lineup(curG);
+    if(id) for(const rr of ROLES) L.start[rr]=L.start[rr].map(x=>x===id?null:x);
+    L.start[r][+i]=id; saveMe(); renderGiornata(); return;
+  }
+  if(el.id==="gmod"){
+    const L=lineup(curG); L.mod=el.value; lineup(curG); saveMe(); renderGiornata(); return;
+  }
+  if(readOnly) return;
+  if(el.dataset.tname!==undefined){
+    const t=S.teams.find(x=>x.id===+el.dataset.tname);
+    if(t){ t.name=el.value.trim()||("Squadra "+t.id); persist(); renderDerived(); }
+  }
+  if(el.id==="budget"){ const v=parseInt(el.value); if(v>0){ S.budget=v; persist(); renderDerived(); } }
+  if(el.dataset.slot){ const v=parseInt(el.value); if(v>=0){ S.slots[el.dataset.slot]=v; persist(); renderDerived(); } }
+  if(el.dataset.plan){ const v=parseInt(el.value); if(v>=0){ S.plan[el.dataset.plan]=v; persist(); renderDerived(); } }
+  if(["lteam","fFree","fTarget","fMine"].includes(el.id)) renderList();
+  if(el.id==="tRig") renderTitolari();
+  if(["rrole","rmine"].includes(el.id)) renderRendimento();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&document.getElementById("cmodal").classList.contains("on")){
+    e.preventDefault(); return closeSwap();
+  }
+  if(e.key==="Escape"&&openId!==null&&document.getElementById("pmodal").classList.contains("on")){
+    e.preventDefault(); return closePlayer();
+  }
+  if(e.target.id==="q"){
+    if(e.key==="ArrowDown"){e.preventDefault();cur=Math.min(cur+1,hits.length-1);paintCur();}
+    else if(e.key==="ArrowUp"){e.preventDefault();cur=Math.max(cur-1,0);paintCur();}
+    else if(e.key==="Enter"){e.preventDefault();choose(cur);}
+    else if(e.key==="Escape"){qEl().value="";hits=[];resEl().innerHTML="";}
+  } else if(e.target.id==="price"&&e.key==="Enter"){
+    e.preventDefault(); const b=document.getElementById("doassign"); if(b) b.click();
+  }
+});
+function paintCur(){
+  const els=resEl().querySelectorAll("button");
+  els.forEach((b,i)=>b.classList.toggle("cur",i===cur));
+  const c=resEl().querySelector("button.cur"); if(c) c.scrollIntoView({block:"nearest"});
+}
+
+document.getElementById("addteam").addEventListener("click",()=>{
+  if(readOnly) return;
+  const id=Math.max(0,...S.teams.map(t=>t.id))+1;
+  S.teams.push({id:id,name:"Squadra "+id}); persist(); renderAll();
+});
+document.getElementById("delteam").addEventListener("click",()=>{
+  if(readOnly) return;
+  if(S.teams.length<=2) return toast("Servono almeno due squadre");
+  const last=S.teams[S.teams.length-1];
+  if(Object.values(S.assign).some(a=>a.team===last.id)) return toast(`${last.name} ha già dei giocatori: liberali prima`);
+  S.teams.pop(); if(ME.myTeam===last.id){ ME.myTeam=null; saveMe(); }
+  persist(); renderAll();
+});
+function applyBackup(txt){
+  const d=JSON.parse(txt), sh=d.shared||d;
+  if(!sh.teams||!sh.assign) throw new Error("non è un backup di quest'app");
+  S=Object.assign(clone(DEF),sh);
+  persist(); renderAll(); toast("Asta ripristinata");
+}
+/* ══ Riepilogo: Excel e stampa ══════════════════════════════════════ */
+function righeRose(){
+  const out=[["Squadra","Ruolo","Giocatore","Squadra di A","Prezzo","Prezzo atteso","Scarto",
+              "Titolarità","Rigorista","Appetibilità","FM 25/26","Presenze 25/26"]];
+  const from=gFrom(), span=gSpan();
+  for(const t of S.teams){
+    const R=roster(t.id);
+    for(const r of ROLES) for(const x of R[r]){
+      const p=byId.get(x.p.id)||x.p, noto=byId.has(x.p.id);
+      const a=attesaSnap(x.p), h=annoScorso(x.p.id);
+      const e=noto?rigOf(p):null;
+      out.push([t.name, r, p.n, p.s, x.price, a, x.price-a,
+        noto?TITLAB[titStato(p).liv]:"—",
+        e?(e[0]+"º"):"", noto?appet(p,from,span):"",
+        h&&h.pv?h.fm:"", h&&h.pv?h.pv:""]);
+    }
+  }
+  return out;
+}
+/* L'Excel riporta i fatti dell'asta e basta: i giudizi delle rose restano
+   dentro l'app, dove si vede da cosa nascono. */
+function righeRiepilogo(){
+  const out=[["Squadra","Spesa","Crediti rimasti","Giocatori",
+              "Portieri","Difensori","Centrocampisti","Attaccanti",
+              "P %","D %","C %","A %","Speso vs media %","Titolari","Rigoristi"]];
+  for(const t of S.teams){
+    const st=stats(t.id), g=giudizio(t.id); if(!g) continue;
+    out.push([t.name, g.pagato, st.left, g.n,
+      st.perRole.P.spent, st.perRole.D.spent, st.perRole.C.spent, st.perRole.A.spent,
+      g.dev.P.reale, g.dev.D.reale, g.dev.C.reale, g.dev.A.reale,
+      Math.round((1/g.resa-1)*100), g.titolari, g.rig]);
+  }
+  return out;
+}
+async function esportaXlsx(){
+  const box=document.getElementById("riepbody");
+  try{
+    const X=await loadXLSX();
+    const wb=X.utils.book_new();
+    X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(righeRiepilogo()),"Riepilogo");
+    X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(righeRose()),"Rose");
+    const nome=`riepilogo-asta-${new Date().toISOString().slice(0,10)}.xlsx`;
+    const out=X.write(wb,{bookType:"xlsx",type:"array"});
+    try{ const dl=window.claude&&claude.use?await claude.use("downloads"):null;
+      if(dl){ await dl.save({filename:nome,data:new Uint8Array(out)}); return toast("Riepilogo salvato"); } }catch(e){}
+    const url=URL.createObjectURL(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+    const a=document.createElement("a"); a.href=url; a.download=nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    toast("Riepilogo scaricato: "+nome);
+  }catch(err){
+    toast("Excel non riuscito");
+    if(box) box.insertAdjacentHTML("afterbegin",`<div class="imperr">Non riesco a creare il file Excel: ${esc(err.message||err)}. Il lettore xlsx si scarica dalla rete: se sei offline, usa la stampa in PDF.</div>`);
+  }
+}
+/* La stampa non usa la pagina a schermo: costruisce una vista sua, densa,
+   pensata per stare in due o tre fogli invece che in quindici. */
+function costruisciStampa(){
+  const d=new Date().toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+  const gs=giudizi();
+  const posto=new Map(gs.map((x,i)=>[x.t.id,i+1]));
+  const tab=`<table class="ptab">
+    <thead><tr><th>#</th><th>Squadra</th><th class="n">Spesa</th><th class="n">Resta</th>
+      <th class="n">P</th><th class="n">D</th><th class="n">C</th><th class="n">A</th>
+      <th class="n">vs media</th><th class="n">Tit.</th><th class="n">Voto</th></tr></thead>
+    <tbody>${gs.map((x,i)=>{
+      const st=stats(x.t.id), g=x.g, dd=1/g.resa-1;
+      return `<tr><td class="n">${i+1}</td><td><b>${esc(x.t.name)}</b></td>
+        <td class="n">${g.pagato}</td><td class="n">${st.left}</td>
+        <td class="n">${st.perRole.P.spent}</td><td class="n">${st.perRole.D.spent}</td>
+        <td class="n">${st.perRole.C.spent}</td><td class="n">${st.perRole.A.spent}</td>
+        <td class="n">${dd>=0?"+":"−"}${Math.abs(Math.round(dd*100))}%</td>
+        <td class="n">${g.titolari}</td><td class="n"><b>${g.voto}</b></td></tr>`;
+    }).join("")}</tbody></table>`;
+  const blocchi=gs.map(x=>{
+    const t=x.t, g=x.g, st=stats(t.id);
+    const sec=ROLES.map(r=>{
+      const l=st.R[r]; if(!l.length) return "";
+      return `<div class="pr"><span class="prh">${r}</span>${l.map(y=>
+        `<span class="pp">${esc(y.p.n)} <b>${y.price}</b></span>`).join("")}</div>`;
+    }).join("");
+    return `<div class="pblock">
+      <div class="pbh"><span class="pos">${posto.get(t.id)}</span><b>${esc(t.name)}</b>
+        <span class="pbv">${g.voto}</span></div>
+      <div class="pbs">${g.pagato} spesi · ${st.left} rimasti · ${g.mod}</div>
+      ${sec}
+      ${g.pro[0]?`<div class="pn ok">+ ${esc(g.pro[0])}</div>`:""}
+      ${g.contro[0]?`<div class="pn ko">${esc(g.contro[0])}</div>`:""}
+    </div>`;
+  }).join("");
+  document.getElementById("printview").innerHTML=`
+    <div class="psthead">
+      <h1>Riepilogo asta — Fantacalcio 2026/27</h1>
+      <p>${S.teams.length} squadre · ${S.budget} crediti a testa · ${Object.keys(S.assign).length} giocatori assegnati · ${d}</p>
+    </div>
+    ${tab}
+    <div class="pgrid">${blocchi}</div>`;
+}
+function stampaRiepilogo(){
+  if(!Object.keys(S.assign).length) return toast("Non c'è ancora niente da stampare");
+  // La vista resta nel DOM (a schermo è display:none) e si ricostruisce a ogni
+  // stampa: svuotarla su afterprint sembrava pulito, ma in alcuni contesti
+  // l'evento arriva prima che il foglio venga impaginato e usciva vuoto.
+  costruisciStampa();
+  window.print();
+}
+document.getElementById("export").addEventListener("click",async()=>{
+  const json=JSON.stringify({shared:S,meta:LISTMETA},null,1);
+  const name=`asta-fantacalcio-${new Date().toISOString().slice(0,10)}.json`;
+  // dentro il visore degli artifact il salvataggio passa dalla capability…
+  try{ const dl=window.claude&&claude.use?await claude.use("downloads"):null;
+    if(dl){ await dl.save({filename:name,data:json}); return toast("Backup salvato"); } }catch(err){}
+  // …aprendo il file in locale basta un download normale
+  try{
+    const url=URL.createObjectURL(new Blob([json],{type:"application/json"}));
+    const a=document.createElement("a"); a.href=url; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    return toast("Backup scaricato: "+name);
+  }catch(err){}
+  try{ await navigator.clipboard.writeText(json); toast("Backup copiato negli appunti"); }
+  catch(err){ const b=document.getElementById("importbox"); b.style.display="block"; b.value=json; b.select(); toast("Copia il testo qui sotto"); }
+});
+document.getElementById("importbtn").addEventListener("click",()=>{
+  if(readOnly) return;
+  const box=document.getElementById("importbox");
+  if(box.style.display==="none"||!box.value.trim()){ box.style.display="block"; box.focus(); return toast("Incolla il backup e premi ancora Importa"); }
+  try{ applyBackup(box.value); box.value=""; box.style.display="none"; }
+  catch(err){ toast("Backup non valido"); }
+});
+document.getElementById("reset").addEventListener("click",()=>{
+  if(readOnly) return;
+  if(!Object.keys(S.assign).length&&!S.log.length) return toast("L'asta è già vuota");
+  S.assign={}; S.log=[]; persist(); renderAll(); toast("Asta azzerata — lega e obiettivi restano");
+});
+document.getElementById("gprev").addEventListener("click",()=>{ if(curG>1){curG--;renderGiornata();} });
+document.getElementById("gnext").addEventListener("click",()=>{ if(curG<38){curG++;renderGiornata();} });
+document.getElementById("gauto").addEventListener("click",()=>{
+  if(!ROLES.some(r=>myRoster()[r].length)) return toast("La tua rosa è ancora vuota");
+  autoFill(curG); renderGiornata(); toast("Formazione proposta per la giornata "+curG);
+});
+document.getElementById("gclear").addEventListener("click",()=>{
+  const L=lineup(curG); ME.lineups[curG]=emptyLine(L.mod); saveMe(); renderGiornata();
+});
+document.querySelectorAll(".tabs button").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===b)));
+    document.querySelectorAll(".view").forEach(v=>v.classList.toggle("on",v.id==="v-"+b.dataset.tab));
+    if(b.dataset.tab==="asta"){ const q=document.getElementById("q"); if(q) q.focus(); }
+    if(b.dataset.tab==="calendario") renderCal();
+    if(b.dataset.tab==="giornate") renderGiornata();
+    if(b.dataset.tab==="titolari") renderTitolari();
+    if(b.dataset.tab==="rendimento") renderRendimento();
+    window.scrollTo(0,0);
+  });
+});
+/* apertura della scheda: il nome è cliccabile ovunque compaia */
+document.addEventListener("click",e=>{
+  const n=e.target.closest("[data-open]");
+  if(n){ e.preventDefault(); return openPlayer(+n.dataset.open); }
+  if(e.target.id==="pmodal") return closePlayer();     // clic fuori dalla scheda
+  if(e.target.id==="cmodal") return closeSwap();
+});
+document.getElementById("rrole").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  rRole=b.dataset.rrole;
+  document.querySelectorAll("#rrole button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+  renderRendimento();
+});
+document.addEventListener("click",e=>{
+  const th=e.target.closest("#rendtable th[data-rsort]"); if(!th) return;
+  const k=th.dataset.rsort;
+  if(rSort===k) rDir=-rDir; else { rSort=k; rDir=-1; }
+  renderRendimento();
+});
+document.getElementById("roleseg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  fRole=b.dataset.role;
+  document.querySelectorAll("#roleseg button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+  renderList();
+});
+document.getElementById("calseg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  calOff=+b.dataset.off;
+  document.querySelectorAll("#calseg button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+  renderCal();
+});
+document.querySelectorAll("table.list th[data-sort]").forEach(th=>{
+  th.addEventListener("click",()=>{
+    const k=th.dataset.sort;
+    if(sortKey===k) sortDir=-sortDir; else { sortKey=k; sortDir=(k==="n"||k==="r")?1:-1; }
+    renderList();
+  });
+});
+
+/* ══ 16. Avvio ══════════════════════════════════════════════════════ */
+document.getElementById("lteam").innerHTML=`<option value="">Tutte</option>`+
+  [...new Set(PL.map(p=>p.s))].sort().map(t=>`<option>${esc(t)}</option>`).join("");
+
+function renderAll(){
+  renderTabs();
+  renderBoard(); renderScarsi(); renderTeams(); renderPlan(); renderLog(); renderList();
+  renderRose(); renderRiepilogo(); renderSetup(); renderPick(); renderCal(); renderGiornata(); renderTitolari();
+  renderBalance(); renderRendimento(); renderBanner();
+}
+setSync();
+renderAll();
+try{
+  const ui=JSON.parse(sessionStorage.getItem("fa-ui")||"null");
+  if(ui){
+    sessionStorage.removeItem("fa-ui");
+    const b=document.querySelector(`.tabs button[data-tab="${ui.tab}"]`);
+    if(b&&ui.tab!=="asta") b.click();
+    if(ui.q){ document.getElementById("q").value=ui.q; search(); }
+    if(ui.sel&&byId.has(ui.sel)&&!S.assign[ui.sel]){   // la chiamata era a metà: riprendila
+      sel=byId.get(ui.sel); renderPick();
+      const pr=document.getElementById("price"), tm=document.getElementById("team");
+      if(pr&&ui.price) pr.value=ui.price;
+      if(tm&&ui.team) tm.value=ui.team;
+    }
+  }
+}catch(e){}
+const q0=document.getElementById("q"); if(q0) q0.focus();
+initStore();
+})();
+</script>

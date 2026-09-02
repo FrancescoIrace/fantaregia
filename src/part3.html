@@ -1,0 +1,393 @@
+<div id="fa-root">
+<header class="board">
+  <div class="board-in">
+    <div class="brand">
+      <h1>Sala d'Asta</h1>
+      <span class="season">SERIE&nbsp;A · 2026/27</span>
+      <span class="synced" id="sync" title="Stato del salvataggio"></span>
+      <button class="modo" id="modo" role="switch" aria-checked="true"
+        title="Riordina il menu: con l'asta accesa vengono prima le pagine che servono a comprare, spenta quelle che servono a giocare le giornate">
+        <span class="mlab">Modalità asta</span><span class="msw"><i></i></span><span class="mval">ON</span>
+      </button>
+    </div>
+    <div class="gauges" id="gauges"></div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="asta" aria-selected="true">Asta live</button>
+    <button role="tab" data-tab="listone" aria-selected="false">Listone</button>
+    <button role="tab" data-tab="titolari" aria-selected="false">Titolari</button>
+    <button role="tab" data-tab="rendimento" aria-selected="false">Rendimento</button>
+    <button role="tab" data-tab="giornate" aria-selected="false">Giornate</button>
+    <button role="tab" data-tab="calendario" aria-selected="false">Calendario</button>
+    <button role="tab" data-tab="rose" aria-selected="false">Rose</button>
+    <button role="tab" data-tab="setup" aria-selected="false">Lega e dati</button>
+  </nav>
+</header>
+
+<main class="wrap">
+<div id="robanner"></div>
+
+<!-- ══════════ ASTA ══════════ -->
+<section class="view on" id="v-asta">
+  <details class="disc" id="disc">
+  <summary>Come leggere gli indici, e da dove vengono i dati</summary>
+  <div class="body">
+    <div>
+      <h4>Convenienza</h4>
+      <p>Confronta l'FVM di un giocatore con quello atteso per la sua fascia di prezzo <i>nel suo ruolo</i> (regressione log-log su tutto il listone). Sopra 1,00 rende più di quanto costa, sotto 1,00 lo paghi più di quanto vale.</p>
+      <p>Serve a scovare chi è prezzato male, non a dire chi è più forte: fra due giocatori uguali premia il meno caro.</p>
+      <p class="src">Dal listone in uso. Si ricalcola a ogni import.</p>
+    </div>
+    <div>
+      <h4>Appetibilità <span class="mono" style="font-size:11px;color:var(--muted)">0–100</span></h4>
+      <p>Mette insieme le cose che il prezzo non dice: <b>titolarità 40</b>, <b>valore nel ruolo 35</b>, <b>calendario 15</b> nella finestra di giornate scelta, <b>rigori 10</b>.</p>
+      <p class="warn">Ai difensori 8 dei 35 punti del valore passano alla mentalità: è l'unico ruolo in cui, a parità di prezzo, spingere in avanti rende più di quanto il listino lasci intendere.</p>
+      <p class="src">Calcolata sul momento dai dati qui sotto.</p>
+    </div>
+    <div>
+      <h4>Titolarità <span class="tdot t1"></span> <span class="tdot t1 reale"></span></h4>
+      <p>Prima che il campionato dica qualcosa è dedotta dalle quotazioni, cioè da quanto il mercato si aspetta che uno giochi: dentro ogni squadra e ruolo, chi costa di più è dato titolare. Alla controprova, 17 dei 18 primi rigoristi risultano titolari.</p>
+      <p>Su questa stima pesano anche le <b>presenze del 2025/26</b>, per il 40%: quotazione e presenze si correlano solo a 0,50, cioè ciascuna delle due dice qualcosa che l'altra non dice — la quotazione conosce il mercato estivo, le presenze sono un fatto. Il correttivo sposta 74 giocatori su 376: scendono quelli dati per titolari che l'anno scorso hanno giocato poco (Martinez Jo. 5 presenze, Meret 11, Frattesi 14), salgono quelli sottovalutati che giocavano sempre (Soulè 32, Saelemaekers 35, Castro 35). Chi non ha storico in Serie A resta sulla sola quotazione.</p>
+      <p>Appena carichi i voti passa ai fatti: quante volte è sceso davvero in campo. Una presenza con voto vale una titolarità piena, uno spezzone senza voto vale un terzo. La fiducia nei dati cresce con le giornate e diventa piena alla sesta — prima una panchina isolata non ribalta il giudizio, dopo sei giornate le quotazioni di agosto non contano più. Il pallino con l'anello (<span class="tdot t1 reale"></span>) segnala che quel giudizio viene dal campo e non dal listino; passandoci sopra si legge su quante giornate.</p>
+      <p class="warn">Gli <b>indisponibili</b> — infortunati e squalificati — sono l'unica cosa che nessun file dà e che decide la giornata: si segnano a mano dalla scheda del giocatore. Un indisponibile azzera la sua titolarità in tutti gli indici e resta fuori dalla formazione automatica finché non lo rimetti dentro.</p>
+      <p class="src">Dal listone in uso più le giornate caricate in <b>Lega e dati</b>.</p>
+    </div>
+    <div>
+      <h4>Rigoristi <span class="rig first">R</span></h4>
+      <p>Da due fonti indipendenti incrociate — Sky Sport e FantaMaster — verificate contro il listone: 61 nomi su 20 squadre. Badge pieno = confermato da entrambe, sbiadito = una sola fonte. Sul primo rigorista concordano in 15 squadre su 20.</p>
+      <p>Tre nomi sono stati scartati perché non corrispondono a nessun giocatore di quella squadra: Nkunku al Milan, Pellegrino al Parma, Pinamonti al Sassuolo.</p>
+      <p class="src warn">Lista fissa di agosto 2026: le gerarchie dal dischetto cambiano durante l'anno.</p>
+    </div>
+    <div>
+      <h4>Calendario <span class="fix d2" style="font-size:9px">AVV</span></h4>
+      <p>Forza d'attacco e solidità difensiva di ogni squadra: si parte dalle quotazioni (attacco: 3 attaccanti e 4 centrocampisti più cari; difesa: portiere titolare e 4 difensori più cari) e si corregge con i <b>risultati veri</b>, ricavati dai gol dei voti che carichi — gol fatti dai giocatori di una squadra, gol subiti dal suo portiere. I risultati prendono peso <span class="mono">n/(n+10)</span>: a dieci giornate contano metà. Ogni partita ha una difficoltà da 1 a 5 che guarda il reparto avversario che conta per quel ruolo, con mezzo gradino di vantaggio in casa. Maiuscolo = in casa.</p>
+      <p class="warn">Tutte le giornate pesano uguale, e non è una scorciatoia: è quello che dicono i numeri. Sulla serie A 2025/26 vera (28 giornate, 280 partite) la forza di una squadra è persistente — correlazione fra andata e ritorno 0,58 in attacco e 0,55 in difesa — ma la <b>forma non esiste</b>: lo scarto dal proprio livello non ha memoria da una giornata all'altra (r = −0,06 sui gol fatti, −0,09 sui subiti, e uguale a due, tre e cinque giornate). Pesando di più le partite recenti si prevede peggio in modo monotono: con emivita di 10 giornate −3,2% contro il non sapere niente, con emivita 2 addirittura +7,8%, cioè peggio di sparare la media. Lo smorzamento serve invece eccome: la stima grezza sulle prime giornate sbaglia il 34% più che non sapere niente.</p>
+      <p class="src">Calendario estratto dal PDF ufficiale della Lega e validato: 38 giornate da 10 partite, 190 accoppiamenti giocati due volte ciascuno.</p>
+    </div>
+    <div>
+      <h4>Mentalità <span class="ment off">offensiva</span></h4>
+      <p>Dal ruolo Mantra del listino: un trequartista o un'ala spingono in avanti, un mediano o un centrale coprono. Serve soprattutto a capire a colpo d'occhio perché uno costa poco, e a non ritrovarsi una rosa sbilanciata.</p>
+      <p class="warn">Sui centrocampisti non entra nel punteggio: la correlazione con quello che il prezzo non spiega è +0,006, cioè il mercato l'ha già scontata. Sui difensori dai 6 crediti in su è +0,29, e lì pesa.</p>
+      <p class="src">Dalla colonna RM del listone.</p>
+    </div>
+    <div>
+      <h4>Prezzo atteso <span class="mono" style="font-size:11px;color:var(--muted)">crediti</span></h4>
+      <p>La quotazione è un indice, non un prezzo: sommate, le quotazioni di tutti i giocatori che verranno presi fanno circa metà dei crediti che girano in una lega. Il prezzo atteso le trasforma in crediti veri di <i>questa</i> lega, usando budget, numero di squadre, slot per reparto e il piano di spesa impostati in <b>Lega e dati</b>.</p>
+      <p>I crediti di ogni reparto si spartiscono fra i giocatori che verranno davvero comprati — i migliori squadre×slot per quotazione. Ognuno parte da 1 credito e il resto va in proporzione a quanto la sua quotazione supera quella del giocatore "da un credito", preso all'85% della lista: l'ultimo sesto di ogni reparto in asta va via a prezzo di base.</p>
+      <p>Ad asta cominciata il numero diventa il <b>prezzo di adesso</b>: si ricalcola sui crediti ancora in mano alle squadre e sui giocatori ancora liberi che entreranno nelle rose. Se la lega ha speso troppo presto scende, se sta tenendo i crediti sale. Quando si stacca dal listino, il valore di partenza resta scritto sotto.</p>
+      <p>Il tassello <b>Mercato</b> nel tabellone dice di quanto la lega sta pagando sopra o sotto il listino, confrontando i prezzi battuti con quelli attesi degli stessi giocatori. Nella lista delle assegnazioni, <span class="deal ok">affare</span> è sotto il 30% del listino, <span class="deal bad">salasso</span> sopra il 45%.</p>
+      <p>I due numeri che governano il modello non sono a occhio: sono tarati sui <b>prezzi medi delle aste vere</b> di questo listone raccolti da fantacalcio-online.com — Lautaro 84, Malen 80, Thuram 71, Ramos 70, Hojlund 70. Il modello li ricostruisce entro il 5%. Sui portieri la concentrazione è più forte che altrove, perché in porta gioca uno solo dei tre: i crediti del reparto vanno quasi tutti sul primo.</p>
+      <p>Anche il <b>piano di spesa</b> preimpostato viene da lì: 7% portieri, 19% difensori, 32% centrocampisti, 42% attaccanti, che è la mediana di quello che i fantallenatori spendono davvero. Se preferisci il tuo, cambialo in <b>Lega e dati</b> e tutti i prezzi si ricalcolano.</p>
+      <p class="src warn">Sono prezzi di equilibrio, non profezie. Un'asta con tre persone innamorate dello stesso attaccante li smentisce, ed è esattamente in quel momento che l'indicatore Mercato serve a qualcosa.</p>
+    </div>
+    <div>
+      <h4>Rendimento</h4>
+      <p>Compare solo dopo che hai caricato almeno una giornata di voti da <b>Lega e dati</b>. Presenze, media voto e fantamedia sono fatti, non stime: sostituiscono a poco a poco la titolarità dedotta dalle quotazioni.</p>
+      <p>Il fantavoto segue lo schema classico — gol +3, assist +1, rigore parato +3, rigore sbagliato −3, autogol −2, ammonizione −0,5, espulsione −1, gol subito −1. La colonna <span class="mono">Rf</span> del file non viene sommata: i rigori segnati sono già dentro <span class="mono">Gf</span>. I voti con asterisco contano come presenza e valgono 6, ma restano fuori dalla media voto.</p>
+      <p>Nella scheda del giocatore, sotto le medie, c'è il dettaglio <b>giornata per giornata</b>: avversario, voto di pagella, i bonus e i malus che ha preso in quella partita e il fantavoto che ne esce. La riga verde con la stella è la sua giornata migliore; una riga in grigio è una partita in cui non è sceso in campo.</p>
+      <p class="src warn">Con due o tre giornate i numeri non dicono ancora nulla: servono cinque o sei partite prima di fidarsi di una media.</p>
+    </div>
+    <div>
+      <h4>Chi resta, chi cerca</h4>
+      <p>Verso la fine dell'asta i prezzi non li fa più il valore dei giocatori: li fa quanti ne sono rimasti e quante squadre devono ancora coprire quel ruolo. Il pannello confronta i <b>titolari ancora liberi</b> con quanti ne servono ancora alle squadre — non gli slot totali, perché le ultime caselle di ogni reparto si riempiono con giocatori da un credito e non muovono il mercato.</p>
+      <p>Il numero a destra è il rapporto fra le due cose. <b>Sopra 1</b> ci sono più squadre a caccia che titolari rimasti: da lì in poi quel reparto si paga, e conviene muoversi prima. <b>Sotto 0,6</b> c'è abbondanza e puoi aspettare. Il segno <span class="mono" style="font-size:11px">TU</span> dice quanti titolari di quel ruolo mancano ancora a te.</p>
+      <p>Quando chiami un giocatore, sotto la riga del prezzo compare <b>quanti ne restano come lui</b>: stesso ruolo, prezzo atteso entro il 30%, almeno la stessa titolarità. Se il numero è basso la riga diventa rossa — è il momento in cui lasciarlo andare costa caro, perché il prossimo di quel livello non c'è.</p>
+      <p class="src warn">Conta i titolari secondo l'app, non secondo il tuo allenatore: se sai che uno è fuori, segnalo indisponibile e sparisce anche da questo conteggio.</p>
+    </div>
+    <div>
+      <h4>Stagione 2025/26</h4>
+      <p>Nella scheda di ogni giocatore c'è la stagione scorsa per intero: presenze, media voto, fantamedia, gol e assist, bonus e cartellini per presenza, rigori calciati e sbagliati, con il confronto (▲▼) rispetto alla mediana del suo ruolo fra chi ha giocato almeno 15 partite, e la posizione in classifica di ruolo. Se ha cambiato squadra, l'intestazione dice dov'era.</p>
+      <p>Sono <b>numeri mostrati, non pesati</b>: nessuno di questi entra in un punteggio. Il motivo è misurato — la quotazione 26/27 e la fantamedia 25/26 si correlano a 0,79 sugli attaccanti, 0,75 sui centrocampisti, 0,66 sui difensori: il mercato ha già prezzato quasi tutto, e quello che resta fuori vale +0,17÷+0,30, troppo poco per costruirci sopra un indice senza premiare anche chi ha avuto una stagione fortunata. L'unica cosa che entra davvero sono le presenze, dentro la titolarità.</p>
+      <p class="src">File statistiche ufficiale 2025/26, agganciato per Id: 376 dei 518 giocatori del listone hanno una stagione alle spalle. Gli altri sono arrivi nuovi e la scheda lo dice.</p>
+    </div>
+    <div>
+      <h4>Punteggio di giornata <span class="mono" style="font-size:11px;color:var(--muted)">0–100</span></h4>
+      <p>Nella tab <b>Giornate</b> ogni casella porta il punteggio di quel giocatore <i>per quella partita</i>: le stesse voci dell'appetibilità ristrette a una giornata sola — titolarità, valore nel ruolo, avversario di quel turno, rigori — più la <b>forma</b>, cioè quanto la fantamedia delle ultime tre presenze si stacca da quella di tutta la stagione.</p>
+      <p>Sotto al nome c'è la frase che spiega il numero: quello che lo tiene su e, se c'è, quello che lo tira giù. Quando in panchina hai qualcuno che supera il titolare di almeno 5 punti, la casella te lo dice. Il pulsante <b>⇄</b> apre il confronto fra tutti i tuoi giocatori di quel ruolo per quella giornata, con avversario, fantamedia, forma e punteggio uno sotto l'altro.</p>
+      <p class="src warn">La forma compare solo da quando le presenze sono più di tre: prima il confronto sarebbe con sé stesso e darebbe sempre zero.</p>
+    </div>
+    <div>
+      <h4>Quello che questi numeri non sanno</h4>
+      <p>Sono tutti costruiti sulle quotazioni di agosto e su una lista di rigoristi di inizio stagione. Non sanno di infortuni, squalifiche, cambi di allenatore, mercato di gennaio né di come una squadra sta effettivamente giocando.</p>
+      <p>Reggono per preparare l'asta. Da ottobre in poi vanno riletti con quello che dice il campo, e il modo giusto per aggiornarli è caricare un listone nuovo da <b>Lega e dati</b>.</p>
+    </div>
+  </div>
+</details>
+
+  <div class="astagrid">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="card">
+        <div class="card-h"><h2>Chiamata</h2><span class="hint" style="margin-left:auto">Cerca, premi Invio, assegna</span></div>
+        <div class="card-b">
+          <div class="searchbox">
+            <input type="text" id="q" placeholder="Nome giocatore o squadra…" autocomplete="off" spellcheck="false">
+            <div class="results" id="results"></div>
+          </div>
+          <div id="pick"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Assegnazioni</h2>
+          <span class="hint mono" id="logcount" style="margin-left:auto"></span>
+          <button class="btn sm wr" id="undo">Annulla ultima</button>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="card">
+        <div class="card-h"><h2>Chi resta, chi cerca</h2>
+          <span class="hint" style="margin-left:auto">titolari liberi · squadre che li cercano</span></div>
+        <div class="card-b"><div class="scarsi" id="scarsi"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Crediti in sala</h2><span class="hint" style="margin-left:auto">residuo · max offerta</span></div>
+        <div class="teamlist" id="teamstate"></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>La mia spesa per reparto</h2></div>
+        <div class="card-b"><div class="plan" id="planbars"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Equilibrio della rosa</h2>
+          <span class="hint" style="margin-left:auto">chi spinge, chi copre</span></div>
+        <div class="card-b"><div class="balance" id="balance"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ LISTONE ══════════ -->
+<section class="view" id="v-listone">
+  <div class="filters">
+    <div class="f"><label class="fl">Ruolo</label>
+      <div class="roleseg" id="roleseg">
+        <button data-role="" aria-pressed="true">Tutti</button>
+        <button data-role="P" aria-pressed="false">P</button>
+        <button data-role="D" aria-pressed="false">D</button>
+        <button data-role="C" aria-pressed="false">C</button>
+        <button data-role="A" aria-pressed="false">A</button>
+      </div>
+    </div>
+    <div class="f grow"><label class="fl" for="lq">Cerca</label><input type="text" id="lq" placeholder="Nome giocatore…" autocomplete="off"></div>
+    <div class="f"><label class="fl" for="lteam">Squadra</label><select id="lteam"></select></div>
+    <div class="f" style="max-width:92px"><label class="fl" for="lmin">Qt. min</label><input type="number" id="lmin" min="0" placeholder="0"></div>
+    <div class="f" style="max-width:92px"><label class="fl" for="lmax">Qt. max</label><input type="number" id="lmax" min="0" placeholder="36"></div>
+    <div class="f" style="max-width:106px"><label class="fl" for="gfrom">Da giornata</label><input type="number" id="gfrom" min="1" max="38" value="1"></div>
+    <div class="f" style="max-width:106px"><label class="fl" for="gspan">Per quante</label><input type="number" id="gspan" min="1" max="38" value="5"></div>
+  </div>
+  <div class="filters" style="margin-bottom:16px">
+    <div class="toggles">
+      <label><input type="checkbox" id="fFree"> Solo svincolati</label>
+      <label><input type="checkbox" id="fTarget"> Solo obiettivi</label>
+      <label><input type="checkbox" id="fMine"> Solo la mia rosa</label>
+      <span class="hint" id="lcount" style="margin-left:4px"></span>
+    </div>
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div class="tablewrap" style="max-height:68vh;overflow-y:auto">
+      <table class="list">
+        <thead><tr>
+          <th data-sort="star" style="width:30px">★</th>
+          <th data-sort="r" style="width:38px">R</th>
+          <th data-sort="n">Giocatore</th>
+          <th data-sort="q" class="num" style="width:70px">Qt.A</th>
+          <th data-sort="f" class="num" style="width:70px">FVM</th>
+          <th data-sort="att" class="num" style="width:84px" title="Quanto dovrebbe costare in questa lega">Atteso</th>
+          <th data-sort="v" class="num" style="width:136px">Convenienza</th>
+          <th data-sort="app" class="num" style="width:112px">Appetibilità</th>
+          <th data-sort="fm" class="num colfm" style="width:84px">FM</th>
+          <th data-sort="cal" style="width:216px">Prossime partite</th>
+          <th data-sort="max" class="num" style="width:72px">Max mio</th>
+          <th data-sort="st" style="width:116px">Stato</th>
+        </tr></thead>
+        <tbody id="lbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <p class="hint" style="margin-top:11px;max-width:76ch">L'<b>appetibilità</b> mette insieme le cose che il prezzo non dice: quanto è dato titolare (40), quanto vale nel suo ruolo (35), quanto è morbido il calendario nella finestra scelta (15) e se tira i rigori (10). La <b>convenienza</b> confronta l'FVM di un giocatore con quello atteso per la sua fascia di prezzo nel suo ruolo: sopra 1,00 rende più di quanto costa, sotto 1,00 lo paghi più di quanto vale. Le <b>prossime partite</b> colorano ogni avversario secondo quanto è ostico <i>per quel ruolo</i> — a un attaccante pesa la difesa avversaria, a un portiere il suo attacco. Maiuscolo = in casa.</p>
+</section>
+
+<!-- ══════════ TITOLARI ══════════ -->
+<section class="view" id="v-titolari">
+  <div class="filters" style="margin-bottom:16px">
+    <div class="f grow"><label class="fl" for="tq">Cerca squadra o giocatore</label><input type="text" id="tq" placeholder="Napoli, Orsolini…" autocomplete="off"></div>
+    <div class="toggles"><label><input type="checkbox" id="tRig"> Solo rigoristi</label></div>
+  </div>
+  <div class="titgrid" id="titgrid"></div>
+  <div class="card" style="margin-top:18px">
+    <div class="card-h"><h2>Da dove vengono questi dati</h2></div>
+    <div class="card-b">
+      <p class="hint" style="max-width:76ch">I <b>rigoristi</b> sono presi da due fonti indipendenti — Sky Sport e FantaMaster — incrociate fra loro e verificate contro il listone: 61 nomi su 20 squadre, di cui i tre non corrispondenti a nessun giocatore in rosa sono stati scartati. Il badge pieno segna chi è confermato da entrambe, quello sbiadito chi compare in una sola fonte.</p>
+      <p class="hint" style="max-width:76ch;margin-top:10px">La <b>titolarità</b> non viene da una lista di probabili formazioni, che dopo una giornata è ancora ballerina: è dedotta dalle quotazioni stesse, cioè da quanto il mercato si aspetta che uno giochi. Dentro ogni squadra e ruolo, chi è quotato di più è dato titolare. Alla controprova, 17 dei 18 primi rigoristi risultano titolari. Si ricalcola da sola quando carichi un listone nuovo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ RENDIMENTO ══════════ -->
+<section class="view" id="v-rendimento">
+  <div class="filters" style="margin-bottom:16px">
+    <div class="f"><label class="fl">Ruolo</label>
+      <div class="roleseg" id="rrole">
+        <button data-rrole="" aria-pressed="true">Tutti</button>
+        <button data-rrole="P" aria-pressed="false">P</button>
+        <button data-rrole="D" aria-pressed="false">D</button>
+        <button data-rrole="C" aria-pressed="false">C</button>
+        <button data-rrole="A" aria-pressed="false">A</button>
+      </div>
+    </div>
+    <div class="f grow"><label class="fl" for="rq">Cerca</label><input type="text" id="rq" placeholder="Nome o squadra…" autocomplete="off"></div>
+    <div class="toggles"><label><input type="checkbox" id="rmine"> Solo la mia rosa</label>
+      <span class="hint" id="rcount"></span></div>
+  </div>
+  <div id="rendbody"></div>
+</section>
+
+<!-- ══════════ GIORNATE ══════════ -->
+<section class="view" id="v-giornate">
+  <div class="gbar">
+    <div class="gnav">
+      <button id="gprev" title="Giornata precedente">‹</button>
+      <div class="gcur"><b id="glab">Giornata 1</b><span id="gdate"></span></div>
+      <button id="gnext" title="Giornata successiva">›</button>
+    </div>
+    <div class="f" style="min-width:118px"><label class="fl" for="gmod">Modulo</label><select id="gmod"></select></div>
+    <button class="btn primary" id="gauto">Schiera la migliore</button>
+    <button class="btn" id="gclear">Svuota</button>
+    <span class="hint" id="gwarn" style="margin-left:auto;text-align:right;max-width:34ch"></span>
+  </div>
+  <div id="gbody"></div>
+</section>
+
+<!-- ══════════ CALENDARIO ══════════ -->
+<section class="view" id="v-calendario">
+  <div class="filters">
+    <div class="f"><label class="fl">Chi guarda il calendario</label>
+      <div class="roleseg" id="calseg">
+        <button data-off="1" aria-pressed="true">Attacco (C e A)</button>
+        <button data-off="0" aria-pressed="false">Difesa (P e D)</button>
+      </div>
+    </div>
+    <div class="f" style="max-width:112px"><label class="fl" for="cfrom">Da giornata</label><input type="number" id="cfrom" min="1" max="38" value="1"></div>
+    <div class="f" style="max-width:112px"><label class="fl" for="cspan">Per quante</label><input type="number" id="cspan" min="1" max="38" value="5"></div>
+    <div class="f" style="flex:1;min-width:180px;text-align:right"><span class="hint" id="calnote"></span></div>
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div class="tablewrap"><table class="list" id="caltable"><tbody id="calbody"></tbody></table></div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <div class="card-h"><h2>Come nasce questo indice</h2></div>
+    <div class="card-b">
+      <p class="hint" style="max-width:76ch;margin-bottom:12px">La forza di ogni squadra è ricavata dalle quotazioni stesse del listone, cioè dal giudizio del mercato: l'<b>attacco</b> pesa le quotazioni dei tre attaccanti e dei quattro centrocampisti più cari, la <b>difesa</b> quelle del portiere titolare e dei quattro difensori più cari. Sono valori di partenza, non risultati sul campo: reggono in agosto e vanno riletti quando il campo dice altro. Il fattore campo vale mezzo gradino di difficoltà.</p>
+      <div class="forcegrid" id="forcetable"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ ROSE ══════════ -->
+<section class="view" id="v-rose">
+  <div class="card" id="riepcard">
+    <div class="card-h"><h2>Riepilogo asta</h2>
+      <span class="hint" id="riepnote" style="margin-left:auto"></span>
+      <button class="btn sm" id="expxlsx">Scarica in Excel</button>
+      <button class="btn sm" id="expprint">Stampa o salva in PDF</button>
+    </div>
+    <div class="card-b"><div id="riepbody"></div></div>
+  </div>
+  <div class="filters" id="rosefilters">
+    <div class="f grow"><label class="fl" for="roq">Cerca nelle rose</label>
+      <input type="text" id="roq" placeholder="Giocatore, squadra di A o partecipante…" autocomplete="off" spellcheck="false"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn sm" id="roopen">Apri tutte</button>
+      <button class="btn sm" id="roclose">Chiudi tutte</button>
+    </div>
+    <span class="hint" id="rocount" style="margin-left:auto"></span>
+  </div>
+  <div class="rosegrid" id="rosegrid"></div>
+</section>
+
+<!-- ══════════ SETUP ══════════ -->
+<section class="view" id="v-setup">
+  <div class="setupgrid">
+    <div class="card">
+      <div class="card-h"><h2>Partecipanti</h2></div>
+      <div class="card-b">
+        <div class="teamedit" id="teamedit"></div>
+        <div style="display:flex;gap:9px;margin-top:13px">
+          <button class="btn sm wr" id="addteam">+ Aggiungi squadra</button>
+          <button class="btn sm danger wr" id="delteam">− Rimuovi ultima</button>
+        </div>
+        <p class="hint" style="margin-top:11px">Il pallino segna la tua squadra. È una scelta di questo dispositivo: ogni partecipante apre la stessa pagina e sceglie la propria.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Regole della lega</h2></div>
+      <div class="card-b">
+        <label class="fl" for="budget">Crediti a disposizione</label>
+        <input type="number" id="budget" min="1" style="max-width:150px" class="wr">
+        <label class="fl" style="margin-top:16px">Slot per reparto</label>
+        <div class="slotgrid" id="slotgrid"></div>
+        <label class="fl" style="margin-top:16px">Piano di spesa — % del budget per reparto</label>
+        <div class="slotgrid" id="plangrid"></div>
+        <p class="hint" id="plansum" style="margin-top:8px"></p>
+        <button class="btn sm wr" id="planmed" style="margin-top:6px"
+          title="Portieri 7, difensori 19, centrocampisti 32, attaccanti 42">Usa il piano mediano delle aste vere</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Listone</h2></div>
+      <div class="card-b">
+        <p class="hint" id="listinfo" style="margin-bottom:12px"></p>
+        <label class="fl" for="filein">Carica quotazioni aggiornate</label>
+        <input type="file" id="filein" accept=".xlsx,.xls,.csv" class="wr" style="font-size:13px;padding:7px 0">
+        <p class="hint" style="margin-top:9px">Accetta il file ufficiale delle quotazioni (xlsx) o un csv con le colonne <span class="mono">Id, R, Nome, Squadra, Qt.A, FVM</span>. Le assegnazioni già fatte restano al loro posto.</p>
+        <div id="importlog" style="margin-top:11px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Voti di giornata</h2></div>
+      <div class="card-b">
+        <p class="hint" id="votiinfo" style="margin-bottom:12px"></p>
+        <label class="fl" for="votifile">Carica il file dei voti — puoi sceglierne anche più di uno</label>
+        <input type="file" id="votifile" accept=".xlsx,.xls" multiple class="wr" style="font-size:13px;padding:7px 0">
+        <div class="votirow wr">
+          <div><label class="fl" for="votig">Giornata</label><input type="number" id="votig" min="1" max="38" value="1"></div>
+          <div><label class="fl" for="votisheet">Foglio</label><select id="votisheet"><option>Fantacalcio</option></select></div>
+          <button class="btn primary" id="votiapply" disabled>Aggiungi</button>
+        </div>
+        <p class="hint" style="margin-top:9px">Il file ufficiale delle pagelle si scarica da
+          <a href="https://www.fantacalcio.it/voti-fantacalcio-serie-a" target="_blank" rel="noopener noreferrer">fantacalcio.it/voti-fantacalcio-serie-a</a>.
+          Contiene tre fogli — Fantacalcio, Statistico, Italia — che sono tre redazioni diverse: scegli quella che usa la tua lega.
+          Ricaricare una giornata già inserita la sostituisce.</p>
+        <div id="votilog" style="margin-top:11px"></div>
+        <div id="votigiornate" style="margin-top:11px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>Backup</h2></div>
+      <div class="card-b">
+        <p class="hint" id="backupnote" style="margin-bottom:12px"></p>
+        <div class="dangerzone">
+          <button class="btn" id="export">Esporta asta</button>
+          <label class="btn wr" for="restorein" style="display:inline-block">Importa da file</label>
+          <input type="file" id="restorein" accept=".json,application/json" style="display:none">
+          <button class="btn wr" id="importbtn">Incolla</button>
+          <button class="btn danger wr" id="reset">Azzera asta</button>
+        </div>
+        <textarea id="importbox" rows="4" style="display:none;width:100%;margin-top:11px;font-family:var(--f-mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:7px;padding:9px" placeholder="Incolla qui il backup e premi di nuovo Importa"></textarea>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<div id="printview" aria-hidden="true"></div>
+
+<div class="modal" id="pmodal"><div class="pcard" id="pcard"></div></div>
+<div class="modal" id="cmodal"><div class="pcard" id="ccard"></div></div>
+<div class="toast" id="toast"></div>
+</div>

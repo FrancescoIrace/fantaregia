@@ -1,0 +1,12 @@
+{
+  "name": "sala-asta-fantacalcio",
+  "version": "1.0.0",
+  "description": "App a file singolo per gestire l'asta del fantacalcio e la stagione: prezzi attesi tarati sulle aste vere, indici verificati, tutto offline.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "./build.sh",
+    "build:dati": "./build.sh dati/"
+  },
+  "devDependencies": { "xlsx": "^0.18.5" }
+}

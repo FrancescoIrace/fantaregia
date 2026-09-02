@@ -1,0 +1,1018 @@
+
+/* ══ 7. Tabellone ═══════════════════════════════════════════════════ */
+function renderBoard(){
+  const me=meId(), st=stats(me);
+  let h=`<div class="gauge hi"><div class="lab">Crediti</div><div class="val">${st.left}</div><div class="sub">di ${S.budget}</div></div>`;
+  const tight=st.slotsLeft>0&&st.max<=Math.max(2,Math.round(S.budget*0.02));
+  h+=`<div class="gauge${tight?" alarm":""}"><div class="lab">Max offerta</div><div class="val">${st.slotsLeft>0?st.max:"—"}</div><div class="sub">${st.slotsLeft} slot liberi</div></div>`;
+  for(const r of ROLES){
+    const c=st.perRole[r].count, tot=S.slots[r];
+    const over=st.perRole[r].spent>Math.round(S.budget*S.plan[r]/100);
+    let dots=""; for(let i=0;i<tot;i++) dots+=`<i class="${i<c?"on":""}"></i>`;
+    h+=`<div class="gauge g${r}"><div class="lab">${r} · ${st.perRole[r].spent}${over?" ⚠":""}</div><div class="val">${c}<span style="font-size:12px;opacity:.5">/${tot}</span></div><div class="slotbar">${dots}</div></div>`;
+  }
+  const mk=mercato();
+  if(mk){
+    const pct=Math.round(mk.infl*100);
+    const forte=Math.abs(mk.infl)>=0.12;
+    h+=`<div class="gauge${forte?(mk.infl>0?" alarm":" good"):""}" title="Finora la lega ha speso ${mk.pagato} crediti per giocatori che di listino ne valevano ${mk.atteso}">
+      <div class="lab">Mercato</div>
+      <div class="val" style="color:${inflCol(mk.infl)}">${pct>=0?"+":"−"}${Math.abs(pct)}%</div>
+      <div class="sub">${mk.infl>=0.12?"si paga caro":mk.infl<=-0.12?"si compra bene":"in linea"}</div></div>`;
+  }
+  document.getElementById("gauges").innerHTML=h;
+}
+/* ══ Scarsità: il pannello che dice quando i prezzi stanno per partire ══ */
+function renderScarsi(){
+  const box=document.getElementById("scarsi"); if(!box) return;
+  const sc=scarsita();
+  box.innerHTML=ROLES.map(r=>{
+    const s=sc[r];
+    const p=s.press;
+    const larg=p===Infinity?100:Math.max(4,Math.min(100,p/2*100));
+    const io=s.mieiTit?`<span class="mio" title="Titolari di questo ruolo che devi ancora prendere tu">tu ${s.mieiTit}</span>`:"";
+    const fasce=[s.fasce.top?`${s.fasce.top} da oltre ${Math.round(0.08*(S.budget||500))}`:"",
+                 s.fasce.medio?`${s.fasce.medio} di fascia media`:""].filter(Boolean).join(" · ");
+    return `<div class="scrow">
+      <span class="chip ${r}">${r}</span>
+      <div class="scmain">
+        <div class="scnum"><b>${s.tit}</b> liber${s.tit===1?"o":"i"}
+          <span class="sep">contro</span> <b>${s.domanda}</b> cercat${s.domanda===1?"o":"i"} ${io}</div>
+        <div class="scbar"><span style="width:${larg}%;background:${pressCol(p)}"></span></div>
+        ${fasce?`<div class="scfa">${fasce}</div>`:`<div class="scfa">nessun titolare di valore rimasto</div>`}
+      </div>
+      <span class="scpress" style="color:${pressCol(p)}" title="Quanti titolari servono ancora alle squadre per ogni titolare rimasto libero">${p===Infinity?"—":p.toFixed(1)}<small>${pressLab(p)}</small></span>
+    </div>`;
+  }).join("")
+   +`<p class="hint" style="margin-top:10px">Sopra 1 ci sono più squadre a caccia che titolari rimasti: da lì in poi quel reparto si paga. Sotto 0,6 puoi aspettare.</p>`;
+}
+/* ══ Modalità asta: riordina il menu ═════════════════════════════════
+   Le stesse pagine, in un ordine diverso. Con l'asta accesa vengono prima
+   quelle che servono a comprare, spenta quelle che servono a giocare le
+   giornate. È una preferenza di chi guarda, quindi resta sul dispositivo. */
+const ORDINE={
+  asta:     ["asta","listone","titolari","rose","calendario","rendimento","giornate","setup"],
+  stagione: ["giornate","rendimento","titolari","listone","calendario","rose","asta","setup"]
+};
+const PRIME=4;   // quante voci sono "quelle del momento"
+function modoAsta(){
+  if(ME.modoAsta===undefined||ME.modoAsta===null){
+    // alla prima apertura decide da sola: se l'asta non è finita, è modalità asta
+    const presi=Object.keys(S.assign).length, servono=totalSlots()*S.teams.length;
+    return !(servono>0&&presi>=servono);
+  }
+  return !!ME.modoAsta;
+}
+function setModo(v){ ME.modoAsta=!!v; saveMe(); renderTabs(); toast(v?"Menu per l'asta":"Menu per la stagione"); }
+function renderTabs(){
+  const nav=document.querySelector(".tabs"); if(!nav) return;
+  const on=modoAsta();
+  const ord=ORDINE[on?"asta":"stagione"];
+  const btn=new Map([...nav.querySelectorAll("button[data-tab]")].map(b=>[b.dataset.tab,b]));
+  ord.forEach((k,i)=>{ const b=btn.get(k); if(!b) return;
+    b.classList.toggle("sec", i>=PRIME && k!=="setup");
+    nav.appendChild(b);                       // riordina spostando in fondo
+  });
+  const m=document.getElementById("modo");
+  if(m){ m.setAttribute("aria-checked",on?"true":"false");
+    m.classList.toggle("off",!on);
+    m.querySelector(".mval").textContent=on?"ON":"OFF"; }
+}
+function renderBanner(){
+  const el=document.getElementById("robanner");
+  if(pending){
+    const t=new Date(pending.m.at).toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
+    el.innerHTML=`<div class="banner" style="background:var(--warn-soft);border-color:var(--warn)">
+      <span style="flex:1;min-width:220px">Su questo dispositivo risultano impostazioni di lega (${esc(pending.diff.join(", "))})
+      cambiate alle ${t} che non sono mai arrivate alla pagina condivisa.</span>
+      <button class="btn sm" id="pfix">Applicale ora</button>
+      <button class="btn sm" id="pdrop">Lascia com'è</button></div>`;
+    return;
+  }
+  if(readOnly){
+    el.innerHTML=`<div class="banner">Stai guardando l'asta in sola lettura: vedi tutto aggiornarsi, ma le assegnazioni le registra chi gestisce la pagina. Gli obiettivi e i prezzi massimi che segni restano comunque tuoi, su questo dispositivo.</div>`;
+  } else if(mode==="condivisa" && !ME.myTeam){
+    el.innerHTML=`<div class="banner">Scegli la tua squadra in <b>Lega e dati</b>: il tabellone in alto seguirà i tuoi crediti invece di quelli della prima squadra in elenco.</div>`;
+  } else el.innerHTML="";
+}
+
+/* ══ 8. Convenienza, grafica ════════════════════════════════════════ */
+/* cella FM del listone: compare solo quando ci sono voti caricati */
+function fmCell(p){
+  const st=statFor(p.id);
+  if(!st||!st.pres) return `<span style="color:var(--line-strong)">—</span>`;
+  return `<span class="fmv" style="color:${fmCol(st.fm)}">${st.fm.toFixed(2)}</span>`
+    +`<div class="subline" style="text-align:right">${st.pres}/${st.su} pres</div>`;
+}
+/* cella "Atteso": il prezzo di adesso, con il listino sotto se se n'è staccato */
+function attCell(p){
+  if(S.assign[p.id]) return `<span style="color:var(--line-strong)">—</span>`;
+  const base=attesa(p.id), ora=attesaOra(p.id);
+  if(ora===null) return `<span class="attv">${base}</span>`;
+  const d=base?ora/base-1:0;
+  return `<span class="attv" style="color:${Math.abs(d)<0.1?"inherit":d>0?"var(--warn)":"var(--ok)"}">${ora}</span>`
+    +(Math.abs(d)>=0.1?`<div class="subline" style="text-align:right">listino ${base}</div>`:"");
+}
+function meter(v){
+  const cls=v>=1.15?"v-hi":v<=0.85?"v-lo":"v-mid";
+  const col=v>=1.15?"var(--ok)":v<=0.85?"var(--crit)":"var(--muted)";
+  const d=Math.max(-1,Math.min(1,(v-1)/0.8)), w=Math.max(1.5,Math.abs(d)*26);
+  const style=d>=0?`left:26px;width:${w}px`:`left:${26-w}px;width:${w}px`;
+  return `<div class="meter"><div class="bar"><span style="${style};background:${col}"></span></div><span class="n ${cls}">${v.toFixed(2)}</span></div>`;
+}
+
+/* ══ 9. Listone ═════════════════════════════════════════════════════ */
+let sortKey="q", sortDir=-1, fRole="";
+const gFrom=()=>Math.max(1,Math.min(38,parseInt(document.getElementById("gfrom").value)||1));
+const gSpan=()=>Math.max(1,Math.min(38,parseInt(document.getElementById("gspan").value)||5));
+function renderList(){
+  const q=document.getElementById("lq").value.trim().toLowerCase();
+  const tf=document.getElementById("lteam").value;
+  const mn=parseInt(document.getElementById("lmin").value)||0;
+  const mx=parseInt(document.getElementById("lmax").value)||999;
+  const onlyFree=document.getElementById("fFree").checked;
+  const onlyT=document.getElementById("fTarget").checked;
+  const onlyMine=document.getElementById("fMine").checked;
+  const me=meId(), from=gFrom(), span=gSpan();
+  let rows=PL.filter(p=>{
+    if(fRole&&p.r!==fRole) return false;
+    if(tf&&p.s!==tf) return false;
+    if(p.q<mn||p.q>mx) return false;
+    if(q&&!(p.n.toLowerCase().includes(q)||p.s.toLowerCase().includes(q))) return false;
+    const a=S.assign[p.id];
+    if(onlyFree&&a) return false;
+    if(onlyT&&!ME.targets[p.id]) return false;
+    if(onlyMine&&!(a&&a.team===me)) return false;
+    return true;
+  });
+  const ro={P:0,D:1,C:2,A:3};
+  rows.sort((a,b)=>{
+    let x,y;
+    switch(sortKey){
+      case "star": x=ME.targets[a.id]?1:0; y=ME.targets[b.id]?1:0; break;
+      case "r": x=ro[a.r]; y=ro[b.r]; break;
+      case "n": return sortDir*a.n.localeCompare(b.n);
+      case "max": x=(ME.targets[a.id]||{}).max||0; y=(ME.targets[b.id]||{}).max||0; break;
+      case "st": x=S.assign[a.id]?1:0; y=S.assign[b.id]?1:0; break;
+      case "cal": x=calScore(a.s,a.r,from,span)||0; y=calScore(b.s,b.r,from,span)||0; break;
+      case "app": x=appet(a,from,span); y=appet(b,from,span); break;
+      case "fm": x=(statFor(a.id)||{}).fm||-1; y=(statFor(b.id)||{}).fm||-1; break;
+      case "att": x=attesaOra(a.id)||attesa(a.id); y=attesaOra(b.id)||attesa(b.id); break;
+      default: x=a[sortKey]; y=b[sortKey];
+    }
+    return sortDir*(x-y)|| a.n.localeCompare(b.n);
+  });
+  const html=rows.slice(0,400).map(p=>{
+    const a=S.assign[p.id], t=ME.targets[p.id];
+    const cls=(a?(a.team===me?"mine":"taken"):"")+(isOut(p.id)?" fuori":"");
+    const stt=a?`<span class="takenby" style="color:${a.team===me?"var(--accent)":"var(--muted)"}">${esc(teamName(a.team))} · ${a.price}</span>`:`<span class="tag ok">libero</span>`;
+    const cs=calScore(p.s,p.r,from,span);
+    return `<tr class="${cls}" data-id="${p.id}">
+      <td><button class="starbtn ${t?"on":""}" data-star="${p.id}" title="Segna come obiettivo">${t?"★":"☆"}</button></td>
+      <td><span class="chip ${p.r}">${p.r}</span></td>
+      <td><div class="namewrap"><span class="pname clic" data-open="${p.id}">${esc(p.n)}</span>${titDot(p)}${rigBadge(p)}${outBadge(p)}</div><div class="pteam">${esc(p.s)} <span class="rm">${esc(p.rm||"")}</span> ${mentChip(p)}</div></td>
+      <td class="num" style="font-weight:600">${p.q}</td>
+      <td class="num" style="color:var(--muted)">${p.f}</td>
+      <td class="num">${attCell(p)}</td>
+      <td class="num">${meter(p.v)}</td>
+      <td class="num">${appetCell(p,from,span)}</td>
+      <td class="num colfm">${fmCell(p)}</td>
+      <td>${cs===null?"":`<div style="display:flex;align-items:center;gap:7px">${fixStrip(p.s,p.r,from,span)}<span class="calscore" style="color:${scoreCol(cs)}">${cs.toFixed(1)}</span></div>`}</td>
+      <td class="num"><input class="tmax" type="number" min="0" data-max="${p.id}" value="${t&&t.max?t.max:""}" placeholder="—"></td>
+      <td>${stt}</td></tr>`;
+  }).join("");
+  const conVoti=giornateGiocate().length>0;
+  document.querySelector("table.list").classList.toggle("stats",conVoti);
+  document.getElementById("lbody").innerHTML=html||`<tr><td colspan="${conVoti?12:11}" class="empty">Nessun giocatore con questi filtri.</td></tr>`;
+  document.getElementById("lcount").textContent=rows.length>400?`${rows.length} giocatori — mostrati i primi 400`:`${rows.length} giocatori`;
+  document.querySelectorAll("table.list th[data-sort]").forEach(th=>{
+    th.innerHTML=th.innerHTML.replace(/\s*<span class="ar">[^<]*<\/span>/,"");
+    if(th.dataset.sort===sortKey) th.innerHTML+=` <span class="ar">${sortDir>0?"▲":"▼"}</span>`;
+  });
+}
+
+/* ══ 10. Vista calendario ═══════════════════════════════════════════ */
+let calOff=1;
+function renderCal(){
+  const from=Math.max(1,Math.min(38,parseInt(document.getElementById("cfrom").value)||1));
+  const span=Math.max(1,Math.min(38,parseInt(document.getElementById("cspan").value)||5));
+  const role=calOff?"A":"D";
+  const it=s=>{ if(!s) return ""; const p=s.split("-"); return p[2]+"/"+p[1]; };
+  const d0=CAL.dates[from-1], d1=CAL.dates[Math.min(37,from+span-2)];
+  document.getElementById("calnote").textContent=
+    `Giornate ${from}–${Math.min(38,from+span-1)}`+(d0?` · dal ${it(d0)} al ${it(d1)}`:"");
+  const rows=CALTEAMS.map(t=>({t,s:calScore(t,role,from,span)})).sort((a,b)=>b.s-a.s);
+  document.getElementById("calbody").innerHTML=rows.map((r,i)=>`
+    <tr><td class="mono" style="color:var(--muted);width:32px">${i+1}</td>
+      <td class="tname">${esc(r.t)}</td>
+      <td>${fixStrip(r.t,role,from,span)}</td>
+      <td class="num"><span class="calscore" style="color:${scoreCol(r.s)}">${r.s.toFixed(2)}</span></td></tr>`).join("");
+  const F=CALTEAMS.map(t=>({t,a:FORCE[t].att,d:FORCE[t].dif})).sort((x,y)=>(y.a+y.d)-(x.a+x.d));
+  document.getElementById("forcetable").innerHTML=F.map(x=>`
+    <div class="forcerow"><span class="fn">${esc(x.t)}</span>
+      <span class="fv" title="Forza d'attacco" style="color:var(--rA)">${x.a>=0?"+":""}${x.a.toFixed(2)}</span>
+      <span class="fv" title="Solidità difensiva" style="color:var(--rD)">${x.d>=0?"+":""}${x.d.toFixed(2)}</span></div>`).join("");
+}
+
+/* ══ 10b. Titolari e rigoristi ══════════════════════════════════════ */
+function renderTitolari(){
+  const q=(document.getElementById("tq").value||"").trim().toLowerCase();
+  const onlyR=document.getElementById("tRig").checked;
+  const squadre=[...new Set(PL.map(p=>p.s))].sort();
+  const html=squadre.map(t=>{
+    let rosa=PL.filter(p=>p.s===t);
+    if(onlyR) rosa=rosa.filter(p=>rigOf(p));
+    if(q && !t.toLowerCase().includes(q)) rosa=rosa.filter(p=>p.n.toLowerCase().includes(q));
+    if(!rosa.length) return "";
+    const rg=rosa.filter(p=>rigOf(p)).sort((a,b)=>rigOf(a)[0]-rigOf(b)[0]);
+    const riga=p=>`<div class="tp"><span class="chip ${p.r}">${p.r}</span>
+            <span class="nm pname clic" data-open="${p.id}">${esc(p.n)}</span>${rigBadge(p)}${outBadge(p)}${mentChip(p)}
+            <span class="qz">${p.q}</span></div>`;
+    const ordina=(a,b)=>("PDCA".indexOf(a.r)-"PDCA".indexOf(b.r))||b.q-a.q;
+    const fuori=rosa.filter(p=>isOut(p.id)).sort(ordina);
+    const dentro=rosa.filter(p=>!isOut(p.id));
+    let secs=[1,2,3].map(lv=>{
+      const l=dentro.filter(p=>titStato(p).liv===lv).sort(ordina);
+      if(!l.length) return "";
+      const daiDati=l.filter(p=>titStato(p).dati).length;
+      return `<div class="titsec"><div class="sh">${TITLAB[lv]} · ${l.length}${daiDati===l.length&&l.length?' <span class="tsrc">dal campo</span>':""}</div>`
+        + l.map(riga).join("")+`</div>`;
+    }).join("");
+    if(fuori.length) secs+=`<div class="titsec"><div class="sh">indisponibili · ${fuori.length}</div>`
+      + fuori.map(riga).join("")+`</div>`;
+    return `<div class="card">
+      <div class="tithead"><h3>${esc(t)}</h3><span class="hint mono">${rosa.length} in lista</span></div>
+      ${rg.length?`<div class="rigrow"><span style="color:var(--muted);font-weight:600">Rigori:</span>
+        ${rg.map(p=>`<span style="display:inline-flex;align-items:center;gap:5px">${rigBadge(p)}${esc(p.n)}</span>`).join("")}</div>`:""}
+      ${secs}</div>`;
+  }).join("");
+  document.getElementById("titgrid").innerHTML=html||`<div class="card"><div class="empty">Nessuna squadra con questi filtri.</div></div>`;
+}
+
+/* ══ 10c. Rendimento ════════════════════════════════════════════════ */
+let rRole="", rSort="fm", rDir=-1;
+function sparkline(serie){
+  if(!serie||!serie.length) return "";
+  const vals=serie.filter(Boolean).map(x=>x.fv);
+  if(!vals.length) return "";
+  const lo=Math.min(4,...vals), hi=Math.max(10,...vals);
+  return '<div class="spark">'+serie.slice(-10).map(x=>{
+    if(!x) return '<i class="no" title="non ha giocato"></i>';
+    const h=Math.max(3,Math.round((x.fv-lo)/((hi-lo)||1)*20));
+    return `<i class="${x.fv>=7?"up":x.fv<=5?"dn":""}" style="height:${h}px" title="Giornata ${x.g}: voto ${x.v.toFixed(1)}${x.sv?" (s.v.)":""}, fantavoto ${x.fv.toFixed(1)}"></i>`;
+  }).join("")+'</div>';
+}
+/* bonus e malus di una singola giornata, come li conta il fantavoto */
+function bonusChips(e,role){
+  const c=[];
+  if(e.gf) c.push(`<span class="bchip pos">${e.gf>1?e.gf+" gol":"Gol"} <b>+${3*e.gf}</b></span>`);
+  if(e.ass) c.push(`<span class="bchip ast">${e.ass>1?e.ass+" assist":"Assist"} <b>+${e.ass}</b></span>`);
+  if(e.rp) c.push(`<span class="bchip pos">${e.rp>1?e.rp+" rig. parati":"Rigore parato"} <b>+${3*e.rp}</b></span>`);
+  if(role==="P"&&!e.sv&&!e.sub) c.push(`<span class="bchip neu">Porta inviolata</span>`);
+  if(role==="P"&&e.sub) c.push(`<span class="bchip neg">${e.sub>1?e.sub+" gol subiti":"Gol subito"} <b>−${e.sub}</b></span>`);
+  if(e.rs) c.push(`<span class="bchip neg">${e.rs>1?e.rs+" rig. sbagliati":"Rigore sbagliato"} <b>−${3*e.rs}</b></span>`);
+  if(e.au) c.push(`<span class="bchip neg">${e.au>1?e.au+" autogol":"Autogol"} <b>−${2*e.au}</b></span>`);
+  if(e.amm) c.push(`<span class="bchip neu">Ammonito <b>−${(0.5*e.amm).toFixed(1).replace(".",",")}</b></span>`);
+  if(e.esp) c.push(`<span class="bchip neg">Espulso <b>−${e.esp}</b></span>`);
+  if(!c.length) c.push(`<span class="bchip nil">nessun bonus</span>`);
+  return c.join("");
+}
+/* una riga per ogni giornata caricata: voto, bonus ricevuti, fantavoto */
+function gdayRows(p,st){
+  const gs=giornateGiocate();
+  const best=st.pres>1?st.best:null;
+  return gs.map((g,i)=>{
+    const e=st.serie[i];
+    const fx=fixtures(p.s,g,1)[0];
+    const opp=fx?`${fx.home?"":"@"}${ABBR(fx.opp)}`:"—";
+    const oppT=fx?`Giornata ${g} — ${fx.home?"in casa contro":"in trasferta a"} ${esc(fx.opp)}`:`Giornata ${g}`;
+    if(!e) return `<div class="gdrow out"><span class="gnum">G${g}</span>
+      <span class="gopp" title="${oppT}">${opp}</span>
+      <span class="gv sv">—</span>
+      <span class="gchips"><span class="bchip nil">non ha giocato</span></span>
+      <span class="gfv" style="color:var(--muted)">—</span></div>`;
+    const isTop=best&&e.g===best.g;
+    return `<div class="gdrow${isTop?" top":""}"${isTop?' title="La sua giornata migliore fra quelle caricate"':""}><span class="gnum">G${g}${isTop?' <span class="gstar">★</span>':""}</span>
+      <span class="gopp" title="${oppT}">${opp}</span>
+      <span class="gv${e.sv?" sv":""}">${e.sv?"s.v.":e.v.toFixed(1).replace(".",",")}<small>voto</small></span>
+      <span class="gchips">${bonusChips(e,p.r)}</span>
+      <span class="gfv" style="color:${fmCol(e.fv)}">${e.fv.toFixed(1).replace(".",",")}<small>fantavoto</small></span></div>`;
+  }).join("");
+}
+function renderRendimento(){
+  const box=document.getElementById("rendbody");
+  const gs=giornateGiocate();
+  if(!gs.length){
+    document.getElementById("rcount").textContent="";
+    box.innerHTML=`<div class="card"><div class="empty">Nessuna giornata caricata.<br>
+      Vai in <b>Lega e dati → Voti di giornata</b> e carica il file delle pagelle: qui compariranno presenze, medie, gol e assist.</div></div>`;
+    return;
+  }
+  const q=(document.getElementById("rq").value||"").trim().toLowerCase();
+  const onlyMine=document.getElementById("rmine").checked;
+  const me=meId();
+  let rows=PL.map(p=>({p:p,st:statFor(p.id)})).filter(x=>{
+    if(!x.st||!x.st.pres) return false;
+    if(rRole&&x.p.r!==rRole) return false;
+    if(q&&!(x.p.n.toLowerCase().includes(q)||x.p.s.toLowerCase().includes(q))) return false;
+    if(onlyMine){ const a=S.assign[x.p.id]; if(!a||a.team!==me) return false; }
+    return true;
+  });
+  rows.sort((a,b)=>{
+    const get=x=>({fm:x.st.fm, mv:x.st.mv||0, pres:x.st.pres, gf:x.st.gf, ass:x.st.ass,
+      q:x.p.q, forma:(formaOf(x.p.id)||{}).delta||0}[rSort]);
+    return rDir*((get(a)||0)-(get(b)||0)) || a.p.n.localeCompare(b.p.n);
+  });
+  document.getElementById("rcount").textContent=
+    `${rows.length} giocatori · giornate ${gs.join(", ")}`+(S.votiMeta&&S.votiMeta.sheet?` · voti ${S.votiMeta.sheet}`:"");
+  const th=(k,lab,cls)=>`<th data-rsort="${k}" class="${cls||""}">${lab}${rSort===k?` <span class="ar">${rDir>0?"▲":"▼"}</span>`:""}</th>`;
+  box.innerHTML=`<div class="card" style="overflow:hidden"><div class="tablewrap" style="max-height:68vh;overflow-y:auto">
+    <table class="list" id="rendtable"><thead><tr>
+      <th style="width:38px">R</th><th>Giocatore</th>
+      ${th("pres","Pres.","num")}${th("mv","Media voto","num")}${th("fm","Fantamedia","num")}
+      ${th("gf","Gol","num")}${th("ass","Assist","num")}
+      <th style="width:74px">Ultime</th>${th("forma","Forma","num")}${th("q","Qt.A","num")}
+    </tr></thead><tbody>${rows.slice(0,400).map(x=>{
+      const p=x.p, st=x.st, f=formaOf(p.id);
+      return `<tr>
+        <td><span class="chip ${p.r}">${p.r}</span></td>
+        <td><div class="namewrap"><span class="pname clic" data-open="${p.id}">${esc(p.n)}</span>${rigBadge(p)}</div>
+            <div class="pteam">${esc(p.s)}${st.sv?` <span class="subline">${st.sv} s.v.</span>`:""}${st.amm||st.esp?` <span class="subline">${st.amm?st.amm+"×⚠":""}${st.esp?" "+st.esp+"×⛔":""}</span>`:""}</div></td>
+        <td class="num">${st.pres}<span style="color:var(--muted)">/${st.su}</span></td>
+        <td class="num">${st.mv===null?"—":st.mv.toFixed(2)}</td>
+        <td class="num"><span class="fmv" style="color:${fmCol(st.fm)}">${st.fm.toFixed(2)}</span></td>
+        <td class="num">${st.gf||"—"}</td>
+        <td class="num">${st.ass||"—"}</td>
+        <td>${sparkline(st.serie)}</td>
+        <td class="num">${f?`<span class="delta" style="color:${f.delta>=0.5?"var(--ok)":f.delta<=-0.5?"var(--crit)":"var(--muted)"}">${f.delta>=0?"+":""}${f.delta.toFixed(1)}</span>`:"—"}</td>
+        <td class="num" style="color:var(--muted)">${p.q}</td>
+      </tr>`;}).join("")}</tbody></table></div></div>
+    <p class="hint" style="margin-top:11px;max-width:76ch">La <b>fantamedia</b> applica gol +3, assist +1, rigore parato +3, rigore sbagliato −3, autogol −2, ammonizione −0,5, espulsione −1, gol subito −1. I voti con asterisco valgono 6 e contano come presenza, ma restano fuori dalla media voto. La <b>forma</b> confronta la fantamedia delle ultime tre presenze con quella di tutta la stagione: sopra zero sta rendendo più del suo standard.</p>`;
+}
+
+/* ══ 10d. Scheda giocatore ══════════════════════════════════════════ */
+let openId=null;
+/* ── La stagione scorsa nella scheda: numeri, non punteggi ───────────
+   Le correlazioni dicono che il mercato ha già prezzato quasi tutto il
+   rendimento 25/26 (quotazione ↔ fantamedia: 0,79 sugli attaccanti). Per
+   questo qui i numeri si vedono e basta: non entrano in nessun indice.
+   L'unica cosa che entra sono le presenze, dentro la titolarità.       */
+function histSec(p){
+  const h=annoScorso(p.id);
+  if(!h) return `<div class="psec"><h5>Stagione 2025/26</h5>
+    <p class="hint">Nessuna presenza in Serie A nel 2025/26: è un arrivo nuovo, o non ha giocato.
+    Finché non arrivano i voti di quest'anno i suoi indici stanno tutti sulle quotazioni.</p></div>`;
+  const M=medieRuolo()[p.r]||{}, rk=rangoFm(p);
+  const cmp=(v,m,dec)=>{ if(m===null||m===undefined) return "";
+    const d=v-m;
+    return `<span class="hcmp" style="color:${d>=0?"var(--ok)":"var(--crit)"}" title="rispetto alla mediana del suo ruolo, fra chi ha giocato almeno 15 partite">${d>=0?"▲":"▼"}${Math.abs(d).toFixed(dec||2)}</span>`; };
+  const nz=h.pv>=15;
+  const cambio=h.sq&&h.sq!==p.s;
+  return `<div class="psec">
+    <h5>Stagione 2025/26${cambio?` · <span style="text-transform:none;letter-spacing:0">era al ${esc(h.sq)}</span>`:""}</h5>
+    <div class="pstats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="pstat"><div class="v">${h.pv}<span style="font-size:12px;color:var(--muted)">/38</span></div><div class="k">Presenze</div></div>
+      <div class="pstat"><div class="v">${h.mv.toFixed(2)}</div><div class="k">Media voto</div></div>
+      <div class="pstat"><div class="v" style="color:${fmCol(h.fm)}">${h.fm.toFixed(2)}</div><div class="k">Fantamedia</div></div>
+      ${p.r==="P"
+        ? `<div class="pstat"><div class="v">${h.gs}</div><div class="k">Gol subiti</div></div>`
+        : `<div class="pstat"><div class="v">${h.gf}<span style="font-size:13px;color:var(--muted)">+${h.ass}</span></div><div class="k">Gol + assist</div></div>`}
+    </div>
+    <div class="exline">
+      ${nz&&M.fm!==null?`<span>Fantamedia sul ruolo ${cmp(h.fm,M.fm)}${rk?` <span class="hint">${rk.pos}ª su ${rk.su} con almeno 15 presenze</span>`:""}</span>`:""}
+      <span>Bonus per presenza <b style="color:${h.bonus?"var(--ok)":"var(--muted)"}">${h.bonus?"+"+h.bonus.toFixed(2):"0"}</b>${nz?cmp(h.bonus,M.bonus):""}</span>
+      <span>Cartellini per presenza <b>${h.cart.toFixed(2)}</b>${nz?cmp(h.cart,M.cart):""}</span>
+      ${p.r==="P"?`<span>Rigori parati <b style="color:${h.rp?"var(--ok)":"var(--muted)"}">${h.rp}</b></span>`:""}
+      ${h.rc?`<span>Rigori calciati <b>${h.rc}</b>${h.rmeno?` <span style="color:var(--crit)">${h.rmeno} sbagliat${h.rmeno===1?"o":"i"}</span>`:""}</span>`:""}
+      ${h.au?`<span style="color:var(--crit)">${h.au} autogol</span>`:""}
+      ${h.esp?`<span style="color:var(--crit)">${h.esp} espulsion${h.esp===1?"e":"i"}</span>`:""}
+    </div>
+    ${h.pv<15?`<p class="hint" style="margin:9px 0 0">Poche partite: questi numeri dicono poco.</p>`:""}
+  </div>`;
+}
+function openPlayer(id){
+  const p=byId.get(id)||(S.assign[id]||{}).snap;
+  if(!p) return;
+  openId=id;
+  const from=gFrom(), span=gSpan();
+  const a=S.assign[p.id], t=ME.targets[p.id], me=meId();
+  const sc=appet(p,from,span), parts=appetParts(p,from,span);
+  const cs=calScore(p.s,p.r,from,span), st=statFor(p.id), f=formaOf(p.id);
+  const m=mentLabel(p);
+  document.getElementById("pcard").innerHTML=`
+    <div class="phead">
+      <div class="povr"><div class="n" style="color:${appetCol(sc)}">${sc}</div><div class="l">Appetibilità</div></div>
+      <div class="pid">
+        <h3>${esc(p.n)}</h3>
+        <div class="sub"><span class="chip ${p.r}">${p.r}</span>${titDot(p)} <span title="${esc(titStato(p).nota)}">${titStato(p).breve}</span>
+          · ${esc(p.s)}${p.rm?` · <span class="rm">${esc(p.rm)}</span>`:""}
+          ${rigBadge(p)}${m?`<span class="ment ${m.k}">${m.t}</span>`:""}</div>
+      </div>
+      <button class="pclose" id="pclose" title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+
+    <div class="psec">
+      <div class="pstats" style="grid-template-columns:repeat(4,1fr)">
+        <div class="pstat"><div class="v">${p.q}</div><div class="k">Quotazione</div></div>
+        <div class="pstat"><div class="v" style="color:var(--muted)">${p.f}</div><div class="k">FVM</div></div>
+        <div class="pstat"><div class="v" style="color:var(--accent)">${attesaOra(p.id)||attesa(p.id)}</div><div class="k">Prezzo atteso</div></div>
+        <div class="pstat"><div class="v" style="color:${p.v>=1.15?"var(--ok)":p.v<=0.85?"var(--crit)":"var(--muted)"}">${p.v.toFixed(2)}</div><div class="k">Convenienza</div></div>
+      </div>
+    </div>
+
+    <div class="psec">
+      <h5>Come nasce l'appetibilità</h5>
+      <div class="brk">${parts.map(x=>`
+        <div class="brkrow">
+          <span class="lab">${x.k}<small>${esc(x.nota)}</small></span>
+          <div class="brkbar"><span style="width:${Math.round(x.v/x.max*100)}%;background:${x.v/x.max>=.7?"var(--ok)":x.v/x.max<=.3?"var(--crit)":"var(--accent)"}"></span></div>
+          <span class="val">${Math.round(x.v)}<span style="opacity:.55">/${x.max}</span></span>
+        </div>`).join("")}</div>
+    </div>
+
+    ${cs===null?"":`<div class="psec">
+      <h5>Prossime ${span} · dalla giornata ${from}</h5>
+      <div class="prow2">${fixStrip(p.s,p.r,from,span)}
+        <span class="calscore" style="color:${scoreCol(cs)}">${cs.toFixed(1)}</span>
+        <span class="hint">5 = calendario morbido</span></div>
+    </div>`}
+
+    ${histSec(p)}
+
+    ${st&&st.pres?`<div class="psec">
+      <h5>Rendimento · ${st.su} ${st.su===1?"giornata caricata":"giornate caricate"}</h5>
+      <div class="pstats" style="grid-template-columns:repeat(4,1fr)">
+        <div class="pstat"><div class="v">${st.pres}<span style="font-size:12px;color:var(--muted)">/${st.su}</span></div><div class="k">Presenze</div></div>
+        <div class="pstat"><div class="v">${st.mv===null?"—":st.mv.toFixed(2)}</div><div class="k">Media voto</div></div>
+        <div class="pstat"><div class="v" style="color:${fmCol(st.fm)}">${st.fm.toFixed(2)}</div><div class="k">Fantamedia</div></div>
+        <div class="pstat"><div class="v">${f?`<span style="color:${f.delta>=0.5?"var(--ok)":f.delta<=-0.5?"var(--crit)":"var(--muted)"}">${f.delta>=0?"+":""}${f.delta.toFixed(1)}</span>`:"—"}</div><div class="k">Forma</div></div>
+      </div>
+      <div class="bonusgrid">
+        <div class="btile gol${st.gf?"":" off"}"><div class="v">${st.gf}</div><div class="k">Gol</div></div>
+        <div class="btile ass${st.ass?"":" off"}"><div class="v">${st.ass}</div><div class="k">Assist</div></div>
+        ${p.r==="P"
+          ? `<div class="btile cs${st.cs?"":" off"}"><div class="v">${st.cs}</div><div class="k">Porta inviolata</div></div>
+             <div class="btile neu${st.rp?"":" off"}"><div class="v">${st.rp}</div><div class="k">Rigori parati</div></div>
+             <div class="btile mal${st.sub?"":" off"}"><div class="v">${st.sub}</div><div class="k">Gol subiti</div></div>`
+          : `<div class="btile neu${st.amm?"":" off"}"><div class="v">${st.amm}</div><div class="k">Ammonizioni</div></div>
+             <div class="btile mal${st.esp+st.au+st.rs?"":" off"}"><div class="v">${st.esp+st.au+st.rs}</div><div class="k">Esp. autogol rig.</div></div>`}
+      </div>
+      <div class="exline">
+        <span>Bonus per presenza <b style="color:${st.bonus?"var(--ok)":"var(--muted)"}">${st.bonus?"+"+st.bonus.toFixed(2):"0"}</b></span>
+        <span>Malus <b style="color:${st.malus?"var(--crit)":"var(--muted)"}">${st.malus?"−"+st.malus.toFixed(2):"0"}</b></span>
+        ${st.scarto===null?"":`<span title="Quanto la fantamedia si stacca dalla media voto: è il valore che porta oltre la pagella">Scarto sulla pagella <b style="color:${st.scarto>=1?"var(--ok)":st.scarto<=-0.3?"var(--crit)":"var(--muted)"}">${Math.abs(st.scarto)<0.005?"0":(st.scarto>0?"+":"")+st.scarto.toFixed(2)}</b></span>`}
+        <span>Giornate con bonus <b>${st.conBonus}/${st.pres}</b></span>
+        ${st.sv?`<span>${st.sv} senza voto</span>`:""}
+      </div>
+      ${st.pres>2?`<div class="exline" style="margin-top:7px"><span>Andamento</span>
+        <span style="margin-left:auto">${sparkline(st.serie)}</span></div>`:""}
+    </div>
+    <div class="psec">
+      <h5>${st.su===1?`Dati Giornata ${giornateGiocate()[0]}`:"Dati giornata per giornata"}</h5>
+      <div class="gdays">${gdayRows(p,st)}</div>
+    </div>`
+    :st&&st.su?`<div class="psec">
+      <h5>${st.su===1?`Dati Giornata ${giornateGiocate()[0]}`:"Dati giornata per giornata"}</h5>
+      <div class="gdays">${gdayRows(p,st)}</div>
+      <p class="hint" style="margin:9px 0 0">Mai sceso in campo nelle giornate caricate.</p>
+    </div>`
+    :`<div class="psec"><h5>Rendimento</h5>
+      <p class="hint">Nessun voto caricato. Da <b>Lega e dati → Voti di giornata</b> compaiono presenze, medie, gol e assist.</p></div>`}
+
+    <div class="pact">
+      <button class="btn sm wr ${isOut(p.id)?"danger":""}" data-pout="${p.id}"
+        title="Toglilo dagli indici e dalla formazione automatica finché non torna">${isOut(p.id)?"↩ È tornato":"⛑ Indisponibile"}</button>
+      ${a?`<span>Preso da <b>${esc(teamName(a.team))}</b> per <b>${a.price}</b> crediti</span>
+           <button class="btn sm wr" data-pfree="${p.id}" style="margin-left:auto">Libera</button>`
+        :`<span class="tag ok">svincolato</span>
+          <button class="btn sm" data-pstar="${p.id}">${t?"★ Obiettivo":"☆ Segna obiettivo"}</button>
+          <label class="hint" style="display:flex;align-items:center;gap:6px">max
+            <input type="number" min="0" data-pmax="${p.id}" value="${t&&t.max?t.max:""}" placeholder="—"></label>
+          <button class="btn primary sm wr" data-pcall="${p.id}" style="margin-left:auto">Chiama all'asta</button>`}
+    </div>`;
+  document.getElementById("pmodal").classList.add("on");
+  const c=document.getElementById("pclose"); if(c) c.focus();
+}
+function closePlayer(){ openId=null; document.getElementById("pmodal").classList.remove("on"); }
+
+/* ══ 11. Console d'asta ═════════════════════════════════════════════ */
+let sel=null, cur=-1, hits=[];
+const qEl=()=>document.getElementById("q");
+const resEl=()=>document.getElementById("results");
+function search(){
+  const q=qEl().value.trim().toLowerCase();
+  if(q.length<2){ hits=[]; resEl().innerHTML=""; return; }
+  hits=PL.filter(p=>p.n.toLowerCase().includes(q)||p.s.toLowerCase().includes(q))
+    .sort((a,b)=>{
+      const an=a.n.toLowerCase().startsWith(q)?0:1, bn=b.n.toLowerCase().startsWith(q)?0:1;
+      return an-bn || (S.assign[a.id]?1:0)-(S.assign[b.id]?1:0) || b.q-a.q;
+    }).slice(0,12);
+  cur=hits.length?0:-1;
+  resEl().innerHTML=hits.map((p,i)=>{
+    const a=S.assign[p.id];
+    return `<button class="${a?"gone":""} ${i===cur?"cur":""}" data-i="${i}">
+      <span class="chip ${p.r}">${p.r}</span>
+      <span style="flex:1;min-width:0"><b>${esc(p.n)}</b> ${titDot(p)}${rigBadge(p)}${outBadge(p)} <span class="pteam">${esc(p.s)}</span></span>
+      <span class="mono" style="font-size:12.5px;color:var(--muted)">${p.q}</span>
+      ${a?`<span class="tag neu">${esc(teamName(a.team))} ${a.price}</span>`:""}</button>`;
+  }).join("");
+}
+function choose(i){
+  if(i<0||i>=hits.length) return;
+  sel=hits[i]; qEl().value=""; hits=[]; resEl().innerHTML=""; renderPick();
+  const pr=document.getElementById("price"); if(pr){ pr.focus(); pr.select(); }
+}
+function renderPick(){
+  const box=document.getElementById("pick");
+  if(!sel){ box.innerHTML=`<p class="hint" style="margin-top:13px">Nessun giocatore selezionato. Digita almeno due lettere, scorri con &uarr; &darr; e premi Invio.</p>`; return; }
+  const p=sel, a=S.assign[p.id], t=ME.targets[p.id], me=meId(), st=stats(me);
+  const from=gFrom(), span=gSpan(), cs=calScore(p.s,p.r,from,span);
+  const roleFull=st.perRole[p.r].count>=S.slots[p.r];
+  box.innerHTML=`
+    <div class="selected" style="margin-top:14px">
+      <div class="selhead">
+        <span class="chip ${p.r}">${p.r}</span>
+        <div class="who">
+          <div class="namewrap"><span class="big">${esc(p.n)}</span>${rigBadge(p)}${outBadge(p)}</div>
+          <div class="sub">${titDot(p)} <span title="${esc(titStato(p).nota)}">${titStato(p).breve}</span> · ${esc(p.s)}${p.rm?' · <span class="rm">'+esc(p.rm)+'</span>':""}${mentChip(p)?' · '+mentChip(p):""}</div>
+        </div>
+      </div>
+      <div class="selstats">
+        <div class="st"><div class="lab">Quotazione</div><div class="qv">${p.q}</div></div>
+        <div class="st"><div class="lab">Prezzo atteso</div><div class="qv" style="color:var(--accent)">${attesaOra(p.id)||attesa(p.id)}</div></div>
+        <div class="st"><div class="lab">Convenienza</div>${meter(p.v)}</div>
+        <div class="st"><div class="lab">Appetibilità</div>${appetCell(p,from,span)}</div>
+        ${cs===null?"":`<div class="st fix"><div class="lab">Prossime ${span}</div>
+          <div class="row">${fixStrip(p.s,p.r,from,span)}<span class="calscore" style="color:${scoreCol(cs)}">${cs.toFixed(1)}</span></div></div>`}
+      </div>
+    </div>
+    ${a?`<div class="suggest" style="border-color:var(--warn);background:var(--warn-soft)">
+        Già assegnato a <b>${esc(teamName(a.team))}</b> per <b>${a.price}</b> crediti.
+        <button class="btn sm wr" id="freeit" style="margin-left:auto">Libera</button></div>`:`
+    <div class="assignrow wr">
+      <div><label class="fl" for="team">Squadra</label>
+        <select id="team">${S.teams.map(x=>`<option value="${x.id}"${x.id===me?" selected":""}>${esc(x.name)}${isMine(x.id)?" (io)":""}</option>`).join("")}</select></div>
+      <div><label class="fl" for="price">Prezzo</label><input type="number" id="price" min="0" value="${t&&t.max?t.max:p.q}"></div>
+      <button class="btn primary" id="doassign">Assegna</button>
+    </div>
+    <div class="offerta" id="offerta"></div>
+    ${altRow(p)}
+    <div class="suggest">
+      <span>Il tuo tetto: <b>${st.max}</b></span>
+      <span>${p.r} presi: <b>${st.perRole[p.r].count}/${S.slots[p.r]}</b>${roleFull?' <span class="tag crit">reparto pieno</span>':""}</span>
+      ${t&&t.max?`<span>Prezzo max che ti sei dato: <b>${t.max}</b></span>`:""}
+      <span style="margin-left:auto"><button class="btn sm" id="startoggle">${t?"★ Obiettivo":"☆ Segna obiettivo"}</button></span>
+    </div>`}`;
+  renderOfferta();
+}
+/* Quanti ne restano come lui: stesso ruolo, prezzo simile, almeno la stessa
+   titolarità. È la domanda che decide se alzare adesso o lasciar perdere. */
+function altRow(p){
+  const alt=alternative(p);
+  const sc=scarsita()[p.r];
+  const pochi=alt.length<=2;
+  const nomi=alt.slice(0,3).map(x=>esc(x.n)).join(", ");
+  return `<div class="altrow${pochi?" pochi":""}">
+    <span>Come lui restano <b>${alt.length}</b></span>
+    ${nomi?`<span class="altnomi">${nomi}${alt.length>3?` e altri ${alt.length-3}`:""}</span>`:""}
+    <span style="margin-left:auto">${p.r} titolari liberi <b>${sc.tit}</b> · cercati <b>${sc.domanda}</b></span>
+  </div>`;
+}
+/* Confronto fra quello che stai per pagare e quello che il giocatore vale
+   adesso in questa lega. Si aggiorna a ogni cifra digitata. */
+function renderOfferta(){
+  const box=document.getElementById("offerta"); if(!box||!sel) return;
+  const inp=document.getElementById("price"); if(!inp) return;
+  const v=parseInt(inp.value);
+  const cons=attesaOra(sel.id)||attesa(sel.id);
+  if(!(v>=0)){ box.innerHTML=`<span class="hint">Consigliato <b>${cons}</b> crediti.</span>`; return; }
+  const d=cons?v/cons-1:0;
+  const col=d>=0.35?"var(--crit)":d>=0.12?"var(--warn)":d<=-0.2?"var(--ok)":"var(--muted)";
+  const verdetto=d>=0.35?"stai strapagando":d>=0.12?"sopra il suo prezzo":d<=-0.2?"lo stai prendendo bene":"in linea";
+  const me=meId(), st=stats(me);
+  const sfora=v>st.max?`<span class="tag crit">oltre il tuo tetto di ${st.max}</span>`:"";
+  box.innerHTML=`<div class="offbar"><span class="offlab">Consigliato ora</span>
+      <b class="mono">${cons}</b>
+      <span class="offdelta" style="color:${col}">${d>=0?"+":"−"}${Math.abs(Math.round(d*100))}% · ${verdetto}</span>
+      ${sfora}</div>`;
+}
+function assign(pid,tid,price){
+  const p=byId.get(pid);
+  S.assign[pid]={team:tid,price:price,snap:p?{id:p.id,r:p.r,n:p.n,s:p.s,q:p.q}:null};
+  S.log.unshift({pid:pid,team:tid,price:price,t:Date.now()});
+  if(S.log.length>500) S.log.length=500;
+  persist(); renderAll();
+}
+function free(pid){
+  delete S.assign[pid];
+  S.log=S.log.filter(l=>l.pid!==pid);
+  persist(); renderAll();
+}
+
+/* ══ 12. Crediti, piano, log, rose ══════════════════════════════════ */
+function renderTeams(){
+  document.getElementById("teamstate").innerHTML=S.teams.map(t=>{
+    const st=stats(t.id);
+    const sq=ROLES.map(r=>{const c=st.perRole[r].count,n=S.slots[r];
+      return `<span class="sq ${r}${c>=n?" full":""}">${c}/${n}</span>`;}).join("");
+    const col=st.slotsLeft>0&&st.max<=2?"var(--crit)":"inherit";
+    return `<div class="teamrow${isMine(t.id)?" me":""}">
+      <span class="tn">${esc(t.name)}${isMine(t.id)?' <span class="tag neu">io</span>':""}</span>
+      <span class="slots">${sq}</span>
+      <span class="credits">${st.left}</span>
+      <span class="mono" style="font-size:12px;color:${col};width:34px;text-align:right">${st.slotsLeft>0?"·"+st.max:"—"}</span>
+    </div>`;
+  }).join("");
+}
+function renderPlan(){
+  const st=stats(meId());
+  const COL={P:"var(--rP)",D:"var(--rD)",C:"var(--rC)",A:"var(--rA)"};
+  document.getElementById("planbars").innerHTML=ROLES.map(r=>{
+    const target=Math.round(S.budget*S.plan[r]/100), spent=st.perRole[r].spent;
+    const scale=Math.max(target,spent,1)*1.12;
+    const w=Math.min(100,spent/scale*100), mk=Math.min(100,target/scale*100);
+    const over=spent>target;
+    return `<div class="planrow">
+      <span class="chip ${r}">${r}</span>
+      <div class="track" title="${ROLENAME[r]}: ${spent} spesi su ${target} pianificati">
+        <div class="fill" style="width:${w}%;background:${over?"var(--crit)":COL[r]};opacity:.32"></div>
+        <div class="mark" style="left:${mk}%"></div>
+        <div class="lb">${spent} / ${target}</div>
+      </div>
+      <span class="mono" style="font-size:12.5px;text-align:right;color:${over?"var(--crit)":"var(--muted)"}">${over?"+"+(spent-target):(target-spent)+" liberi"}</span>
+    </div>`;
+  }).join("");
+}
+function renderLog(){
+  document.getElementById("logcount").textContent=`${Object.keys(S.assign).length} assegnati`;
+  const el=document.getElementById("log");
+  if(!S.log.length){ el.innerHTML=`<div class="empty">L'asta non è ancora cominciata.</div>`; return; }
+  el.innerHTML=S.log.slice(0,80).map(l=>{
+    const p=byId.get(l.pid)||(S.assign[l.pid]||{}).snap; if(!p) return "";
+    return `<div class="logrow">
+      <span class="chip ${p.r}">${p.r}</span>
+      <span style="font-weight:600">${esc(p.n)}</span>${rigBadge(p)}
+      <span class="who">→ ${esc(teamName(l.team))}${isMine(l.team)?" (io)":""}</span>
+      ${dealTag(l.pid,l.price)}
+      <span class="pr" style="color:${l.price>p.q*1.5?"var(--warn)":"inherit"}">${l.price}</span>
+      <button class="btn sm danger wr" data-free="${l.pid}" title="Libera">✕</button>
+    </div>`;
+  }).join("");
+}
+
+/* ══ 12c. Equilibrio della rosa ═════════════════════════════════════ */
+function renderBalance(){
+  const R=roster(meId());
+  const rows=["D","C"].map(r=>{
+    const l=R[r].map(x=>x.p);
+    const g={off:0,equ:0,cop:0};
+    l.forEach(p=>{ const m=mentLabel(p); if(m) g[m.k]++; });
+    const n=g.off+g.equ+g.cop;
+    if(!n) return `<div class="balrow"><span class="chip ${r}">${r}</span>
+      <div class="balbar"><i class="none"></i></div>
+      <span class="balnote" style="color:var(--muted)">—</span></div>`;
+    const seg=k=>g[k]?`<i class="${k}" style="flex:${g[k]}" title="${g[k]} ${k==="off"?"offensivi":k==="equ"?"equilibrati":"di copertura"}">${g[k]}</i>`:"";
+    const share=g.off/n;
+    const poco = n>=4 && share<0.25;
+    return `<div class="balrow">
+      <span class="chip ${r}">${r}</span>
+      <div class="balbar">${seg("off")}${seg("equ")}${seg("cop")}</div>
+      <span class="balnote" style="color:${poco?"var(--warn)":"var(--muted)"}">${Math.round(share*100)}% off</span>
+    </div>${poco?`<p class="hint" style="margin:-4px 0 0 37px;color:var(--warn)">Solo ${g.off} su ${n} ${r==="D"?"difensori spingono":"centrocampisti spingono"}: rischi una rosa che prende pochi bonus.</p>`:""}`;
+  }).join("");
+  const tot=["D","C"].reduce((a,r)=>a+R[r].length,0);
+  document.getElementById("balance").innerHTML = rows +
+    (tot?`<p class="hint" style="margin-top:2px">La mentalità viene dal ruolo Mantra: <span class="ment off">offensiva</span> per ali, trequartisti ed esterni, <span class="ment cop">copertura</span> per centrali e mediani.</p>`
+        :`<p class="hint">Qui vedrai quanto è sbilanciata la tua rosa fra chi spinge e chi copre, man mano che compri.</p>`);
+}
+
+/* ══ 12b. Giornate: formazione ══════════════════════════════════════ */
+const MODULI={"3-4-3":[3,4,3],"3-5-2":[3,5,2],"4-3-3":[4,3,3],"4-4-2":[4,4,2],
+              "4-5-1":[4,5,1],"5-3-2":[5,3,2],"5-4-1":[5,4,1]};
+let curG=1;
+const emptyLine=mod=>{
+  const [d,c,a]=MODULI[mod];
+  return {mod:mod,start:{P:[null],D:Array(d).fill(null),C:Array(c).fill(null),A:Array(a).fill(null)},bench:[]};
+};
+function lineup(g){
+  if(!ME.lineups) ME.lineups={};
+  let L=ME.lineups[g];
+  if(!L||!MODULI[L.mod]) { L=emptyLine("3-4-3"); ME.lineups[g]=L; }
+  const [d,c,a]=MODULI[L.mod], need={P:1,D:d,C:c,A:a};
+  for(const r of ROLES){                       // adegua gli slot al modulo
+    L.start[r]=(L.start[r]||[]).slice(0,need[r]);
+    while(L.start[r].length<need[r]) L.start[r].push(null);
+  }
+  return L;
+}
+/* quanto conviene schierarlo in QUESTA giornata: valore del giocatore, pesato dal calendario */
+/* ══ Chi schierare ══════════════════════════════════════════════════
+   Il punteggio di giornata è l'appetibilità ristretta a quella partita,
+   più la forma recente: le stesse voci dell'asta, ma guardando una
+   giornata sola. Resta 0–100 anche quando i pezzi cambiano, così due
+   ruoli diversi restano confrontabili.                                */
+function dayParts(p,g){
+  const parts=appetParts(p,g,1);
+  if(giornateGiocate().length){
+    const f=formaOf(p.id,3);
+    parts.push({k:"forma", max:8,
+      v: f?8*Math.max(0,Math.min(1,(f.delta+2)/4)):4,
+      nota: f?((f.delta>=0?"+":"−")+Math.abs(f.delta).toFixed(1)+" sulle ultime "+f.n)
+             :"non abbastanza partite"});
+  }
+  return parts;
+}
+function dayScore(p,g){
+  if(isOut(p.id)) return 0;
+  const parts=dayParts(p,g);
+  const tot=parts.reduce((a,x)=>a+x.v,0), max=parts.reduce((a,x)=>a+x.max,0);
+  return max?Math.round(tot/max*100):0;
+}
+/* la riga di motivazione: cosa lo tiene su, e cosa lo tira giù */
+function dayWhy(p,g){
+  if(isOut(p.id)) return "indisponibile";
+  const parts=dayParts(p,g);
+  const pro=parts.filter(x=>x.v/x.max>=0.7).sort((a,b)=>b.v/b.max-a.v/a.max);
+  const con=parts.filter(x=>x.v/x.max<=0.3).sort((a,b)=>a.v/a.max-b.v/b.max);
+  const dice=x=>({"titolarità":titStato(p).dati?"gioca sempre":"titolare",
+    "valore nel ruolo":"vale nel ruolo","calendario":"calendario facile",
+    "rigori":"tira i rigori","mentalità":"spinge avanti","forma":"in forma"})[x.k]||x.k;
+  const male=x=>({"titolarità":"gioca poco","valore nel ruolo":"vale poco nel ruolo",
+    "calendario":"calendario duro","rigori":"","mentalità":"","forma":"fuori forma"})[x.k]||"";
+  const su=pro.slice(0,2).map(dice).filter(Boolean);
+  const giu=con.map(male).filter(Boolean).slice(0,1);
+  return [...su,...giu].join(" · ")||"niente di speciale";
+}
+function myRoster(){ return roster(meId()); }
+function usedIds(L){
+  const s=new Set();
+  for(const r of ROLES) for(const id of L.start[r]) if(id) s.add(id);
+  return s;
+}
+function autoFill(g){
+  const L=lineup(g), R=myRoster();
+  const [d,c,a]=MODULI[L.mod], need={P:1,D:d,C:c,A:a};
+  const taken=new Set();
+  for(const r of ROLES){
+    const pool=R[r].map(x=>x.p).filter(p=>!isOut(p.id)).sort((x,y)=>dayScore(y,g)-dayScore(x,g));
+    L.start[r]=[];
+    for(let i=0;i<need[r];i++){
+      const p=pool.find(z=>!taken.has(z.id));
+      if(p){ taken.add(p.id); L.start[r].push(p.id); } else L.start[r].push(null);
+    }
+  }
+  L.bench=ROLES.flatMap(r=>R[r].map(x=>x.p)).filter(p=>!taken.has(p.id))
+    .sort((x,y)=>dayScore(y,g)-dayScore(x,g)).map(p=>p.id);
+  saveMe();
+}
+/* ── Chi schierare: i candidati per una casella, uno sotto l'altro, con
+      il perché di ciascuno. Risponde alla domanda del sabato mattina. */
+let swapSlot=null;
+function openSwap(key){
+  const [r,i]=key.split(":"); const idx=+i;
+  const g=curG, L=lineup(g), R=myRoster(), used=usedIds(L);
+  const dentro=L.start[r][idx];
+  const cand=R[r].map(x=>x.p).filter(p=>p.id===dentro||!used.has(p.id))
+    .sort((a,b)=>dayScore(b,g)-dayScore(a,g));
+  swapSlot=key;
+  const lab={P:"Porta",D:"Difesa",C:"Centrocampo",A:"Attacco"}[r];
+  const righe=cand.map(p=>{
+    const sc=dayScore(p,g), f=fixtures(p.s,g,1)[0];
+    const st=statFor(p.id), fo=formaOf(p.id,3);
+    const qui=p.id===dentro;
+    return `<div class="cand${qui?" now":""}${isOut(p.id)?" ko":""}">
+      <div class="cn"><span class="nm">${esc(p.n)}</span>${titDot(p)}${rigBadge(p)}${outBadge(p)}
+        <span class="pteam">${esc(p.s)}</span>${qui?'<span class="tag ok">in campo</span>':""}</div>
+      <div class="cw">${esc(dayWhy(p,g))}</div>
+      <div class="cf">${f?`<span class="fix d${Math.round(fixDiff(f.opp,isOff(p.r),f.home))}${f.home?"":" away"}">${ABBR(f.opp)}</span>`:'<span class="hint">riposa</span>'}
+        ${st&&st.pres?`<span class="cfm" style="color:${fmCol(st.fm)}">FM ${st.fm.toFixed(2)}</span>`:""}
+        ${fo?`<span class="cfo" style="color:${fo.delta>=0.5?"var(--ok)":fo.delta<=-0.5?"var(--crit)":"var(--muted)"}">${fo.delta>=0?"+":"−"}${Math.abs(fo.delta).toFixed(1)}</span>`:""}</div>
+      <div class="cs" style="color:${appetCol(sc)}">${sc}</div>
+      <button class="btn sm ${qui?"":"primary"}" data-put="${p.id}" ${qui?"disabled":""}>${qui?"già dentro":"Schiera"}</button>
+    </div>`;
+  }).join("")||`<div class="empty">Nessun altro ${lab.toLowerCase()} disponibile in rosa.</div>`;
+  document.getElementById("ccard").innerHTML=`
+    <div class="phead">
+      <div class="pid"><h3>Chi schierare</h3>
+        <div class="sub">${lab} · casella ${idx+1} · giornata ${g}</div></div>
+      <button class="pclose" id="cclose" title="Chiudi">✕</button>
+    </div>
+    <div class="psec"><div class="cands">${righe}</div></div>
+    <div class="psec"><p class="hint">Il punteggio di giornata pesa titolarità, valore nel ruolo, avversario di quella partita, rigori e forma recente. È un consiglio, non un verdetto: se sai qualcosa che i numeri non sanno, vince quello che sai tu.</p></div>`;
+  document.getElementById("cmodal").classList.add("on");
+  const c=document.getElementById("cclose"); if(c) c.focus();
+}
+function closeSwap(){ swapSlot=null; document.getElementById("cmodal").classList.remove("on"); }
+function putInSlot(pid){
+  if(!swapSlot) return;
+  const [r,i]=swapSlot.split(":"); const L=lineup(curG);
+  // se il giocatore era in un'altra casella dello stesso ruolo, si scambiano
+  const j=L.start[r].indexOf(pid);
+  if(j>=0 && j!==+i){ L.start[r][j]=L.start[r][+i]; }
+  L.start[r][+i]=pid;
+  saveMe(); closeSwap(); renderGiornata();
+}
+function syncBench(g){
+  const L=lineup(g), R=myRoster(), used=usedIds(L);
+  const all=ROLES.flatMap(r=>R[r].map(x=>x.p)).filter(p=>!used.has(p.id));
+  const ids=new Set(all.map(p=>p.id));
+  L.bench=(L.bench||[]).filter(id=>ids.has(id));
+  for(const p of all.sort((x,y)=>dayScore(y,g)-dayScore(x,g)))
+    if(!L.bench.includes(p.id)) L.bench.push(p.id);
+}
+function renderGiornata(){
+  const g=curG, L=lineup(g), R=myRoster();
+  const roster_n=ROLES.reduce((n,r)=>n+R[r].length,0);
+  const it=s=>{ if(!s) return ""; const p=s.split("-"); return p[2]+"/"+p[1]+"/"+p[0].slice(2); };
+  document.getElementById("glab").textContent="Giornata "+g;
+  document.getElementById("gdate").textContent=it(CAL.dates[g-1]);
+  document.getElementById("gprev").disabled=g<=1;
+  document.getElementById("gnext").disabled=g>=38;
+  const sel=document.getElementById("gmod");
+  if(sel.options.length!==Object.keys(MODULI).length)
+    sel.innerHTML=Object.keys(MODULI).map(m=>`<option>${m}</option>`).join("");
+  sel.value=L.mod;
+
+  const box=document.getElementById("gbody");
+  if(!roster_n){
+    document.getElementById("gwarn").textContent="";
+    box.innerHTML=`<div class="card"><div class="empty">La tua rosa è vuota.<br>
+      Scegli la tua squadra in <b>Lega e dati</b> e assegnale dei giocatori nell'asta: qui compariranno da schierare.</div></div>`;
+    return;
+  }
+  syncBench(g);
+  const used=usedIds(L);
+  const rows=[["A","Attacco"],["C","Centrocampo"],["D","Difesa"],["P","Porta"]].map(([r,lab])=>{
+    const slots=L.start[r].map((id,i)=>{
+      const p=id?byId.get(id)||(S.assign[id]||{}).snap:null;
+      const opts=R[r].map(x=>x.p)
+        .filter(x=>!used.has(x.id)||x.id===id)
+        .sort((x,y)=>dayScore(y,g)-dayScore(x,g))
+        .map(x=>`<option value="${x.id}"${x.id===id?" selected":""}>${esc(x.n)} (${esc(x.s)})</option>`).join("");
+      const ko=p&&isOut(p.id);
+      const sc=p?dayScore(p,g):null;
+      const alt=R[r].map(x=>x.p).filter(x=>!used.has(x.id)&&!isOut(x.id));
+      const meglio=p&&alt.length?alt.reduce((m,x)=>dayScore(x,g)>dayScore(m,g)?x:m,alt[0]):null;
+      const su=meglio&&dayScore(meglio,g)>sc+4;
+      return `<div class="slot${p?"":" empty"}${ko?" ko":""}">
+        <div class="slotop">
+          <select data-lineup="${r}:${i}"><option value="">— vuoto —</option>${opts}</select>
+          <button class="btn sm alt" data-swap="${r}:${i}" title="Confronta con chi hai in panchina">⇄</button>
+        </div>
+        <div class="meta">${p?(ko?outBadge(p):"")+fixStrip(p.s,p.r,g,1)
+            +`<span class="dsc" style="color:${appetCol(sc)}">${sc}</span>`:'<span class="hint">nessuno</span>'}</div>
+        ${p?`<div class="why">${esc(dayWhy(p,g))}</div>`:""}
+        ${su?`<div class="why alt2">meglio <b>${esc(meglio.n)}</b> · ${dayScore(meglio,g)}</div>`:""}
+      </div>`;
+    }).join("");
+    return `<div><div class="rowlab">${lab}</div><div class="prow" data-n="${L.start[r].length}">${slots}</div></div>`;
+  }).join("");
+
+  const xi=ROLES.flatMap(r=>L.start[r]).filter(Boolean).map(id=>byId.get(id)||(S.assign[id]||{}).snap).filter(Boolean);
+  const missing=ROLES.reduce((n,r)=>n+L.start[r].filter(x=>!x).length,0);
+  const avgD=xi.length?xi.reduce((a,p)=>{const f=fixtures(p.s,g,1)[0];return a+(f?fixDiff(f.opp,isOff(p.r),f.home):3);},0)/xi.length:0;
+  const casa=xi.filter(p=>{const f=fixtures(p.s,g,1)[0];return f&&f.home;}).length;
+  const ko=xi.filter(p=>isOut(p.id)).length;
+  document.getElementById("gwarn").innerHTML = (missing
+    ? `<span class="tag warn">${missing} ${missing>1?"caselle vuote":"casella vuota"}</span>`
+    : (L.bench.length?`<span class="tag ok">formazione completa</span>`:""))
+    + (ko?` <span class="tag crit">${ko} in campo ${ko>1?"sono segnati indisponibili":"è segnato indisponibile"}</span>`:"");
+
+  const bench=L.bench.map((id,i)=>{
+    const p=byId.get(id)||(S.assign[id]||{}).snap; if(!p) return "";
+    return `<div class="benchrow">
+      <span class="ord">${i+1}</span>
+      <span class="chip ${p.r}">${p.r}</span>
+      <span class="bn">${esc(p.n)} <span class="pteam">${esc(p.s)}</span></span>
+      ${fixStrip(p.s,p.r,g,1)}
+      ${isOut(p.id)?outBadge(p):""}
+      <span class="dsc" style="color:${appetCol(dayScore(p,g))};margin:0">${dayScore(p,g)}</span>
+      <button class="mv" data-bmv="${i}:-1" title="Sali"${i===0?" disabled":""}>▲</button>
+      <button class="mv" data-bmv="${i}:1" title="Scendi"${i===L.bench.length-1?" disabled":""}>▼</button>
+    </div>`;
+  }).join("");
+
+  box.innerHTML=`
+    <div class="pitch">${rows}</div>
+    <div class="card" style="margin-top:18px">
+      <div class="card-h"><h2>Panchina</h2>
+        <span class="hint" style="margin-left:auto">nell'ordine in cui vuoi che entrino</span></div>
+      <div class="benchlist">${bench||'<div class="empty">Nessuno in panchina.</div>'}</div>
+      <div class="gsum">
+        <span>Titolari: <b>${xi.length}</b>/11</span>
+        <span>In casa: <b>${casa}</b></span>
+        <span>Difficoltà media dell'undici: <b style="color:${avgD?scoreCol(6-avgD):"inherit"}">${avgD?avgD.toFixed(2):"—"}</b> su 5</span>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:11px;max-width:76ch">Le formazioni restano su questo dispositivo: nessuno degli altri partecipanti le vede. <b>Schiera la migliore</b> ordina i tuoi per valore corretto con la difficoltà della partita di giornata — è un punto di partenza, non il tuo ultimo giudizio.</p>`;
+}
+
+/* ══ Riepilogo d'asta: la classifica dei giudizi ════════════════════ */
+/* il giudizio disteso, sotto la rosa */
+function giudizioBox(g){
+  return `<div class="giud">
+    <div class="gh">Giudizio <b style="color:${votoCol(g.voto)}">${g.voto}</b><span class="hint" style="margin-left:auto">${g.mod} · undici da ${g.media.toFixed(0)}</span></div>
+    <div class="gparts">${g.parti.map(x=>`
+      <div class="gpart" title="${esc(x.nota)}">
+        <div class="gpl">${x.k}</div>
+        <div class="gpb"><span style="width:${Math.round(x.v/x.max*100)}%;background:${x.v/x.max>=.7?"var(--ok)":x.v/x.max<=.3?"var(--crit)":"var(--accent)"}"></span></div>
+        <div class="gpv">${Math.round(x.v)}<span style="opacity:.5">/${x.max}</span></div>
+      </div>`).join("")}</div>
+    ${g.pro.length?`<ul class="glist pro">${g.pro.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+    ${g.contro.length?`<ul class="glist contro">${g.contro.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+  </div>`;
+}
+function renderRiepilogo(){
+  const box=document.getElementById("riepbody"); if(!box) return;
+  const gs=giudizi();
+  const presi=Object.keys(S.assign).length;
+  const note=document.getElementById("riepnote");
+  if(!gs.length||!presi){
+    note.textContent="";
+    box.innerHTML=`<div class="empty">L'asta non è ancora cominciata: qui comparirà il riepilogo con il giudizio di ogni rosa.</div>`;
+    return;
+  }
+  const slotTot=totalSlots()*S.teams.length;
+  note.textContent=`${presi} giocatori su ${slotTot} · ${S.teams.length} squadre · ${S.budget} crediti a testa`;
+  box.innerHTML=`<div class="tablewrap"><table class="list riep">
+    <thead><tr>
+      <th style="width:34px">#</th><th>Squadra</th>
+      <th class="num" style="width:74px">Spesa</th>
+      <th class="num" style="width:64px">Resta</th>
+      <th class="num" style="width:150px">P · D · C · A</th>
+      <th class="num" style="width:104px" title="Quanto ha speso rispetto alla media della lega, a parità di valore comprato">Speso vs media</th>
+      <th class="num" style="width:74px">Undici</th>
+      <th class="num" style="width:74px">Titolari</th>
+      <th class="num" style="width:78px">Voto</th>
+    </tr></thead><tbody>${gs.map((x,i)=>{
+      const st=stats(x.t.id), g=x.g;
+      const rip=ROLES.map(r=>`<span style="color:var(--r${r})">${g.dev[r].reale}</span>`).join(" · ");
+      const d=1/g.resa-1;   // quanto ha pagato in più per lo stesso valore
+      return `<tr${isMine(x.t.id)?' class="mine"':""}>
+        <td class="mono" style="color:var(--muted)">${i+1}</td>
+        <td><b>${esc(x.t.name)}</b>${isMine(x.t.id)?' <span class="tag neu">io</span>':""}
+          <div class="pteam">${g.mod} · ${g.n} giocatori</div></td>
+        <td class="num">${g.pagato}</td>
+        <td class="num" style="color:var(--muted)">${st.left}</td>
+        <td class="num" style="font-size:12px">${rip}</td>
+        <td class="num" style="color:${d<=-0.05?"var(--ok)":d>=0.05?"var(--crit)":"var(--muted)"}">${d>=0?"+":"−"}${Math.abs(Math.round(d*100))}%</td>
+        <td class="num">${g.media.toFixed(0)}</td>
+        <td class="num">${g.titolari}</td>
+        <td class="num"><b style="font-size:16px;color:${votoCol(g.voto)}">${g.voto}</b></td>
+      </tr>`;
+    }).join("")}</tbody></table></div>
+    <p class="hint" style="margin-top:10px">Il voto non viene da un modello linguistico — la pagina non ha rete — ma dagli stessi indici che hai usato in asta: undici tipo 40, profondità 15, prezzi pagati 20, titolari veri 15, rigoristi 5, rischi 5. Sotto ogni rosa c'è il dettaglio, voce per voce.</p>`;
+}
+/* le rose sono richiudibili: lo stato è privato e resta su questo dispositivo,
+   così ognuno tiene aperta solo quella che gli interessa */
+const roseAperta=id=>!(ME.roseChiuse&&ME.roseChiuse[id]);
+function toggleRosa(id,aperta){
+  ME.roseChiuse=Object.assign({},ME.roseChiuse||{});
+  if(aperta) delete ME.roseChiuse[id]; else ME.roseChiuse[id]=1;
+  saveMe();
+}
+function tutteRose(aperte){
+  ME.roseChiuse={};
+  if(!aperte) for(const t of S.teams) ME.roseChiuse[t.id]=1;
+  saveMe(); renderRose();
+}
+const roQ=()=>{ const el=document.getElementById("roq"); return el?el.value.trim().toLowerCase():""; };
+function renderRose(){
+  const q=roQ();
+  const cerca=p=>p.n.toLowerCase().includes(q)||p.s.toLowerCase().includes(q);
+  let squadre=0, trovati=0;
+  const html=S.teams.map(t=>{
+    const st=stats(t.id);
+    const perNome=q&&t.name.toLowerCase().includes(q);   // cercando il partecipante si apre tutta la sua rosa
+    let match=0;
+    const secs=ROLES.map(r=>{
+      const tutti=st.R[r];
+      const list=q&&!perNome?tutti.filter(x=>cerca(x.p)):tutti;
+      match+=q?(perNome?tutti.length:list.length):0;
+      const holes=S.slots[r]-tutti.length;
+      let rows=list.map(x=>{
+        const ev=q&&cerca(x.p)?" trovato":"";
+        return `<div class="rp${ev}"><span class="chip ${r}">${r}</span><span class="nm pname clic" data-open="${x.p.id}">${esc(x.p.n)}</span>${rigBadge(x.p)}${outBadge(x.p)}<span class="pteam" style="font-size:11px">${esc(x.p.s)}</span><span class="pz">${x.price}</span><button class="x wr" data-free="${x.p.id}" title="Libera">✕</button></div>`;
+      }).join("");
+      if(!q&&holes>0) rows+=`<div class="rp hole">${holes} slot da riempire</div>`;
+      if(q&&!rows) return "";
+      return `<div class="rosesec"><div class="sh"><span>${ROLENAME[r]}</span><span class="mono">${st.perRole[r].spent} cr</span></div>${rows}</div>`;
+    }).join("");
+    if(q&&!match) return "";
+    squadre++; trovati+=match;
+    const g=giudizio(t.id);
+    /* cercando, le rose con un riscontro si aprono da sole */
+    const aperta=q?true:roseAperta(t.id);
+    return `<details class="card rosecard" data-rose="${t.id}"${aperta?" open":""} style="${isMine(t.id)?"border-color:var(--accent);":""}">
+      <summary class="rosehead"><span class="tw" aria-hidden="true">▸</span>
+        <h3>${esc(t.name)}</h3>${isMine(t.id)?'<span class="tag neu">io</span>':""}
+        ${q?`<span class="tag ok">${match} ${match===1?"trovato":"trovati"}</span>`:""}
+        ${g?`<span class="voto" style="color:${votoCol(g.voto)}" title="Il voto della rosa">${g.voto}</span>`:""}
+        <span class="mono" style="font-weight:600">${st.left}</span></summary>
+      <div class="roseb">${secs}${!q&&g?giudizioBox(g):""}</div></details>`;
+  }).join("");
+  document.getElementById("rosegrid").innerHTML=html||`<div class="card"><div class="empty">Nessun giocatore e nessun partecipante con questo nome.</div></div>`;
+  const c=document.getElementById("rocount");
+  if(c) c.textContent=q?`${trovati} ${trovati===1?"giocatore":"giocatori"} in ${squadre} ${squadre===1?"rosa":"rose"}`
+                      :`${S.teams.length} rose · ${Object.keys(S.assign).length} giocatori assegnati`;
+}
