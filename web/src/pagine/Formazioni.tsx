@@ -1,0 +1,276 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
+import { MODULI, ROLES, type Motore, type Rosa } from '../domain/motore.ts'
+import {
+  conModulo, metti, normalizza, ordinaPerRuolo, sincronizzaPanchina, sposta, usati, vuota, type Formazione,
+} from '../domain/formazione.ts'
+import type { Giocatore, Ruolo } from '../domain/tipi.ts'
+import type { RigheLega } from '../data/componi.ts'
+import { salvaFormazioni } from '../data/lega.ts'
+import { ABBR, appetCol, dataBreve, deltaCol, fascia, fmCol, segno } from '../viste/colori.ts'
+import { FixStrip, OutBadge, RigBadge, TitDot } from '../viste/segni.tsx'
+import { Avviso, Bottone, Card, Ruolo as ChipRuolo } from '../ui.tsx'
+
+const REPARTI: [Ruolo, string][] = [['A', 'Attacco'], ['C', 'Centrocampo'], ['D', 'Difesa'], ['P', 'Porta']]
+const NOME_REPARTO: Record<Ruolo, string> = { P: 'Porta', D: 'Difesa', C: 'Centrocampo', A: 'Attacco' }
+
+/* ══ Formazioni ══════════════════════════════════════════════════════
+   renderGiornata() dell'app a file singolo: il campo col modulo, una
+   maglia per casella con il punteggio di giornata e la frase che lo
+   spiega, la panchina in ordine d'ingresso, «Schiera la migliore».
+   La formazione è privata: la vede solo chi la fa.                     */
+export default function Formazioni({ legaId, utenteId, righe, motore: m }: { legaId: string; utenteId: string; righe: RigheLega; motore: Motore }) {
+  const oggi = m.giornataOggi()
+  const [g, setG] = useState(oggi)
+  const [tutte, setTutte] = useState<Record<string, Formazione>>(() => (righe.preferenze?.formazioni ?? {}) as Record<string, Formazione>)
+  const [casella, setCasella] = useState<{ r: Ruolo; i: number } | null>(null)
+  const [stato, setStato] = useState<string | null>(null)
+  const attesa = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(attesa.current), [])
+
+  const R = useMemo(() => m.roster(m.meId()), [m])
+  const rosa = useMemo(() => ROLES.flatMap(r => R[r].map(x => x.p)), [R])
+  // il punteggio di giornata si chiede decine di volte per giocatore: si calcola una volta per giornata
+  const punteggi = useMemo(() => new Map(rosa.map(p => [p.id, m.dayScore(p, g)])), [m, g, rosa])
+  const sc = (p: Giocatore) => punteggi.get(p.id) ?? m.dayScore(p, g)
+  const giocatore = (id: number): Giocatore | null => m.byId.get(id) ?? m.S.assign[id]?.snap ?? null
+  const L0 = normalizza(tutte[g])
+  const L: Formazione = { ...L0, bench: sincronizzaPanchina(L0, rosa, sc) }
+  const dentro = usati(L)
+
+  function cambia(nuova: Formazione, msg?: string) {
+    const nuove = { ...tutte, [g]: nuova }
+    setTutte(nuove); setStato(msg ?? 'salvo…')
+    clearTimeout(attesa.current)
+    attesa.current = setTimeout(() => {
+      salvaFormazioni(legaId, utenteId, nuove).then(
+        () => setStato('salvata'),
+        (e: Error) => setStato(`non salvata: ${e.message}`),
+      )
+    }, 700)
+  }
+
+  const xi = ROLES.flatMap(r => L.start[r]).filter((x): x is number => !!x).map(giocatore).filter((p): p is Giocatore => !!p)
+  const mancano = ROLES.reduce((n, r) => n + L.start[r].filter(x => !x).length, 0)
+  const partita = (p: Giocatore) => m.fixtures(p.s, g, 1)[0]
+  const difficolta = xi.length ? xi.reduce((a, p) => { const f = partita(p); return a + (f ? m.fixDiff(f.opp, m.isOff(p.r), f.home) : 3) }, 0) / xi.length : 0
+  const inCasa = xi.filter(p => partita(p)?.home).length
+  const ko = xi.filter(p => m.isOut(p.id)).length
+  const media = xi.length ? Math.round(xi.reduce((a, p) => a + sc(p), 0) / xi.length) : null
+
+  return (
+    <div>
+      {!righe.preferenze?.mia_squadra && (
+        <div className="mb-4">
+          <Avviso>
+            Non hai ancora scelto la tua squadra: fallo in <Link to={`/lega/${legaId}`} className="font-semibold underline">Panoramica</Link>.
+            Intanto qui vedi la rosa di <b>{m.teamName(m.meId())}</b>.
+          </Avviso>
+        </div>
+      )}
+      <div className="gbar">
+        <div className="gnav">
+          <button type="button" disabled={g <= 1} onClick={() => setG(g - 1)} title="Giornata precedente">‹</button>
+          <div className="gcur">
+            <b>Giornata {g}</b>
+            <span>{dataBreve(m.CAL.dates[g - 1])}{g === oggi && <> <span className="oggi">oggi</span></>}</span>
+          </div>
+          <button type="button" disabled={g >= 38} onClick={() => setG(g + 1)} title="Giornata successiva">›</button>
+        </div>
+        <label className="block min-w-[118px]">
+          <span className="mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase">Modulo</span>
+          <select value={L.mod} onChange={e => cambia(conModulo(L, e.target.value))}
+            className="w-full rounded-[7px] border border-line-strong bg-surface px-2.5 py-1.5 text-sm">
+            {Object.keys(MODULI).map(mod => <option key={mod}>{mod}</option>)}
+          </select>
+        </label>
+        <Bottone variante="primario" disabled={!rosa.length}
+          onClick={() => cambia(m.formazioneAutomatica(g, L.mod), `formazione proposta per la giornata ${g}`)}>Schiera la migliore</Bottone>
+        <Bottone onClick={() => cambia(vuota(L.mod))}>Svuota</Bottone>
+        <span className="ml-auto flex max-w-[40ch] flex-wrap items-center justify-end gap-1.5 text-right">
+          {mancano ? <span className="tag warn">{mancano} {mancano > 1 ? 'caselle vuote' : 'casella vuota'}</span>
+            : L.bench.length ? <span className="tag ok">formazione completa</span> : null}
+          {ko > 0 && <span className="tag crit">{ko} in campo {ko > 1 ? 'sono segnati indisponibili' : 'è segnato indisponibile'}</span>}
+          {stato && <span className="hint w-full">{stato}</span>}
+        </span>
+      </div>
+
+      {!rosa.length ? (
+        <Card>
+          <div className="empty">
+            La tua rosa è vuota.<br />Scegli la tua squadra in <b>Panoramica</b>: qui compariranno i suoi giocatori da schierare.
+          </div>
+        </Card>
+      ) : (
+        <>
+          <div className="distinta">
+            <Dato v={<>{xi.length}<span>/11</span></>} k="titolari" col={mancano ? 'var(--warn)' : 'var(--ok)'} />
+            <Dato v={media ?? '—'} k="punteggio medio" col={media === null ? undefined : appetCol(media)} />
+            <Dato v={xi.length ? <>{difficolta.toFixed(1)}<span>/5</span></> : '—'} k="difficoltà del turno" />
+            <Dato v={<>{inCasa}<span>/{xi.length || 11}</span></>} k="in casa" />
+            {ko > 0 && <Dato v={ko} k="indisponibili in campo" col="var(--crit)" />}
+          </div>
+
+          <div className="campo">
+            <div className="linee" aria-hidden="true">
+              <span className="lmezzo" /><span className="lcerchio" /><span className="larea" /><span className="lareola" />
+            </div>
+            {REPARTI.map(([r, lab]) => (
+              <div key={r} className="greparto">
+                <div className="rowlab"><span>{lab}</span></div>
+                <div className="prow" data-n={L.start[r].length}>
+                  {L.start[r].map((id, i) => (
+                    <Maglia key={i} m={m} g={g} p={id ? giocatore(id) : null} sc={sc}
+                      alternative={R[r].map(x => x.p).filter(x => !dentro.has(x.id) && !m.isOut(x.id))}
+                      onApri={() => setCasella({ r, i })} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-[18px]">
+            <Card denso titolo="Panchina" azioni={<>
+              <span className="hint">nell'ordine in cui vuoi che entrino</span>
+              {L.bench.length > 1 && (
+                <Bottone piccolo title="Rimette in fila per reparto: portieri, difensori, centrocampisti, attaccanti"
+                  onClick={() => cambia({ ...L, bench: ordinaPerRuolo(L.bench, id => giocatore(id)?.r, id => { const p = m.byId.get(id); return p ? sc(p) : 0 }) })}>
+                  Ordina per ruolo
+                </Bottone>
+              )}
+            </>}>
+              <div className="benchlist">
+                {L.bench.length ? L.bench.map((id, i) => {
+                  const p = giocatore(id); if (!p) return null
+                  const prima = i > 0 ? giocatore(L.bench[i - 1]) : null
+                  const s = sc(p)
+                  return (
+                    <div key={id} className={`benchrow${prima && prima.r !== p.r ? ' reparto' : ''}`}>
+                      <span className="ord">{i + 1}</span>
+                      <ChipRuolo r={p.r} />
+                      <span className="bn">{p.n} <span className="pteam">{p.s}</span></span>
+                      <FixStrip m={m} team={p.s} r={p.r} from={g} span={1} />
+                      <OutBadge m={m} p={p} />
+                      <span className="dsc" style={{ color: appetCol(s), margin: 0 }}>{s}</span>
+                      <button type="button" className="mv" title="Sali" disabled={i === 0} onClick={() => cambia({ ...L, bench: sposta(L.bench, i, -1) })}>▲</button>
+                      <button type="button" className="mv" title="Scendi" disabled={i === L.bench.length - 1} onClick={() => cambia({ ...L, bench: sposta(L.bench, i, 1) })}>▼</button>
+                    </div>
+                  )
+                }) : <div className="empty">Nessuno in panchina.</div>}
+              </div>
+            </Card>
+          </div>
+          <p className="hint mt-[11px] max-w-[76ch]">
+            Le formazioni sono tue: nessuno degli altri partecipanti le vede. <b>Schiera la migliore</b> ordina i tuoi per valore
+            corretto con la difficoltà della partita di giornata — è un punto di partenza, non il tuo ultimo giudizio.
+          </p>
+        </>
+      )}
+
+      {casella && (
+        <ChiSchierare m={m} g={g} L={L} R={R} casella={casella} sc={sc}
+          onChiudi={() => setCasella(null)}
+          onScegli={pid => { cambia(metti(L, casella.r, casella.i, pid)); setCasella(null) }} />
+      )}
+    </div>
+  )
+}
+
+function Dato({ v, k, col }: { v: ReactNode; k: string; col?: string }) {
+  return <div className="dst"><div className="dsv" style={col ? { color: col } : undefined}>{v}</div><div className="dsk">{k}</div></div>
+}
+
+/* La maglia di una casella: la fascia viene dal punteggio di giornata, ed è
+   la stessa scala di colori usata ovunque. Se in panchina c'è chi fa più
+   di cinque punti meglio, il bordo lo dice. */
+function Maglia({ m, g, p, sc, alternative, onApri }: {
+  m: Motore; g: number; p: Giocatore | null; sc: (p: Giocatore) => number; alternative: Giocatore[]; onApri: () => void
+}) {
+  if (!p) return (
+    <button type="button" className="gslot vuoto" onClick={onApri}>
+      <span className="gs-piu">+</span><span className="gs-vuoto">scegli</span>
+    </button>
+  )
+  const s = sc(p), ko = m.isOut(p.id)
+  const meglio = alternative.length ? alternative.reduce((a, x) => sc(x) > sc(a) ? x : a, alternative[0]) : null
+  const su = !!meglio && sc(meglio) > s + 4
+  const st = m.statFor(p.id), fo = m.formaOf(p.id, 3)
+  return (
+    <button type="button" className={`gslot ${fascia(s)}${ko ? ' ko' : ''}${su ? ' meglio' : ''}`} onClick={onApri}>
+      <span className="gs-rate">
+        <b>{s}</b>
+        <i>{p.r}</i>
+        {m.rigOf(p) && <span className="gs-rig"><RigBadge m={m} p={p} /></span>}
+      </span>
+      <span className="gs-main">
+        <span className="gs-nome">{p.n}</span>
+        <span className="gs-sq"><TitDot m={m} p={p} /> {p.s}{ko && <> <OutBadge m={m} p={p} /></>}</span>
+        <span className="gs-stat">
+          <FixStrip m={m} team={p.s} r={p.r} from={g} span={1} />
+          {st && st.pres ? <span className="gsv"><i>fm</i><b style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(1)}</b></span> : null}
+          {fo && <span className="gsv"><i>for</i><b style={{ color: deltaCol(fo.delta) }}>{segno(fo.delta)}</b></span>}
+        </span>
+        <span className="gs-why">{m.dayWhy(p, g)}</span>
+        {su && meglio && <span className="gs-meglio">↑ {meglio.n} {sc(meglio)}</span>}
+      </span>
+    </button>
+  )
+}
+
+/* «Chi schierare»: i candidati per una casella, uno sotto l'altro, con il
+   perché di ciascuno. Risponde alla domanda del sabato mattina. */
+function ChiSchierare({ m, g, L, R, casella, sc, onChiudi, onScegli }: {
+  m: Motore; g: number; L: Formazione; R: Rosa; casella: { r: Ruolo; i: number }
+  sc: (p: Giocatore) => number; onChiudi: () => void; onScegli: (pid: number) => void
+}) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onChiudi() }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onChiudi])
+  const { r, i } = casella
+  const qui = L.start[r][i], occupati = usati(L)
+  const cand = R[r].map(x => x.p).filter(p => p.id === qui || !occupati.has(p.id)).sort((a, b) => sc(b) - sc(a))
+  return (
+    <div className="modal on" onClick={e => { if (e.target === e.currentTarget) onChiudi() }}>
+      <div className="pcard" role="dialog" aria-modal="true" aria-label="Chi schierare">
+        <div className="phead">
+          <div className="pid"><h3>Chi schierare</h3><div className="sub">{NOME_REPARTO[r]} · casella {i + 1} · giornata {g}</div></div>
+          <button type="button" className="pclose" onClick={onChiudi} title="Chiudi" autoFocus>✕</button>
+        </div>
+        <div className="psec">
+          <div className="cands">
+            {cand.length ? cand.map(p => {
+              const s = sc(p), f = m.fixtures(p.s, g, 1)[0], st = m.statFor(p.id), fo = m.formaOf(p.id, 3), ora = p.id === qui
+              return (
+                <div key={p.id} className={`cand${ora ? ' now' : ''}${m.isOut(p.id) ? ' ko' : ''}`}>
+                  <div className="cn">
+                    <span className="nm">{p.n}</span><TitDot m={m} p={p} /><RigBadge m={m} p={p} /><OutBadge m={m} p={p} />
+                    <span className="pteam">{p.s}</span>{ora && <span className="tag ok">in campo</span>}
+                  </div>
+                  <div className="cw">{m.dayWhy(p, g)}</div>
+                  <div className="cf">
+                    {f ? <span className={`fix d${Math.round(m.fixDiff(f.opp, m.isOff(p.r), f.home))}${f.home ? '' : ' away'}`}>{ABBR(f.opp)}</span>
+                      : <span className="hint">riposa</span>}
+                    {st && st.pres ? <span style={{ color: fmCol(st.fm!) }}>FM {st.fm!.toFixed(2)}</span> : null}
+                    {fo && <span style={{ color: deltaCol(fo.delta) }}>{segno(fo.delta)}</span>}
+                  </div>
+                  <div className="cs" style={{ color: appetCol(s) }}>{s}</div>
+                  <Bottone piccolo className="btn" variante={ora ? 'normale' : 'primario'} disabled={ora} onClick={() => onScegli(p.id)}>
+                    {ora ? 'già dentro' : 'Schiera'}
+                  </Bottone>
+                </div>
+              )
+            }) : <div className="empty">Nessun altro {NOME_REPARTO[r].toLowerCase()} disponibile in rosa.</div>}
+          </div>
+        </div>
+        <div className="psec">
+          <p className="hint">
+            Il punteggio di giornata pesa titolarità, valore nel ruolo, avversario di quella partita, rigori e forma recente.
+            È un consiglio, non un verdetto: se sai qualcosa che i numeri non sanno, vince quello che sai tu.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

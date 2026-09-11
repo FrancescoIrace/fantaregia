@@ -1,0 +1,22 @@
+# Dipendenze e build
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Segreti: le chiavi del progetto Supabase restano fuori dal repo
+.env
+.env.*
+!.env.example
+
+# Cache locale della Supabase CLI, specifica per macchina
+supabase/.temp/
+supabase/.branches/
+
+# Dati reali della lega: stesso vincolo di licenza della root.
+# Nessun export dal database (listone, voti, backup d'asta) va versionato.
+*.xlsx
+*.xls
+asta_reale.json
+*asta_reale*.json
+export/
