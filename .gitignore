@@ -3,6 +3,7 @@
 # di istruzioni, non dato: resta tracciato.
 dati/*
 !dati/LEGGIMI.md
+CLAUDE.md
 
 # File Excel: possono contenere listoni o voti reali
 *.xlsx
