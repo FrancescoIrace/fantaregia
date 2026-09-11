@@ -17,3 +17,9 @@ asta_reale.json
 
 # Scratch della build
 .check.js
+
+# Dipendenze e segreti (la webapp in web/ ha anche un suo .gitignore)
+node_modules/
+.env
+.env.*
+!.env.example
