@@ -1,6 +1,6 @@
 /* I piccoli segni che l'app a file singolo mette accanto ai nomi:
    titolarità, rigorista, indisponibile, la striscia delle partite. */
-import type { Motore } from '../domain/motore.ts'
+import { MENTNAME, type Motore } from '../domain/motore.ts'
 import type { Giocatore, Ruolo } from '../domain/tipi.ts'
 import { ABBR } from './colori.ts'
 
@@ -25,6 +25,14 @@ export function OutBadge({ m, p }: { m: Motore; p: Giocatore }) {
   if (!m.isOut(p.id)) return null
   const sq = m.squalificatoA(p.id, m.nextG())
   return <span className={`outb${sq ? ' squal' : ''}`} title={sq ? 'Squalificato per la prossima giornata' : 'Segnato indisponibile'}>{sq ? 'SQU' : 'OUT'}</span>
+}
+
+/** mentalità: una parola al posto delle sigle Mantra, misurata dentro il ruolo */
+export function MentChip({ m, p }: { m: Motore; p: Giocatore }) {
+  const l = m.mentLabel(p)
+  if (!l) return null
+  const codici = (p.rm || '').split(';').map(x => x.trim()).filter(x => x in MENTNAME).map(x => MENTNAME[x])
+  return <span className={`ment ${l.k}`} title={codici.join(', ') || l.t}>{l.t}</span>
 }
 
 /** le prossime partite: colore = difficoltà 1…5, minuscolo = in trasferta */
