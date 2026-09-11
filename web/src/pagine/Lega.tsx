@@ -8,6 +8,7 @@ import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
 import Formazioni from './Formazioni.tsx'
+import Scontri from './Scontri.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -43,10 +44,13 @@ export default function Lega({ utenteId }: { utenteId: string }) {
       <nav className="flex gap-1 overflow-x-auto border-b border-line">
         <NavLink to={`/lega/${id}`} end className={scheda}>Panoramica</NavLink>
         <NavLink to={`/lega/${id}/formazioni`} className={scheda}>Formazioni</NavLink>
+        <NavLink to={`/lega/${id}/scontri`} className={scheda}>Lega</NavLink>
       </nav>
       <Routes>
         <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
         <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} />} />
+        <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
       </Routes>
     </div>
   )

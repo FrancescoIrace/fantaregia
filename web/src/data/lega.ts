@@ -73,6 +73,26 @@ export async function assegna(legaId: string, giocatoreId: number, squadraId: nu
   return data
 }
 
+/** «la mia squadra»: privata anche lei, in preferenze */
+export async function salvaMiaSquadra(legaId: string, utenteId: string, squadraId: number | null) {
+  const { error } = await supabase.from('preferenze').upsert(
+    { lega_id: legaId, utente_id: utenteId, mia_squadra: squadraId, aggiornate_il: new Date().toISOString() },
+    { onConflict: 'lega_id,utente_id' },
+  )
+  if (error) throw new Error(error.message)
+}
+
+/** quale nome del calendario di lega è questa squadra (S.legaMap): un nome
+    appartiene a una squadra sola, chi lo aveva lo perde */
+export async function salvaAbbinamento(legaId: string, squadraId: number, idx: number | null) {
+  if (idx !== null) {
+    const { error } = await supabase.from('squadre').update({ lega_idx: null }).eq('lega_id', legaId).eq('lega_idx', idx).neq('id', squadraId)
+    if (error) throw new Error(error.message)
+  }
+  const { error } = await supabase.from('squadre').update({ lega_idx: idx }).eq('id', squadraId)
+  if (error) throw new Error(error.message)
+}
+
 /** le formazioni sono private: stanno nella riga di preferenze di chi le fa */
 export async function salvaFormazioni(legaId: string, utenteId: string, formazioni: Record<string, unknown>) {
   const { error } = await supabase.from('preferenze').upsert(
