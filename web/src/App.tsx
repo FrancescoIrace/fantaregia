@@ -37,7 +37,7 @@ export default function App() {
           <Suspense fallback={<p className="text-muted">Un attimo…</p>}>
             <Routes>
               <Route path="/invito/:codice" element={<Invito haSessione={!!sessione} />} />
-              <Route path="/lega/:id" element={sessione ? <Lega utenteId={sessione.user.id} /> : <Accesso />} />
+              <Route path="/lega/:id/*" element={sessione ? <Lega utenteId={sessione.user.id} /> : <Accesso />} />
               <Route path="*" element={sessione ? <Leghe utenteId={sessione.user.id} /> : <Accesso />} />
             </Routes>
           </Suspense>

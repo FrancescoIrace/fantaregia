@@ -1,0 +1,226 @@
+/* ══ Stili portati dall'app a file singolo ═══════════════════════════
+   Da src/part1.html e src/part2.html, con i nomi originali delle classi:
+   le viste nuove li usano così come sono, e chi confronta le due app
+   ritrova le stesse cose. Quello che è solo impaginazione generica sta in
+   Tailwind; qui resta quello che ha un disegno suo (il campo, le maglie,
+   la striscia delle partite, i segni di titolarità e rigori).          */
+:root {
+  --f1: #DCEFE2; --f1t: #14603A; --f2: #E9F1D8; --f2t: #4E6E27;
+  --f3: #F3EBDC; --f3t: #7A6134; --f4: #F8E3D6; --f4t: #9C4517; --f5: #F9DCD9; --f5t: #A32017;
+  --erba: #C8E2CE; --erba-2: #BEDBC6; --erba-linea: rgba(255,255,255,.9);
+  --oro: #8A6410; --oro-2: #D6A82C; --arg: #586167; --arg-2: #98A6AE;
+  --bro: #6E4222; --bro-2: #B4794C; --gre: #5A666C; --gre-2: #8B989F;
+  --f-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --f1: #1B5240; --f1t: #8FE6BA; --f2: #2B4529; --f2t: #C3E19C;
+    --f3: #3B3524; --f3t: #DCCB9C; --f4: #4C2C1C; --f4t: #F0B18C; --f5: #4D211D; --f5t: #F3A49B;
+    --erba: #183A2E; --erba-2: #143327; --erba-linea: rgba(198,244,218,.34);
+    --oro: #7A5A12; --oro-2: #C9A238; --arg: #4C575D; --arg-2: #8A979E;
+    --bro: #5F3A1E; --bro-2: #A66E44; --gre: #414D53; --gre-2: #77848B;
+  }
+}
+:root[data-theme="dark"] {
+  --f1: #1B5240; --f1t: #8FE6BA; --f2: #2B4529; --f2t: #C3E19C;
+  --f3: #3B3524; --f3t: #DCCB9C; --f4: #4C2C1C; --f4t: #F0B18C; --f5: #4D211D; --f5t: #F3A49B;
+  --erba: #183A2E; --erba-2: #143327; --erba-linea: rgba(198,244,218,.34);
+  --oro: #7A5A12; --oro-2: #C9A238; --arg: #4C575D; --arg-2: #8A979E;
+  --bro: #5F3A1E; --bro-2: #A66E44; --gre: #414D53; --gre-2: #77848B;
+}
+
+/* ── generici ─────────────────────────────── */
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.pteam{font-size:12px;color:var(--muted)}
+.tag{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em}
+.tag.ok{background:var(--ok-soft);color:var(--ok)} .tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.crit{background:var(--crit-soft);color:var(--crit)} .tag.neu{background:var(--surface-2);color:var(--muted)}
+.empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:14px}
+
+/* ── Giornate / formazione ────────────────── */
+.gbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+.gnav{display:flex;align-items:center;gap:0;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;background:var(--surface)}
+.gnav button{background:none;border:0;padding:8px 13px;font-size:15px;font-weight:600;color:var(--muted)}
+.gnav button:hover:not(:disabled){color:var(--accent);background:var(--accent-soft)}
+.gnav button:disabled{opacity:.3;cursor:default}
+.gnav .gcur{padding:5px 15px;border-left:1px solid var(--line);border-right:1px solid var(--line);text-align:center;min-width:118px}
+.gnav .gcur b{display:block;font-family:var(--f-display);font-size:16px;font-weight:600;line-height:1.15}
+.gnav .gcur span{font-family:var(--f-mono);font-size:10.5px;color:var(--muted)}
+.prow{display:grid;gap:10px}
+.prow[data-n="1"]{grid-template-columns:repeat(1,minmax(0,1fr));max-width:210px;margin:0 auto}
+.prow[data-n="2"]{grid-template-columns:repeat(2,minmax(0,1fr));max-width:420px;margin:0 auto}
+.prow[data-n="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
+.prow[data-n="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
+.prow[data-n="5"]{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:640px){.prow[data-n="4"],.prow[data-n="5"]{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}
+  .prow[data-n="3"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.dsc{font-family:var(--f-mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;margin-left:auto}
+/* scelta del titolare */
+.cands{display:flex;flex-direction:column;gap:7px}
+.cand{display:grid;grid-template-columns:1fr auto auto auto;grid-template-areas:"n f s b" "w f s b";
+  gap:2px 11px;align-items:center;padding:9px 11px;border-radius:9px;
+  background:var(--surface-2);border:1px solid var(--line)}
+.cand.now{border-color:var(--accent);background:var(--accent-soft)}
+.cand.ko{opacity:.55}
+.cand .cn{grid-area:n;display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.cand .cn .nm{font-weight:600;font-size:14px}
+.cand .cw{grid-area:w;font-size:11px;color:var(--muted)}
+.cand .cf{grid-area:f;display:flex;align-items:center;gap:7px;font-family:var(--f-mono);font-size:11px}
+.cand .cs{grid-area:s;font-family:var(--f-mono);font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.cand .btn{grid-area:b}
+@media(max-width:560px){
+  .cand{grid-template-columns:1fr auto;grid-template-areas:"n s" "w s" "f b";row-gap:6px}
+}
+.rowlab{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;text-align:center;margin-bottom:6px;line-height:1.4}
+.benchlist{display:flex;flex-direction:column;max-height:min(56vh,540px);overflow-y:auto}
+.benchrow{display:flex;align-items:center;gap:9px;padding:7px 14px;border-bottom:1px solid var(--line);font-size:13.5px}
+.benchrow:last-child{border-bottom:0}
+.benchrow.reparto{border-top:1px solid var(--line-strong)}
+.benchrow .bn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.benchrow .ord{font-family:var(--f-mono);font-size:11px;color:var(--muted);width:16px}
+.benchrow .mv{background:none;border:0;color:var(--line-strong);font-size:11px;padding:0 2px;line-height:1}
+.benchrow .mv:hover:not(:disabled){color:var(--accent)}
+.benchrow .mv:disabled{opacity:.25;cursor:default}
+
+/* ── Titolarità, rigori, indisponibili ────── */
+.tdot{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none;vertical-align:middle}
+.tdot.t1{background:var(--ok)} .tdot.t2{background:var(--warn)}
+.tdot.t3{background:var(--line-strong)} .tdot.t4{background:var(--line-strong);opacity:.5}
+/* anello attorno al pallino quando la titolarità viene dai voti veri e non dalle quotazioni */
+.tdot.reale{box-shadow:0 0 0 2px var(--surface),0 0 0 3px currentColor;color:var(--muted)}
+.outb{font-size:9px;letter-spacing:.08em;font-weight:700;padding:1px 5px;border-radius:4px;
+  background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit);white-space:nowrap}
+.outb.squal{background:var(--crit-soft);color:var(--crit)}
+.rig{display:inline-flex;align-items:center;justify-content:center;height:15px;min-width:15px;padding:0 3px;
+  border-radius:4px;font-family:var(--f-mono);font-size:9.5px;font-weight:600;letter-spacing:.02em;flex:none;
+  background:var(--rA-soft);color:var(--rA);border:1px solid transparent}
+.rig.first{border-color:var(--rA)}
+.rig.soft{opacity:.62}
+
+/* ── Calendario: la striscia delle partite ── */
+.fixstrip{display:flex;gap:3px;align-items:center}
+.fix{font-family:var(--f-mono);font-size:10px;font-weight:600;padding:3px 4px;border-radius:4px;min-width:32px;text-align:center;letter-spacing:.02em;flex:none}
+.fix.away{opacity:.78;font-weight:500;text-transform:lowercase}
+.fix.d1{background:var(--f1);color:var(--f1t)} .fix.d2{background:var(--f2);color:var(--f2t)}
+.fix.d3{background:var(--f3);color:var(--f3t)} .fix.d4{background:var(--f4);color:var(--f4t)}
+.fix.d5{background:var(--f5);color:var(--f5t)}
+.oggi{display:inline-block;font-family:var(--f-mono);font-size:9.5px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:99px;
+  background:var(--accent-soft);color:var(--accent);vertical-align:1px}
+
+/* ── Finestra sopra la pagina ─────────────── */
+.modal{position:fixed;inset:0;z-index:200;display:none;align-items:flex-start;justify-content:center;
+  padding:28px 16px;overflow-y:auto;background:rgba(10,18,22,.55);backdrop-filter:blur(3px)}
+.modal.on{display:flex}
+.pcard{background:var(--surface);border:1px solid var(--line-strong);border-radius:14px;box-shadow:0 20px 60px -20px rgba(0,0,0,.5);
+  width:100%;max-width:520px;overflow:hidden;animation:pop .16s ease-out}
+@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.pcard{animation:none}}
+.phead{display:flex;gap:16px;align-items:center;padding:18px 18px 16px;
+  background:linear-gradient(135deg,var(--accent-soft),transparent 70%);border-bottom:1px solid var(--line)}
+.pid{flex:1;min-width:0}
+.pid h3{font-family:var(--f-display);font-size:24px;font-weight:800;margin:0;letter-spacing:-.025em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pid .sub{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:4px}
+.pclose{background:none;border:0;font-size:19px;color:var(--muted);line-height:1;padding:2px 4px;align-self:flex-start}
+.pclose:hover{color:var(--crit)}
+.psec{padding:14px 18px;border-bottom:1px solid var(--line)}
+.psec:last-child{border-bottom:0}
+
+/* ── Il campo ─────────────────────────────────────────────────────────
+   Un modulo si legge meglio guardandolo che leggendolo: le caselle sono
+   maglie appoggiate sull'erba, e cliccandone una si apre il confronto
+   fra i candidati, che è dove la scelta si fa davvero.                 */
+.distinta{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.dst{flex:1;min-width:118px;padding:10px 13px;border:1px solid var(--line);
+  border-radius:var(--radius);background:var(--surface)}
+.dsv{font-family:var(--f-mono);font-size:23px;font-weight:700;line-height:1.05;
+  font-variant-numeric:tabular-nums}
+.dsv span{font-size:14px;font-weight:500;color:var(--muted)}
+.dsk{font-size:11px;color:var(--muted);margin-top:3px}
+.campo{position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  padding:22px 16px 26px;display:flex;flex-direction:column;gap:14px;overflow:hidden;
+  background:repeating-linear-gradient(180deg,var(--erba) 0 74px,var(--erba-2) 74px 148px)}
+.campo .linee{position:absolute;inset:0;pointer-events:none}
+/* centrate con translate: i margini in percentuale guarderebbero il contenitore */
+.campo .linee span{position:absolute;border:2px solid var(--erba-linea);
+  left:50%;transform:translateX(-50%)}
+/* si guarda dalla propria porta: metà campo in alto, area in basso */
+.linee .lmezzo{left:0;right:0;top:10px;width:auto;height:0;transform:none;border-width:0 0 2px 0}
+.linee .lcerchio{top:10px;width:132px;height:66px;border-radius:0 0 132px 132px;border-top:0}
+.linee .larea{bottom:0;width:60%;max-width:460px;height:146px;border-bottom:0;border-radius:7px 7px 0 0}
+.linee .lareola{bottom:0;width:30%;max-width:220px;height:62px;border-bottom:0;border-radius:5px 5px 0 0}
+.greparto{position:relative;z-index:1}
+.campo .rowlab{margin-bottom:7px;color:color-mix(in srgb,var(--ink) 62%,transparent)}
+.campo .rowlab span{background:var(--erba);padding:1px 11px;border-radius:20px;display:inline-block}
+
+/* ── La card del giocatore, impaginata come una figurina: la fascia
+      (oro, argento, bronzo) è il punteggio di giornata a colpo d'occhio ── */
+.gslot{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;min-width:0;
+  text-align:left;padding:0;border-radius:11px;border:1px solid var(--line);
+  background:var(--surface);box-shadow:var(--shadow);cursor:pointer;overflow:hidden;
+  position:relative;transition:transform .12s,border-color .12s;color:inherit;font:inherit}
+.gs-rate{position:relative}
+.gs-rate::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.22) 0 38%,rgba(255,255,255,.04) 38.5%)}
+.gslot:hover{border-color:var(--accent);transform:translateY(-2px)}
+.gslot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gslot.ko{border-color:var(--crit)}
+.gslot.meglio{border-color:var(--warn)}
+.gs-rate{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding:9px 4px;background:linear-gradient(160deg,var(--fa),var(--fb))}
+.gslot.f-oro{--fa:var(--oro-2);--fb:var(--oro)}
+.gslot.f-arg{--fa:var(--arg-2);--fb:var(--arg)}
+.gslot.f-bro{--fa:var(--bro-2);--fb:var(--bro)}
+.gslot.f-gre{--fa:var(--gre-2);--fb:var(--gre)}
+/* la fascia metallica è scura in entrambi i temi: il numero resta bianco */
+.gs-rate b{font-family:var(--f-mono);font-size:21px;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.gs-rate i{font-style:normal;font-family:var(--f-mono);font-size:11px;font-weight:700;
+  letter-spacing:.08em;color:#fff;opacity:.85;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.gs-rig{line-height:0;margin-top:1px}
+.gs-main{display:flex;flex-direction:column;gap:1px;min-width:0;padding:8px 10px 8px 0}
+.gs-nome{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:-.015em;
+  line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-sq{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-stat{display:flex;align-items:center;gap:7px;margin-top:4px;padding-top:5px;
+  border-top:1px solid var(--line);min-width:0;flex-wrap:wrap}
+.gsv{display:flex;align-items:baseline;gap:3px}
+.gsv i{font-style:normal;font-size:8.5px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--muted);font-weight:700}
+.gsv b{font-family:var(--f-mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.gs-why{font-size:10.5px;color:var(--muted);line-height:1.3;margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-meglio{font-size:10.5px;color:var(--warn);font-weight:650;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gslot.vuoto{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;min-height:96px;border-style:dashed;background:transparent;box-shadow:none;
+  color:var(--muted)}
+.gslot.vuoto:hover{border-style:solid;color:var(--accent);background:var(--surface)}
+.gs-piu{font-size:22px;line-height:1;font-weight:300}
+.gs-vuoto{font-size:11.5px}
+@media(prefers-reduced-motion:reduce){ .gslot:hover{transform:none} }
+@media(max-width:640px){
+  /* su telefono si stringono le maglie, non si spezzano le righe del modulo */
+  .campo{padding:14px 8px 20px;gap:10px}
+  .campo .prow{gap:6px}
+  .campo .prow[data-n="3"]{grid-template-columns:repeat(3,minmax(0,1fr));max-width:none}
+  .campo .prow[data-n="4"]{grid-template-columns:repeat(4,minmax(0,1fr));max-width:none}
+  .campo .prow[data-n="5"]{grid-template-columns:repeat(3,minmax(0,1fr));max-width:none}
+  .gslot{grid-template-columns:minmax(0,1fr);gap:0}
+  .gs-rate{flex-direction:row;justify-content:space-between;align-items:center;padding:3px 7px}
+  .gs-rate .gs-rig{margin:0}
+  .gs-main{padding:6px 7px}
+  .gs-why,.gs-meglio,.gsv{display:none}
+  .gs-rate b{font-size:16px} .gs-rate i{font-size:9.5px}
+  .gs-nome{font-size:12.5px}
+  .gs-sq{font-size:9.5px}
+  .gs-stat{gap:4px;margin-top:3px;padding-top:4px}
+  .linee .larea{height:126px}
+  .dst{flex:1 1 calc(50% - 5px);min-width:0;padding:8px 10px}
+  .dsv{font-size:19px}
+}

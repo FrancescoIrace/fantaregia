@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, NavLink, Route, Routes, useParams } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
-import { ROLES } from '../domain/motore.ts'
-import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
+import { ROLES, type Motore } from '../domain/motore.ts'
+import type { RigheLega } from '../data/componi.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
+import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
+import Formazioni from './Formazioni.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
-/* La pagina della lega, per ora: il tabellone delle squadre calcolato dal
-   motore sui dati veri, la squadra di chi guarda, cosa è caricato, chi c'è.
-   Le viste dell'app a file singolo arrivano qui una alla volta. */
+/* La lega: intestazione, schede, e sotto la vista scelta. I dati si
+   caricano una volta qui e le viste li ricevono già calcolati dal motore;
+   il realtime li aggiorna per tutte insieme. */
 export default function Lega({ utenteId }: { utenteId: string }) {
   const { id = '' } = useParams()
   const { righe, motore, errore, ricarica } = useLega(id, utenteId)
@@ -26,12 +28,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
   if (!righe || !motore) return <p className="text-muted">Carico la lega…</p>
 
   const io = membri.find(m => m.utente_id === utenteId)
-  const mia = righe.preferenze?.mia_squadra ?? null
-  const scegliSquadra = async (sq: string) => {
-    await supabase.from('preferenze').upsert({ lega_id: id, utente_id: utenteId, mia_squadra: sq ? Number(sq) : null }, { onConflict: 'lega_id,utente_id' })
-    ricarica()
-  }
-  const giornate = motore.giornateGiocate()
+  const scheda = ({ isActive }: { isActive: boolean }) =>
+    `-mb-px border-b-2 px-3.5 py-2.5 text-sm font-semibold ${isActive ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'}`
 
   return (
     <div className="space-y-6">
@@ -41,6 +39,33 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         <span className="font-mono text-[11px] text-muted">{righe.lega.stagione}</span>
         {io && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">{NOME_RUOLO[io.ruolo]}</span>}
       </div>
+      {/* link assoluti: dentro una rotta con /* i relativi si risolvono in modo ambiguo */}
+      <nav className="flex gap-1 overflow-x-auto border-b border-line">
+        <NavLink to={`/lega/${id}`} end className={scheda}>Panoramica</NavLink>
+        <NavLink to={`/lega/${id}/formazioni`} className={scheda}>Formazioni</NavLink>
+      </nav>
+      <Routes>
+        <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
+        <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} />} />
+      </Routes>
+    </div>
+  )
+}
+
+/* Il tabellone delle squadre calcolato dal motore sui dati veri, la
+   squadra di chi guarda, i file della lega, chi c'è. */
+function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
+  id: string; utenteId: string; righe: RigheLega; motore: Motore; ricarica: () => void; membri: Membro[]; io: Membro | undefined
+}) {
+  const mia = righe.preferenze?.mia_squadra ?? null
+  const scegliSquadra = async (sq: string) => {
+    await supabase.from('preferenze').upsert({ lega_id: id, utente_id: utenteId, mia_squadra: sq ? Number(sq) : null }, { onConflict: 'lega_id,utente_id' })
+    ricarica()
+  }
+  const giornate = motore.giornateGiocate()
+
+  return (
+    <div className="space-y-6">
       {io?.ruolo === 'lettore' && <Avviso>Sei in sola lettura: vedi tutto aggiornarsi in tempo reale, ma non puoi scrivere.</Avviso>}
 
       <Card titolo="Squadre" azioni={

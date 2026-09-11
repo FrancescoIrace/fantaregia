@@ -2,7 +2,7 @@
    Tailwind: card, pulsanti, campi, avvisi, etichette di ruolo. */
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
 
-export function Card({ titolo, azioni, children }: { titolo?: ReactNode; azioni?: ReactNode; children: ReactNode }) {
+export function Card({ titolo, azioni, children, denso }: { titolo?: ReactNode; azioni?: ReactNode; children: ReactNode; denso?: boolean }) {
   return (
     <section className="rounded-card border border-line bg-surface shadow-card">
       {(titolo || azioni) && (
@@ -11,7 +11,7 @@ export function Card({ titolo, azioni, children }: { titolo?: ReactNode; azioni?
           {azioni && <div className="ml-auto flex items-center gap-2">{azioni}</div>}
         </div>
       )}
-      <div className="p-4">{children}</div>
+      <div className={denso ? '' : 'p-4'}>{children}</div>
     </section>
   )
 }
