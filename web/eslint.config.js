@@ -19,6 +19,10 @@ export default defineConfig([
       ecmaVersion: 2022,
       globals: globals.browser,
     },
+    rules: {
+      // togliere un campo con { campo: _, ...resto } è voluto, non una svista
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
+    },
   },
   {
     files: ['test/**/*.ts', 'vite.config.ts'],

@@ -4,25 +4,9 @@
    preludio: i ruoli anon/authenticated, auth.uid(), la publication del
    realtime. Poi quattro utenti provano a fare quello che possono e quello
    che non possono: admin, banditore, lettore, estraneo.               */
-import { readdirSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { PGlite, type Transaction } from '@electric-sql/pglite'
+import type { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
-
-const MIGRAZIONI = fileURLToPath(new URL('../../supabase/migrations/', import.meta.url))
-
-const PRELUDIO = `
-  create role anon nologin;
-  create role authenticated nologin;
-  create schema auth;
-  create table auth.users (id uuid primary key);
-  create function auth.uid() returns uuid language sql stable
-    as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema auth to anon, authenticated;
-  grant execute on function auth.uid() to anon, authenticated;
-  grant usage on schema public to anon, authenticated;
-  create publication supabase_realtime;
-`
+import { comeUtente, nuovoDb } from './pglite.ts'
 
 const ADMIN = '00000000-0000-4000-8000-00000000000a'
 const BANDITORE = '00000000-0000-4000-8000-00000000000b'
@@ -36,24 +20,14 @@ const snap = (id: number) => { const p = LISTONE.find(x => x[0] === id)!; return
 
 let db: PGlite
 
-/* una transazione come la farebbe PostgREST: ruolo e utente valgono solo lì dentro */
-async function come<T = Record<string, unknown>>(uid: string | null, sql: string, params: unknown[] = []): Promise<T[]> {
-  return db.transaction(async (tx: Transaction) => {
-    await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [uid ?? ''])
-    await tx.exec(`set local role ${uid ? 'authenticated' : 'anon'}`)
-    return (await tx.query<T>(sql, params)).rows
-  })
-}
+const come = <T = Record<string, unknown>>(uid: string | null, sql: string, params: unknown[] = []) => comeUtente<T>(db, uid, sql, params)
 const fallisce = (p: Promise<unknown>, msg: RegExp) => expect(p).rejects.toThrow(msg)
 
 let lega: string
 let squadre: number[]
 
 beforeAll(async () => {
-  db = new PGlite()
-  await db.exec(PRELUDIO)
-  for (const f of readdirSync(MIGRAZIONI).filter(f => f.endsWith('.sql')).sort())
-    await db.exec(readFileSync(MIGRAZIONI + f, 'utf8'))
+  db = await nuovoDb()
   await db.query('insert into auth.users (id) values ($1), ($2), ($3), ($4)', [ADMIN, BANDITORE, LETTORE, ESTRANEO])
 })
 

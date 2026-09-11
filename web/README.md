@@ -22,6 +22,8 @@ npx supabase link --project-ref <ref-del-progetto>
 npx supabase db push
 ```
 
+A ogni nuova migrazione basta rilanciare `npx supabase db push`.
+
 Ogni tabella ha le policy RLS: i dati di una lega li leggono solo i suoi membri. Non è un dettaglio: listoni e voti non sono nostri e alcuni file vietano esplicitamente la ripubblicazione, quindi niente di questo database deve essere leggibile da fuori.
 
 ## Test
@@ -33,6 +35,7 @@ npm test
 - `test/equivalenza.test.ts`: avvia l'app originale in jsdom e confronta ogni indice con il port in TypeScript, in modo esatto.
 - `test/db/schema.test.ts`: applica le migrazioni a un Postgres in memoria (PGlite) e prova permessi, conflitti fra banditori e regole d'asta.
 - `test/componi.test.ts`: dalle righe del database allo stato del motore.
+- `test/import.test.ts`: una lega esportata come la esporta l'app a file singolo, importata con `importa_lega()` e riletta: il motore deve dare gli stessi numeri prima e dopo.
 
 Nessun test usa dati reali: solo `../esempi/` (giocatori inventati) e leghe sintetiche.
 

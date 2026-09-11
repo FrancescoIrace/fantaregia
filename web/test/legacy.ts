@@ -39,19 +39,24 @@ export interface DatiLegacy {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Legacy = Record<string, any>
 
-export async function avviaLegacy(d: DatiLegacy) {
+/** la pagina come la costruisce build.sh, con i dati dentro: è anche il file che l'import legge */
+export function assemblaPagina(d: DatiLegacy, gancio = true) {
   const p4 = parte(4).slice('<script id="fa-app">'.length).trimEnd().slice(0, -'</script>'.length)
   let p6 = parte(6)
-  const fine = p6.lastIndexOf('})();')
-  p6 = p6.slice(0, fine) + `Object.assign(window.__fa,{${ESPORTA.join(',')}});\n` + p6.slice(fine)
-
+  if (gancio) {
+    const fine = p6.lastIndexOf('})();')
+    p6 = p6.slice(0, fine) + `Object.assign(window.__fa,{${ESPORTA.join(',')}});\n` + p6.slice(fine)
+  }
   const meta = { name: 'Listone di prova', when: null, count: d.players.length }
   const blocco = '<script id="fa-data">window.PLAYERS=' + jsonSafe(d.players)
     + ';window.CAL=' + jsonSafe(d.cal) + ';window.RIG=' + jsonSafe(d.rig) + ';window.HIST=' + jsonSafe(d.hist)
     + ';window.SHARED=' + jsonSafe(d.shared) + ';window.LISTMETA=' + jsonSafe(meta) + ';</script>'
   const corpo = parte(1) + parte(2) + parte(3) + '\n' + blocco + '\n' + '<script id="fa-app">' + p4 + parte(5) + p6
-  const html = '<!doctype html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n</head>\n<body>\n' + corpo + '\n</body>\n</html>\n'
+  return '<!doctype html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n</head>\n<body>\n' + corpo + '\n</body>\n</html>\n'
+}
 
+export async function avviaLegacy(d: DatiLegacy) {
+  const html = assemblaPagina(d)
   const errori: string[] = []
   const vc = new VirtualConsole()
   vc.on('jsdomError', e => errori.push(e.message))
