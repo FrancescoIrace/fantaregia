@@ -1,5 +1,5 @@
 {
-  "name": "sala-asta-fantacalcio",
+  "name": "fantaregia",
   "version": "1.0.0",
   "description": "App a file singolo per gestire l'asta del fantacalcio e la stagione: prezzi attesi tarati sulle aste vere, indici verificati, tutto offline.",
   "type": "module",

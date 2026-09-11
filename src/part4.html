@@ -21,7 +21,7 @@ function pageHTML(shared,players,meta){
     +';window.LISTMETA='+jsonSafe(meta)+';<\/script>';
   return '<!doctype html>\n<html lang="it">\n<head>\n<meta charset="utf-8">\n'
     +'<meta name="viewport" content="width=device-width,initial-scale=1">\n'
-    +"<title>Sala d'Asta Fantacalcio</title>\n"+SRC["fa-font"]+"\n"+SRC["fa-css1"]+"\n"+SRC["fa-css2"]
+    +"<title>Fantaregia · asta e stagione</title>\n"+SRC["fa-font"]+"\n"+SRC["fa-css1"]+"\n"+SRC["fa-css2"]
     +"\n</head>\n<body>\n"+SRC["fa-root"]+"\n"+data+"\n"+SRC["fa-app"]+"\n</body>\n</html>";
 }
 
@@ -168,6 +168,7 @@ async function initStore(){
       try{ const r=localStorage.getItem(KEY_SOLO); if(r) S=Object.assign(clone(DEF),JSON.parse(r)); }catch(e){}
     }
     if(dirty){ saveSolo(); dirty=false; }
+    allineaGiornate();      // ora S c'è per davvero: la giornata di lega si può calcolare
     renderAll();
   }
   setSync(); renderBanner(); renderSetup();
@@ -190,6 +191,9 @@ function roster(tid){
 function stats(tid){
   const R=roster(tid); let spent=0,count=0; const perRole={};
   for(const r of ROLES){ const s=R[r].reduce((a,x)=>a+x.price,0); perRole[r]={spent:s,count:R[r].length}; spent+=s; count+=R[r].length; }
+  // la correzione dei movimenti va tolta dalla SPESA, non aggiunta al residuo:
+  // altrimenti il residuo torna ma la spesa mostra 1075 su un budget di 1000
+  spent-=aggCrediti(tid);
   const left=S.budget-spent, slotsLeft=totalSlots()-count;
   return {R,spent,count,left,slotsLeft,perRole,max:slotsLeft>0?Math.max(0,left-(slotsLeft-1)):0};
 }
@@ -197,6 +201,7 @@ const teamName=tid=>{const t=S.teams.find(x=>x.id===tid);return t?t.name:"?";};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const curTab=()=>document.querySelector('.tabs button[aria-selected="true"]').dataset.tab;
 
+let giornateTocco=false;   // true appena l'utente sceglie una giornata a mano
 let toastT;
 function toast(msg){ const el=document.getElementById("toast"); el.textContent=msg; el.classList.add("on");
   clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove("on"),2100); }
@@ -562,14 +567,18 @@ function titDot(p){
 }
 /* ── Indisponibili: infortuni e squalifiche, le uniche cose che nessun
       file ci dà e che decidono la giornata. Le segna chi tiene l'asta.  */
-const isOut=id=>!!(S.out&&S.out[id]);
+/* «indisponibile adesso» = segnato a mano, oppure squalificato per la
+   prossima giornata. Gli indici e la formazione automatica guardano qui. */
+const isOut=id=>!!(S.out&&S.out[id])||squalificatoA(id,nextG());
 function toggleOut(id){
   if(readOnly) return;
   S.out=Object.assign({},S.out||{});
   if(S.out[id]) delete S.out[id]; else S.out[id]=1;
   persist(); renderAll();
 }
-const outBadge=p=>isOut(p.id)?`<span class="outb" title="Segnato indisponibile: infortunato o squalificato">OUT</span>`:"";
+const outBadge=p=>{ if(!isOut(p.id)) return "";
+  const sq=squalificatoA(p.id,nextG());
+  return `<span class="outb${sq?" squal":""}" title="${sq?"Squalificato per la prossima giornata":"Segnato indisponibile"}">${sq?"SQU":"OUT"}</span>`; };
 function rigBadge(p){
   const e=rigOf(p); if(!e) return "";
   const [rank,both]=e;
@@ -920,4 +929,715 @@ function giudizi(){
     .sort((a,b)=>b.g.voto-a.g.voto);
 }
 const votoCol=v=>v>=70?"var(--ok)":v>=55?"var(--warn)":"var(--crit)";
+
+/* ══ 13. Calendario di lega ═════════════════════════════════════════
+   Il calendario della lega dice CHI affronti; quello di serie A dice
+   quanto è dura per i tuoi giocatori. Sono due cose diverse e qui si
+   incrociano: la giornata cattiva è quella in cui l'avversario è forte
+   E i tuoi big giocano fuori casa contro le prime.
+
+   S.lega = {teams:[nomi di lega], off:2, gior:[[[iCasa,iOsp],…] × 36], nome}
+   S.legaMap = {idSquadraAsta: indiceNelCalendarioDiLega}
+   L'offset è quanto va aggiunto alla giornata di lega per avere quella
+   di serie A: nel file del 2026/27 la 1ª di lega è la 3ª di serie A.  */
+const legaOn=()=>!!(S.lega&&S.lega.gior&&S.lega.gior.length&&S.lega.teams);
+const legaGiornate=()=>legaOn()?S.lega.gior.length:0;
+const legaSerieA=gl=>Math.max(1,Math.min(38,gl+(S.lega&&S.lega.off||0)));
+const legaIdx=tid=>{ const m=S.legaMap||{}; const v=m[tid]; return (v===undefined||v===null||v<0)?null:v; };
+function legaTid(i){
+  const m=S.legaMap||{};
+  for(const tid in m) if(m[tid]===i) return +tid;
+  return null;
+}
+const legaNome=i=>(legaOn()&&S.lega.teams[i])||"—";
+/* le 6 partite di una giornata, tradotte in squadre dell'asta dove si può */
+function legaPartite(gl){
+  if(!legaOn()) return [];
+  const gg=S.lega.gior[gl-1]||[];
+  return gg.map(([a,b])=>({
+    casaI:a, ospI:b,
+    casa:legaTid(a), osp:legaTid(b),
+    casaNome:legaNome(a), ospNome:legaNome(b)
+  }));
+}
+/* chi affronto alla giornata di lega gl */
+function legaAvv(tid,gl){
+  const i=legaIdx(tid); if(i===null) return null;
+  for(const p of legaPartite(gl)){
+    if(p.casaI===i) return {i:p.ospI, tid:p.osp, nome:p.ospNome, casa:true,  gl:gl, ga:legaSerieA(gl)};
+    if(p.ospI===i)  return {i:p.casaI,tid:p.casa,nome:p.casaNome,casa:false, gl:gl, ga:legaSerieA(gl)};
+  }
+  return null;
+}
+const legaTutte=tid=>{ const out=[]; for(let g=1;g<=legaGiornate();g++){ const a=legaAvv(tid,g); if(a) out.push(a); } return out; };
+
+/* ══ 13b. Quanto ci si aspetta che faccia una rosa ═══════════════════
+   Stima, non previsione, e vale la pena dire da cosa è fatta.
+
+   Per ogni giocatore del miglior undici possibile:
+     · quanto vale la sua pagella media — dai voti di quest'anno se ce ne
+       sono abbastanza, altrimenti dal 2025/26, altrimenti dal prior di ruolo;
+     · quanto aggiunge di bonus per presenza, corretto dalla durezza della
+       partita di serie A di quella giornata;
+     · con quale probabilità gioca davvero (la titolarità), perché uno che
+       non scende in campo lascia il posto a una riserva che vale meno.
+
+   Accanto alla media serve lo SCARTO, ed è la parte che cambia le scelte.
+   Il fantavoto di un attaccante che segna spesso oscilla molto più di
+   quello di un difensore: modellando i gol come eventi rari, ogni gol
+   pesa 3 e porta varianza 9λ. Sommando i giocatori (indipendenti, in
+   buona approssimazione) viene lo scarto della squadra — e da lì la
+   probabilità di vincere lo scontro, che è la domanda vera.            */
+const MV_BASE={P:6.0,D:5.95,C:6.0,A:5.95};
+function attesoGiocatore(p,ga){
+  if(!p) return null;
+  const st=statFor(p.id), h=annoScorso(p.id);
+  let mv, bon, lam=0, laa=0, fonte;
+  if(st&&st.pv>=4){                                  // abbastanza giornate quest'anno
+    mv=st.mv; bon=st.fm-st.mv; fonte="quest'anno";
+    lam=(st.gf||0)/st.pv; laa=(st.ass||0)/st.pv;
+  }else if(h&&h.pv>=8){                              // altrimenti la stagione scorsa
+    mv=h.mv; bon=h.scarto; fonte="2025/26";
+    lam=(h.gf+h.rp)/h.pv; laa=h.ass/h.pv;
+    if(st&&st.pv){ const w=st.pv/4; mv=(1-w)*mv+w*st.mv; bon=(1-w)*bon+w*(st.fm-st.mv); }
+  }else{                                             // nuovo o senza storia: prior di ruolo
+    mv=MV_BASE[p.r]; fonte="stima dal ruolo";
+    const q=Math.max(1,p.q||1);
+    bon=p.r==="A"?0.9*Math.min(1.6,q/16):p.r==="C"?0.45*Math.min(1.6,q/14):p.r==="D"?0.25:0.15;
+    lam=p.r==="A"?bon/3.2:p.r==="C"?bon/4:0.03; laa=lam*0.5;
+  }
+  // la partita di serie A di quella giornata sposta i bonus, non la pagella
+  let mult=1;
+  const fx=p.s?fixtures(p.s,ga,1)[0]:null;
+  if(fx){ const d=fixDiff(fx.opp,isOff(p.r),fx.home); mult=1+(3-d)*0.12; }   // 1 facile → ~1,24
+  bon=bon*mult; lam=lam*mult; laa=laa*mult;
+  const fv=mv+bon;
+  // varianza: la pagella oscilla poco, i bonus tanto
+  const varia=0.42 + 9*lam + 1*laa + (p.r==="P"?0.9:p.r==="D"?0.55:0.25);
+  return {fv:fv, mv:mv, bon:bon, sd:Math.sqrt(varia), gioca:titW(p), fonte:fonte, mult:mult, fx:fx};
+}
+/* il punteggio atteso di una squadra a una data giornata di serie A */
+function attesoRosa(tid,ga){
+  // la rosa di QUELLA giornata: per le giornate future coincide con quella
+  // di adesso, per quelle passate tiene conto di scambi e svincoli
+  const R=rosterAt(tid,ga);
+  const noti=r=>R[r].map(x=>byId.get(x.p.id)||x.p);
+  const val=p=>{ const a=attesoGiocatore(p,ga); return a?a.fv*Math.max(0.15,a.gioca):0; };
+  const ord={}; for(const r of ROLES) ord[r]=noti(r).slice().sort((a,b)=>val(b)-val(a));
+  let best=null;
+  for(const mod in MODULI){
+    const [d,c,a]=MODULI[mod]; const need={P:1,D:d,C:c,A:a};
+    if(ROLES.some(r=>ord[r].length<need[r])) continue;
+    const xi=ROLES.flatMap(r=>ord[r].slice(0,need[r]));
+    const s=xi.reduce((t,p)=>t+val(p),0);
+    if(!best||s>best.s) best={mod:mod,xi:xi,s:s};
+  }
+  if(!best){ const xi=ROLES.flatMap(r=>ord[r]).slice(0,11); best={mod:"—",xi:xi,s:xi.reduce((t,p)=>t+val(p),0)}; }
+  // chi non gioca lascia il posto a una riserva del suo ruolo: qui il costo del cambio
+  const panca={}; for(const r of ROLES){ const dentro=new Set(best.xi.map(p=>p.id));
+    const fuori=ord[r].filter(p=>!dentro.has(p.id)); panca[r]=fuori.length?attesoGiocatore(fuori[0],ga):null; }
+  let media=0, varTot=0; const righe=[];
+  for(const p of best.xi){
+    const a=attesoGiocatore(p,ga); if(!a) continue;
+    const ris=panca[p.r], fvRis=ris?ris.fv*0.92:5.6;      // la riserva rende un po' meno
+    const g=Math.max(0,Math.min(1,a.gioca));
+    const m=g*a.fv+(1-g)*fvRis;
+    media+=m;
+    // varianza del giocatore più quella di "gioca o non gioca"
+    varTot+=g*a.sd*a.sd+g*(1-g)*Math.pow(a.fv-fvRis,2);
+    righe.push({p:p, a:a, atteso:m});
+  }
+  righe.sort((x,y)=>y.atteso-x.atteso);
+  return {mod:best.mod, media:media, sd:Math.sqrt(varTot), xi:righe,
+          perRuolo:ROLES.reduce((o,r)=>{o[r]=righe.filter(x=>x.p.r===r).reduce((s,x)=>s+x.atteso,0);return o;},{})};
+}
+/* funzione di ripartizione normale: serve per la probabilità di vincere */
+function normCdf(z){
+  const t=1/(1+0.2316419*Math.abs(z));
+  const d=0.3989423*Math.exp(-z*z/2);
+  const p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
+  return z>0?1-p:p;
+}
+/* lo scontro di una giornata: chi è favorito, di quanto, e cosa conviene fare */
+let _scSig="", _scCache=new Map();
+function scontro(tid,gl){
+  const sig=[S.rev,Object.keys(S.stats||{}).length,JSON.stringify(S.legaMap||{})].join("|");
+  if(sig!==_scSig){ _scSig=sig; _scCache=new Map(); }
+  const k=tid+"|"+gl; if(_scCache.has(k)) return _scCache.get(k);
+  const avv=legaAvv(tid,gl);
+  let out=null;
+  if(avv){
+    const ga=avv.ga;
+    const mia=attesoRosa(tid,ga);
+    const sua=avv.tid?attesoRosa(avv.tid,ga):null;
+    if(sua){
+      const diff=mia.media-sua.media;
+      const sd=Math.sqrt(mia.sd*mia.sd+sua.sd*sua.sd)||1;
+      const pv=normCdf(diff/sd);
+      out={avv:avv, ga:ga, mia:mia, sua:sua, diff:diff, sd:sd, pVinco:pv,
+           // sotto: alzare la varianza aiuta. sopra: abbassarla.
+           strategia: pv<0.42?"rischio":pv>0.58?"prudenza":"pari",
+           durezza: sua.media};
+    }else out={avv:avv, ga:ga, mia:mia, sua:null};
+  }
+  _scCache.set(k,out);
+  return out;
+}
+/* ══ 13c. I giocatori pericolosi dell'avversario ═════════════════════
+   Pericoloso non è chi fa la media più alta: è chi può farti male in una
+   domenica sola. Un difensore da 6 fisso non ribalta niente; una punta che
+   segna una volta su tre sì. Quindi l'ordine è per TETTO — il valore che
+   quel giocatore supera all'incirca una volta su dieci, cioè media più
+   1,28 scarti — e non per media.                                        */
+function pericolosi(tid,ga,quanti){
+  if(!tid) return [];
+  const R=attesoRosa(tid,ga);
+  return R.xi.map(x=>{
+    const a=x.a, e=rigOf(x.p);
+    const tetto=x.atteso+1.28*a.sd;
+    const perche=[];
+    if(e&&e[0]===1) perche.push("tira i rigori");
+    const st=statFor(x.p.id), h=annoScorso(x.p.id);
+    const lam=st&&st.pv>=4?(st.gf||0)/st.pv:(h&&h.pv>=8?(h.gf+h.rp)/h.pv:0);
+    if(lam>=0.35) perche.push("segna spesso");
+    else if(lam>=0.18) perche.push("va spesso a segno");
+    if(a.mult>=1.15) perche.push("partita morbida");
+    else if(a.mult<=0.85) perche.push("partita dura");
+    if(!perche.length&&a.gioca>=0.9) perche.push("gioca sempre");   // solo se non c'è di meglio da dire
+    return {p:x.p, a:a, atteso:x.atteso, tetto:tetto, rig:e&&e[0]===1,
+            perche:perche.slice(0,2).join(" · ")||"titolare"};
+  }).sort((x,y)=>y.tetto-x.tetto).slice(0,quanti||5);
+}
+/* la giornata nera: avversario forte E calendario di serie A cattivo per i miei */
+function legaIncroci(tid){
+  const out=[];
+  for(let g=1;g<=legaGiornate();g++){
+    const s=scontro(tid,g); if(!s||!s.sua) continue;
+    // quanto è dura la giornata di serie A per il mio undici
+    const dur=s.mia.xi.length
+      ? s.mia.xi.reduce((a,x)=>a+(x.a.fx?fixDiff(x.a.fx.opp,isOff(x.p.r),x.a.fx.home):3),0)/s.mia.xi.length
+      : 3;
+    out.push({gl:g, ga:s.ga, avv:s.avv, pVinco:s.pVinco, diff:s.diff,
+              durSerieA:dur, mia:s.mia.media, sua:s.sua.media,
+              // 0 = giornata comoda, 100 = da incubo
+              nera: Math.round(clamp01((1-s.pVinco)*0.62+((dur-2)/2.2)*0.38)*100)});
+  }
+  return out;
+}
+
+
+/* ══ 18. Mercato: scambi e svincoli ═════════════════════════════════
+   S.assign dice chi possiede un giocatore ADESSO. Da solo non basta:
+   se scambi un giocatore alla decima giornata, i punti che ha fatto
+   dalla prima alla nona si sposterebbero con lui, e il rendimento del
+   passato diventerebbe falso.
+
+   Quindi accanto alle assegnazioni c'è un registro dei movimenti:
+
+     S.moves = [{ id, g, tipo, ts, voci:[{pid, da, a, prezzo}], agg:{tid:delta} }]
+
+   · g     è la giornata DA CUI il movimento vale
+   · voci  chi si sposta e fra chi (null = svincolato, fuori da tutte le
+           rose), con il prezzo che portava addosso in quel momento —
+           serve per rimettere le cose a posto se il movimento si annulla
+   · agg   la correzione ai crediti, spiegata sotto
+
+   Il possesso a una certa giornata si ricava all'indietro: si parte da
+   adesso e si disfano i movimenti successivi a quella giornata. Costa
+   poco perché i movimenti in una stagione sono una manciata.          */
+const moves=()=>Array.isArray(S.moves)?S.moves:(S.moves=[]);
+const nextG=()=>{ const g=giornateGiocate(); return Math.min(38,(g.length?Math.max(...g):0)+1); };
+
+/* chi possedeva questo giocatore alla giornata g (null = nessuno) */
+function ownerAt(pid,g){
+  const a=S.assign[pid];
+  let cur=a?a.team:null;
+  const ms=moves();
+  for(let i=ms.length-1;i>=0;i--){
+    const m=ms[i]; if(m.g<=g) break;                 // già ordinati per giornata
+    for(const v of m.voci) if(+v.pid===+pid) cur=v.da;
+  }
+  return cur;
+}
+/* la rosa di una squadra a una certa giornata */
+function rosterAt(tid,g){
+  const out={P:[],D:[],C:[],A:[]};
+  const visti=new Set();
+  const metti=pid=>{
+    if(visti.has(+pid)) return; visti.add(+pid);
+    if(ownerAt(pid,g)!==tid) return;
+    const a=S.assign[pid];
+    const p=giocatoreDi(pid); if(!p) return;
+    out[p.r].push({p:p, price:a?(a.price||0):prezzoStorico(pid)});
+  };
+  for(const pid in S.assign) metti(pid);
+  for(const m of moves()) for(const v of m.voci) metti(v.pid);   // anche chi è uscito
+  for(const r of ROLES) out[r].sort((a,b)=>b.price-a.price||a.p.n.localeCompare(b.p.n));
+  return out;
+}
+
+/* ── i crediti ──────────────────────────────────────────────────────
+   I crediti residui si ricavano da budget meno la somma dei prezzi in
+   rosa. Con i movimenti quel conto va corretto, altrimenti dice bugie:
+   uno scambio alla pari fra Bastoni (65) e Dimarco (156) farebbe
+   crollare di 91 crediti il residuo di chi riceve, senza che abbia
+   pagato niente. La correzione riporta il residuo dove deve stare.
+
+   · scambio senza crediti → agg = (prezzi in entrata) − (prezzi in
+     uscita), così il residuo non si muove di un credito;
+   · svincolo → l'utente dichiara rimborso R e costo C, e la formula
+     si riduce ad agg = R − prezzo pagato a suo tempo.                */
+function aggCrediti(tid){
+  let a=0;
+  for(const m of moves()) if(m.agg&&m.agg[tid]) a+=m.agg[tid];
+  return a;
+}
+const prezzoDi=pid=>{ const a=S.assign[pid]; return a?(a.price||0):prezzoStorico(pid); };
+/* il prezzo di chi non è più in nessuna rosa: lo tiene il movimento che l'ha portato fuori */
+function prezzoStorico(pid){
+  const ms=moves();
+  for(let i=ms.length-1;i>=0;i--) for(const v of ms[i].voci)
+    if(+v.pid===+pid && v.prezzo!==undefined) return v.prezzo;
+  return 0;
+}
+function giocatoreDi(pid){
+  const a=S.assign[pid];
+  if(a&&(byId.get(+pid)||a.snap)) return byId.get(+pid)||a.snap;
+  if(byId.get(+pid)) return byId.get(+pid);
+  for(const m of moves()) for(const v of m.voci) if(+v.pid===+pid&&v.snap) return v.snap;
+  return null;
+}
+
+/* ── registrare un movimento ────────────────────────────────────────
+   Prima si controlla, poi si scrive. I controlli non sono formalità:
+   uno scambio fra ruoli diversi lascia una rosa fuori regola, e senza
+   avviso te ne accorgi la domenica quando non riesci a schierare.    */
+function verificaScambio(pidA,pidB){
+  const a=S.assign[pidA], b=S.assign[pidB];
+  const pa=giocatoreDi(pidA), pb=giocatoreDi(pidB);
+  if(!a||!b) return "uno dei due giocatori non è in nessuna rosa";
+  if(!pa||!pb) return "non trovo uno dei due giocatori nel listone";
+  if(a.team===b.team) return "sono già nella stessa squadra";
+  if(pa.r!==pb.r) return `ruoli diversi (${pa.r} e ${pb.r}): la lega scambia ruolo per ruolo`;
+  return null;
+}
+function registraScambio(pidA,pidB,g){
+  const err=verificaScambio(pidA,pidB); if(err) throw new Error(err);
+  const a=S.assign[pidA], b=S.assign[pidB];
+  const ta=a.team, tb=b.team, pa=prezzoDi(pidA), pb=prezzoDi(pidB);
+  const g0=giocatoreDi(pidA), g1=giocatoreDi(pidB);
+  const pa0=g0?{id:g0.id,r:g0.r,n:g0.n,s:g0.s,q:g0.q}:undefined;
+  const pb0=g1?{id:g1.id,r:g1.r,n:g1.n,s:g1.s,q:g1.q}:undefined;
+  const m={ id:Date.now(), g:g, tipo:"scambio", ts:Date.now(),
+    voci:[{pid:+pidA, da:ta, a:tb, prezzo:pa, snap:pa0},
+          {pid:+pidB, da:tb, a:ta, prezzo:pb, snap:pb0}],
+    // il residuo di nessuno dei due deve muoversi: qui la correzione
+    agg:{ [ta]: pb-pa, [tb]: pa-pb } };
+  a.team=tb; b.team=ta;
+  moves().push(m); moves().sort((x,y)=>x.g-y.g||x.ts-y.ts);
+  return m;
+}
+function verificaSvincolo(tid,pidFuori,pidDentro){
+  const a=S.assign[pidFuori];
+  if(!a||a.team!==tid) return "il giocatore da svincolare non è in questa rosa";
+  if(S.assign[pidDentro]) return "il giocatore da prendere è già in una rosa";
+  const pf=giocatoreDi(pidFuori), pd=byId.get(+pidDentro);
+  if(!pd) return "il giocatore da prendere non è nel listone";
+  if(pf&&pd.r!==pf.r) return `ruoli diversi (${pf.r} esce, ${pd.r} entra): gli slot non tornerebbero`;
+  return null;
+}
+function registraSvincolo(tid,pidFuori,pidDentro,rimborso,costo,g){
+  const err=verificaSvincolo(tid,pidFuori,pidDentro); if(err) throw new Error(err);
+  const pagatoAllora=prezzoDi(pidFuori);
+  const pd=byId.get(+pidDentro);
+  const gf=giocatoreDi(pidFuori);
+  const pf0=gf?{id:gf.id,r:gf.r,n:gf.n,s:gf.s,q:gf.q}:undefined;
+  const m={ id:Date.now(), g:g, tipo:"svincolo", ts:Date.now(),
+    voci:[{pid:+pidFuori, da:tid, a:null, prezzo:pagatoAllora, snap:pf0},
+          {pid:+pidDentro, da:null, a:tid, prezzo:costo, snap:{id:pd.id,r:pd.r,n:pd.n,s:pd.s,q:pd.q}}],
+    rimborso:rimborso, costo:costo,
+    // il derivato restituisce già i crediti del giocatore uscente: qui
+    // si corregge con il rimborso davvero pattuito
+    agg:{ [tid]: rimborso-pagatoAllora } };
+  delete S.assign[pidFuori];
+  S.assign[pidDentro]={team:tid, price:costo, snap:{id:pd.id,r:pd.r,n:pd.n,s:pd.s,q:pd.q}};
+  moves().push(m); moves().sort((x,y)=>x.g-y.g||x.ts-y.ts);
+  return m;
+}
+/* annullare l'ultimo movimento: si rimettono le cose come stavano */
+function annullaMovimento(id){
+  const ms=moves(); const i=ms.findIndex(m=>m.id===id);
+  if(i<0) throw new Error("movimento non trovato");
+  const m=ms[i];
+  for(const v of m.voci){
+    if(v.a===null){                                   // era uscito: torna dentro
+      // al SUO prezzo, quello registrato nella voce — non al rimborso pattuito
+      S.assign[v.pid]={team:v.da, price:v.prezzo||0, snap:v.snap};
+    }else if(v.da===null){                             // era entrato: esce
+      delete S.assign[v.pid];
+    }else if(S.assign[v.pid]){
+      S.assign[v.pid].team=v.da;
+    }
+  }
+  ms.splice(i,1);
+  return m;
+}
+/* i movimenti che riguardano una squadra, dal più recente */
+const moviDi=tid=>moves().filter(m=>m.voci.some(v=>v.da===tid||v.a===tid)).slice().reverse();
+
+
+/* ══ 20. Che giornata è oggi ════════════════════════════════════════
+   All'apertura l'app partiva sempre dalla giornata 1, e a novembre era
+   una scocciatura quotidiana. La data del dispositivo basta a evitarla,
+   perché il calendario porta con sé la data di ogni giornata.
+
+   La regola è "la prima giornata non ancora giocata": dal lunedì alla
+   domenica stai preparando quella che viene, non quella passata. Non
+   scende mai sotto le giornate di cui hai già caricato i voti — se ne
+   hai caricate cinque, oggi è almeno la sesta, anche se il calendario
+   in uso fosse di un'altra stagione.
+
+   Senza date nel calendario si ripiega sulle giornate caricate + 1, che
+   è quello che l'app faceva prima e resta un ripiego onesto.          */
+function giornataOggi(){
+  const oggi=new Date(); oggi.setHours(0,0,0,0);
+  const D=CAL.dates||[];
+  let daData=null, conDate=0;
+  for(let g=1;g<=D.length;g++){
+    const s=D[g-1]; if(!s) continue;
+    conDate++;
+    if(daData===null){
+      const d=new Date(s+"T00:00:00");
+      if(!isNaN(d)&&d>=oggi) daData=g;
+    }
+  }
+  if(daData===null&&conDate) daData=D.length;      // stagione finita: resta l'ultima
+  const g=Math.max(daData||0, nextG()||1);
+  return Math.max(1,Math.min(38,g));
+}
+/* la stessa giornata, nella numerazione della lega */
+function legaOggi(){
+  if(!legaOn()) return 1;
+  const g=giornataOggi()-(S.lega.off||0);
+  return Math.max(1,Math.min(legaGiornate(),g));
+}
+
+
+/* ══ 20. Rose ufficiali della lega ═══════════════════════════════════
+   Quello che segni all'asta è un appunto preso in fretta, spesso mentre
+   parlano tutti. Il file delle rose che la lega pubblica dopo l'asta è
+   invece la versione firmata: se i due non combaciano, sbaglia quasi
+   sempre l'appunto. Qui il file si legge, si confronta e — solo se lo
+   chiedi — si copia sopra.
+
+   Il foglio ROSE è a colonne affiancate: ogni squadra occupa un nome e
+   un «costo», intestati in cima, con i giocatori sotto fino alla riga
+   «totale». Chi non ha ancora fatto l'asta ha «totale 0» subito.       */
+function parseRoseLega(rows){
+  const cel=(r,c)=>{ const v=(rows[r]||[])[c]; return v===undefined||v===null?"":String(v).trim(); };
+  // l'intestazione è la prima riga con almeno due «costo»
+  let h=-1;
+  for(let i=0;i<Math.min(rows.length,12);i++){
+    let k=0; const larg=(rows[i]||[]).length;
+    for(let c=0;c<larg;c++) if(/^costo$/i.test(cel(i,c))) k++;
+    if(k>=2){ h=i; break; }
+  }
+  if(h<0) throw new Error("non trovo la riga di intestazione con le colonne «costo»: il file non sembra quello delle rose");
+  const blocchi=[];
+  const larg=(rows[h]||[]).length;
+  for(let c=0;c+1<larg;c++)
+    if(/^costo$/i.test(cel(h,c+1))&&cel(h,c)) blocchi.push({nome:cel(h,c), cn:c, cp:c+1});
+  if(!blocchi.length) throw new Error("l'intestazione c'è ma non ci sono squadre sopra le colonne «costo»");
+  const squadre=blocchi.map(b=>{
+    const gio=[]; let tot=null;
+    for(let j=h+1;j<rows.length;j++){
+      const n=cel(j,b.cn);
+      if(!n) break;
+      if(/^totale$/i.test(n)){ tot=parseInt(cel(j,b.cp))||0; break; }
+      gio.push({n:n, cr:parseInt(cel(j,b.cp))||0});
+    }
+    return {nome:b.nome, gio:gio, totale:tot===null?gio.reduce((s,g)=>s+g.cr,0):tot};
+  });
+  if(!squadre.some(s=>s.gio.length)) throw new Error("le colonne ci sono ma sono tutte vuote");
+  return {squadre:squadre, quando:Date.now()};
+}
+
+/* dal nome del file all'id del listone. I due file escono dalla stessa
+   fonte, quindi il nome corto è identico — «Milinkovic-Savic V.» di qua
+   e di là. Il ripiego serve per i pochi casi in cui l'iniziale cambia. */
+function indiceNomi(){
+  const m=new Map(), corti=new Map();
+  const metti=p=>{
+    if(!p||!p.n) return;
+    const k=normNome(p.n);
+    if(!m.has(k)) m.set(k,[]);
+    if(!m.get(k).some(x=>+x.id===+p.id)) m.get(k).push(p);
+    const c=normNome(p.n.replace(/\s+\S{1,4}\.?$/,""));         // via l'iniziale finale
+    if(c&&c!==k){ if(!corti.has(c)) corti.set(c,[]);
+      if(!corti.get(c).some(x=>+x.id===+p.id)) corti.get(c).push(p); }
+  };
+  for(const p of PL) metti(p);
+  // il listone si aggiorna e ogni tanto perde qualcuno, ma in rosa ci resta:
+  // senza questo, chi è sparito dalle quotazioni risulterebbe «non riconosciuto»
+  for(const pid in S.assign) metti(giocatoreDi(pid));
+  for(const mv of moves()) for(const v of mv.voci) if(v.snap) metti(v.snap);
+  return {pieni:m, corti:corti};
+}
+function trovaGiocatore(nome,ix){
+  ix=ix||indiceNomi(); const k=normNome(nome);
+  let c=ix.pieni.get(k);
+  if(c&&c.length===1) return c[0];
+  if(c&&c.length>1) return null;                 // omonimi: meglio dirlo che indovinare
+  c=ix.corti.get(k);
+  if(c&&c.length===1) return c[0];
+  return null;
+}
+
+/* Abbinare le squadre del file a quelle dell'asta. Il nome aiuta — se il
+   calendario di lega è caricato i nomi sono gli stessi — ma da solo non
+   basta: «thuramisu» somiglia a chiunque abbia comprato Thuram. Qui però
+   c'è un indizio molto più forte, che il calendario non aveva: dentro il
+   file ci sono le rose. Due colonne che parlano della stessa squadra
+   condividono venti giocatori su venticinque; due che non c'entrano
+   niente ne condividono uno per caso. Quindi si contano.               */
+function abbinaRose(nomi,rose){
+  const out={}, presi=new Set(), usati=new Set();
+  const prendi=(j,tid)=>{ out[j]=tid; presi.add(j); usati.add(String(tid)); };
+  // 1. il nome uguale, dal calendario o dall'asta: è una scelta dell'utente
+  const nomeLega=tid=>{ if(!legaOn()) return null;
+    const i=legaIdx(tid); return (i===null||i===undefined||i<0)?null:S.lega.teams[i]; };
+  for(const t of S.teams){
+    const cand=[nomeLega(t.id), t.name].filter(Boolean).map(normNome);
+    const j=nomi.findIndex((n,k)=>!presi.has(k)&&cand.includes(normNome(n)));
+    if(j>=0) prendi(j,t.id);
+  }
+  // 2. il resto per sovrapposizione di rose
+  if(rose){
+    const ix=indiceNomi();
+    const setFile=rose.map(sq=>{ const s=new Set();
+      for(const g of sq.gio){ const p=trovaGiocatore(g.n,ix); if(p) s.add(+p.id); } return s; });
+    const setApp=new Map(S.teams.map(t=>[String(t.id),new Set()]));
+    for(const pid in S.assign){ const s=setApp.get(String(S.assign[pid].team)); if(s) s.add(+pid); }
+    const coppie=[];
+    nomi.forEach((n,j)=>{ if(presi.has(j)||!setFile[j].size) return;
+      const p=[];
+      for(const t of S.teams){ if(usati.has(String(t.id))) continue;
+        let k=0; for(const pid of setFile[j]) if(setApp.get(String(t.id)).has(pid)) k++;
+        p.push({j:j, tid:t.id, k:k});
+      }
+      p.sort((a,b)=>b.k-a.k);
+      if(!p.length) return;
+      const secondo=p[1]?p[1].k:0;
+      // due soglie: quasi mezza rosa in comune, e il doppio del secondo
+      // classificato. Leghe diverse condividono i giocatori di moda, non
+      // venti nomi su venticinque.
+      if(p[0].k>=Math.max(8,Math.round(setFile[j].size*0.45))&&p[0].k>=2*secondo) coppie.push(p[0]);
+    });
+    coppie.sort((a,b)=>b.k-a.k);
+    for(const c of coppie){ if(presi.has(c.j)||usati.has(String(c.tid))) continue; prendi(c.j,c.tid); }
+  }
+  return out;
+}
+
+/* Il file delle rose sa con certezza chi è chi — la sovrapposizione delle
+   rose non lascia dubbi — e usa gli stessi nomi del calendario di lega,
+   dove invece l'abbinamento è indovinato per somiglianza. Sarebbe sciocco
+   non travasare la cosa certa sopra quella incerta.                     */
+function abbinaCalendarioDalleRose(file,map){
+  if(!legaOn()) return null;
+  const nuovo={}, presi=new Set(), cambi=[];
+  file.squadre.forEach((sq,i)=>{
+    const tid=map[i]; if(tid===undefined) return;
+    const j=S.lega.teams.indexOf(sq.nome);
+    if(j<0||presi.has(j)) return;
+    nuovo[tid]=j; presi.add(j);
+    if(legaIdx(tid)!==j) cambi.push(`${teamName(tid)} → ${S.lega.teams[j]}`);
+  });
+  if(!Object.keys(nuovo).length) return null;
+  // quello che le rose non coprono resta com'era, se non va in conflitto
+  for(const tid in S.legaMap||{}) if(nuovo[tid]===undefined&&!presi.has(S.legaMap[tid])){
+    nuovo[tid]=S.legaMap[tid]; presi.add(S.legaMap[tid]);
+  }
+  S.legaMap=nuovo;
+  return {quanti:Object.keys(nuovo).length, cambi:cambi};
+}
+
+/* Il confronto. Nessuna scrittura: solo il verdetto, voce per voce.    */
+function confrontoRose(file){
+  const map=abbinaRose(file.squadre.map(s=>s.nome), file.squadre);
+  const ix=indiceNomi();
+  const righe=[], senza=[];
+  const vistiPid=new Set(), tidIgnoti=new Set();
+  file.squadre.forEach((sq,i)=>{
+    const tid=map[i];
+    if(tid===undefined){ if(sq.gio.length) senza.push(sq.nome); return; }
+    if(!sq.gio.length) return;                    // squadra che non ha ancora fatto l'asta
+    for(const g of sq.gio){
+      const p=trovaGiocatore(g.n,ix);
+      if(!p){ righe.push({stato:"ignoto", nome:g.n, cr:g.cr, tid:tid});
+              tidIgnoti.add(String(tid)); continue; }
+      vistiPid.add(+p.id);
+      const a=S.assign[p.id];
+      if(!a) righe.push({stato:"solofile", pid:p.id, p:p, cr:g.cr, tid:tid});
+      else if(String(a.team)!==String(tid)) righe.push({stato:"squadra", pid:p.id, p:p, cr:g.cr, tid:tid, era:a.team, prezzoApp:a.price||0});
+      else if((a.price||0)!==g.cr) righe.push({stato:"prezzo", pid:p.id, p:p, cr:g.cr, tid:tid, prezzoApp:a.price||0});
+      else righe.push({stato:"ok", pid:p.id, p:p, cr:g.cr, tid:tid});
+    }
+  });
+  // chi nell'app sta in una squadra abbinata ma nel file non c'è
+  const tidCoperti=new Set(file.squadre.map((s,i)=>s.gio.length?map[i]:undefined)
+                                       .filter(x=>x!==undefined).map(String));
+  for(const pid in S.assign){
+    if(vistiPid.has(+pid)) continue;
+    const a=S.assign[pid];
+    if(!tidCoperti.has(String(a.team))) continue;
+    const p=giocatoreDi(pid); if(!p) continue;
+    // se in quella squadra c'è un nome che non ho riconosciuto, questo qui
+    // potrebbe essere proprio lui scritto in un altro modo: non lo tolgo
+    righe.push({stato:"soloapp", pid:+pid, p:p, cr:a.price||0, tid:a.team,
+                dubbio:tidIgnoti.has(String(a.team))});
+  }
+  const conta={ok:0,prezzo:0,squadra:0,solofile:0,soloapp:0,ignoto:0};
+  for(const r of righe) conta[r.stato]++;
+  const dubbi=righe.filter(r=>r.stato==="soloapp"&&r.dubbio).length;
+  // i totali di spesa, squadra per squadra
+  const totali=[];
+  file.squadre.forEach((sq,i)=>{
+    const tid=map[i]; if(tid===undefined||!sq.gio.length) return;
+    // il «totale» del file è la somma secca dei prezzi in rosa; la spesa
+    // che mostra Rose è al netto delle correzioni dei movimenti, quindi
+    // confrontare quella darebbe differenze inventate
+    let somma=0; for(const pid in S.assign) if(String(S.assign[pid].team)===String(tid)) somma+=S.assign[pid].price||0;
+    totali.push({tid:tid, nomeFile:sq.nome, file:sq.totale, app:somma});
+  });
+  return {map:map, righe:righe, conta:conta, senza:senza, totali:totali, dubbi:dubbi,
+          diverse:conta.prezzo+conta.squadra+conta.solofile+conta.soloapp-dubbi};
+}
+
+/* ── i movimenti nascosti dentro il confronto ────────────────────────
+   La prima prova col file vero ha detto una cosa che non mi aspettavo:
+   quasi nessuna delle differenze era uno sbaglio d'asta. Erano movimenti
+   veri — uno esce e un altro entra nella stessa squadra e nello stesso
+   ruolo, oppure due si scambiano di posto fra due squadre. Riscriverle
+   come correzioni sarebbe il modo peggiore di sistemarle: cancellerebbe
+   il fatto che quel giocatore, fino a ieri, i punti li faceva a un altro.
+   Quindi prima si riconoscono, poi si registrano come movimenti.        */
+function movimentiProposti(cmp){
+  const usati=new Set(), scambi=[], svincoli=[];
+  const sq=cmp.righe.filter(r=>r.stato==="squadra");
+  for(const a of sq){
+    if(usati.has(a.pid)) continue;
+    const b=sq.find(x=>!usati.has(x.pid)&&x.pid!==a.pid&&
+      String(x.tid)===String(a.era)&&String(x.era)===String(a.tid)&&x.p.r===a.p.r);
+    if(!b) continue;
+    if(!S.assign[a.pid]||!S.assign[b.pid]) continue;
+    usati.add(a.pid); usati.add(b.pid);
+    scambi.push({a:a, b:b});
+  }
+  // svincoli: dentro la stessa squadra, uno che esce e uno che entra
+  const perSq=new Map();
+  const metti=(tid,k,r)=>{ const s=String(tid);
+    if(!perSq.has(s)) perSq.set(s,{fuori:[],dentro:[]}); perSq.get(s)[k].push(r); };
+  for(const r of cmp.righe){
+    if(r.stato==="soloapp"&&!r.dubbio) metti(r.tid,"fuori",r);
+    else if(r.stato==="solofile"&&byId.has(+r.pid)) metti(r.tid,"dentro",r);
+  }
+  for(const [tid,g] of perSq){
+    for(const ruolo of ROLES){
+      const f=g.fuori.filter(x=>x.p.r===ruolo).sort((x,y)=>y.cr-x.cr);
+      const d=g.dentro.filter(x=>x.p.r===ruolo).sort((x,y)=>y.cr-x.cr);
+      for(let i=0;i<Math.min(f.length,d.length);i++)
+        svincoli.push({tid:isNaN(+tid)?tid:+tid, fuori:f[i], dentro:d[i]});
+    }
+  }
+  return {scambi:scambi, svincoli:svincoli, quanti:scambi.length+svincoli.length};
+}
+/* Registrarli. Il rimborso si dà pari al prezzo pagato a suo tempo: è la
+   regola più comune, ed è anche quella che fa tornare i totali di spesa
+   del file — provata sulle dodici squadre della lega vera.              */
+function registraProposti(prop,g){
+  let n=0; const guai=[];
+  for(const s of prop.scambi){
+    try{ registraScambio(s.a.pid,s.b.pid,g); n++; }
+    catch(e){ guai.push(`${s.a.p.n} ↔ ${s.b.p.n}: ${e.message}`); }
+  }
+  for(const s of prop.svincoli){
+    try{ registraSvincolo(s.tid,s.fuori.pid,s.dentro.pid,prezzoDi(s.fuori.pid),s.dentro.cr,g); n++; }
+    catch(e){ guai.push(`${s.fuori.p.n} → ${s.dentro.p.n}: ${e.message}`); }
+  }
+  return {fatti:n, guai:guai};
+}
+
+/* Allineare: il file diventa la verità. Si tocca solo ciò che riguarda
+   le squadre abbinate e presenti nel file, e mai i nomi non riconosciuti. */
+function allineaRose(cmp){
+  let messi=0, tolti=0, corretti=0;
+  for(const r of cmp.righe){
+    if(r.stato==="solofile"){
+      S.assign[r.pid]={team:r.tid, price:r.cr, snap:{id:r.p.id,r:r.p.r,n:r.p.n,s:r.p.s,q:r.p.q}};
+      messi++;
+    }else if(r.stato==="squadra"){
+      S.assign[r.pid].team=r.tid; S.assign[r.pid].price=r.cr; corretti++;
+    }else if(r.stato==="prezzo"){
+      S.assign[r.pid].price=r.cr; corretti++;
+    }else if(r.stato==="soloapp"&&!r.dubbio){
+      delete S.assign[r.pid]; tolti++;
+    }
+  }
+  return {messi:messi, tolti:tolti, corretti:corretti};
+}
+
+
+/* ══ 21. I risultati veri della serie A ══════════════════════════════
+   Non c'è niente da importare: i gol stanno già dentro il file dei voti.
+   Ogni giocatore porta i suoi gol fatti, ogni portiere i gol subiti, e
+   gli autogol vanno all'avversario — è lo stesso conto che calcForze usa
+   da sempre per stimare le forze, solo che finora nessuno lo vedeva.
+   Le due strade si controllano a vicenda: i gol che una squadra segna
+   devono essere quelli che il portiere avversario ha subito.            */
+let _rsig="", _RIS=null;
+function risultati(){
+  const sig=giornateGiocate().join(",")+"|"+(S.rev||0);
+  if(sig===_rsig) return _RIS;
+  const R=golDaiVoti(), per={};
+  for(const t of CALTEAMS) for(const x of (R[t]||[])){
+    (per[x.g]=per[x.g]||[]).push({t:t, x:x});
+  }
+  const out={};
+  for(const g in per){
+    const viste=new Set(), lista=[];
+    for(const {t,x} of per[g]){
+      if(viste.has(t)||viste.has(x.avv)) continue;
+      viste.add(t); viste.add(x.avv);
+      const avv=per[g].find(y=>y.t===x.avv);
+      // il controllo incrociato: i miei gol sono i suoi subiti
+      const torna=avv?(avv.x.gs===x.gf&&avv.x.gf===x.gs):null;
+      lista.push(x.casa?{casa:t, osp:x.avv, gc:x.gf, go:x.gs, torna:torna}
+                      :{casa:x.avv, osp:t, gc:x.gs, go:x.gf, torna:torna});
+    }
+    out[+g]=lista;
+  }
+  _rsig=sig; _RIS=out;
+  return out;
+}
+const risultatiDi=g=>risultati()[g]||[];
+/* la classifica, dalle giornate di cui ci sono i voti */
+function classificaSerieA(){
+  const R=golDaiVoti(), T={};
+  for(const t of CALTEAMS) T[t]={t:t, pt:0, g:0, v:0, n:0, p:0, gf:0, gs:0};
+  for(const t of CALTEAMS) for(const x of (R[t]||[])){
+    const a=T[t]; a.g++; a.gf+=x.gf; a.gs+=x.gs;
+    if(x.gf>x.gs){ a.v++; a.pt+=3; } else if(x.gf===x.gs){ a.n++; a.pt++; } else a.p++;
+  }
+  return Object.values(T).filter(x=>x.g)
+    .sort((a,b)=>b.pt-a.pt||(b.gf-b.gs)-(a.gf-a.gs)||b.gf-a.gf||a.t.localeCompare(b.t));
+}
+/* quanto pesano ormai i risultati nella stima delle forze: serve a dire
+   la verità nella pagina Calendario, che finora prometteva solo quotazioni */
+function pesoRisultati(){
+  const n=giornateGiocate().length;
+  return n?n/(n+FORZA_K):0;
+}
+
+
 </script>

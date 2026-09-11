@@ -1,4 +1,3 @@
-
 /* ══ 13. Lega e dati ════════════════════════════════════════════════ */
 function renderSetup(){
   // Non ridisegnare un gruppo di campi mentre ci si sta scrivendo dentro:
@@ -24,6 +23,8 @@ function renderSetup(){
     <input type="number" min="0" max="100" data-plan="${r}" value="${S.plan[r]}"${readOnly?" disabled":""}></div>`).join("");
   renderSetupLabels();
   renderVotiPanel();
+  renderStato();
+  applicaGruppi();
   document.getElementById("backupnote").textContent = mode==="condivisa"
     ? "L'asta è salvata nella pagina stessa: chiunque apra questo link vede lo stesso tabellone. L'esportazione serve solo come copia di sicurezza."
     : "L'asta è salvata nel browser di questo dispositivo. Esporta prima di chiudere se vuoi riprenderla altrove.";
@@ -52,11 +53,15 @@ function renderSetupLabels(){
    proprio da lì, così gli input non vengono sostituiti sotto le dita. */
 function renderDerived(){
   renderBoard(); renderScarsi(); renderTeams(); renderPlan(); renderLog(); renderList();
-  renderRose(); renderRiepilogo(); renderGiornata(); renderTitolari(); renderBalance(); renderRendimento(); renderPick(); renderSetupLabels(); renderBanner();
+  renderRose(); renderRiepilogo(); renderGiornata(); renderTitolari(); renderBalance(); renderRendimento(); renderPick(); renderSetupLabels(); renderBanner(); renderLega(); renderMercato();
+  renderInfermeria();
 }
 
 /* ══ 14. Import di un listone aggiornato ════════════════════════════ */
 let xlsxLoading=null;
+/* stato del confronto con le rose ufficiali (dichiarato qui in alto perché
+   renderAll lo guarda già al primo giro, prima che si arrivi in fondo) */
+let roseFile=null, roseCmp=null, roseProp=null, roseTutto=false, roseInCorso=false;
 function loadXLSX(){
   if(window.XLSX) return Promise.resolve(window.XLSX);
   if(xlsxLoading) return xlsxLoading;
@@ -262,8 +267,9 @@ function applyVotiBatch(){
   }
   S.stats=stats;
   S.votiMeta=Object.assign({},S.votiMeta||{},{sheet:sheet});
+  const eco=ecoInfermeria();
   persist(); renderAll();
-  box.innerHTML=`<div class="impok">Caricate dal foglio <b>${esc(sheet)}</b>:<ul style="margin:6px 0 0 18px">${righe.join("")}</ul></div>`;
+  box.innerHTML=`<div class="impok">Caricate dal foglio <b>${esc(sheet)}</b>:<ul style="margin:6px 0 0 18px">${righe.join("")}</ul></div>${eco}`;
   votiBatch=null; votiWB=null;
   document.getElementById("votiapply").disabled=true;
   document.getElementById("votiapply").textContent="Aggiungi";
@@ -286,8 +292,9 @@ function applyVoti(){
     const gia=S.stats && S.stats[g];
     S.stats=Object.assign({},S.stats||{}); S.stats[g]=r.voti;
     S.votiMeta=Object.assign({},S.votiMeta||{},{sheet:sheet});
+    const eco=ecoInfermeria();
     persist(); renderAll();
-    box.innerHTML=`<div class="impok">Giornata ${g} ${gia?"sostituita":"caricata"} dal foglio <b>${esc(sheet)}</b>:
+    box.innerHTML=`${eco}<div class="impok">Giornata ${g} ${gia?"sostituita":"caricata"} dal foglio <b>${esc(sheet)}</b>:
       ${r.righe} giocatori con voto, ${noti} riconosciuti nel listone.
       ${r.rfSospetto?`<br><b>Attenzione:</b> ${r.rfSospetto} righe hanno più rigori segnati che gol totali. Controlla i bonus di quei giocatori.`:""}
       </div>
@@ -309,7 +316,65 @@ function removeGiornata(g){
 }
 
 /* ══ 15. Eventi ═════════════════════════════════════════════════════ */
+document.addEventListener("keydown",e=>{
+  if(e.target.id!=="svq") return;
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+    e.preventDefault();
+    if(!svHits.length) return;
+    svCur=(svCur+(e.key==="ArrowDown"?1:svHits.length-1))%svHits.length;
+    document.querySelectorAll("#svres button").forEach((b,i)=>b.classList.toggle("cur",i===svCur));
+    return;
+  }
+  if(e.key==="Enter"){ e.preventDefault(); scegliSvincolato(svCur); return; }
+  if(e.key==="Escape"){ svHits=[]; document.getElementById("svres").innerHTML=""; }
+});
 document.addEventListener("click",e=>{
+  const svr=e.target.closest&&e.target.closest("#svres button[data-svi]");
+  if(svr){ scegliSvincolato(+svr.dataset.svi); return; }
+  if(e.target.id==="svclear"){ svSel=null; renderSvScelto(); renderSvEsito();
+    const q=document.getElementById("svq"); if(q) q.focus(); return; }
+  const mkb=e.target.closest&&e.target.closest("#mkseg button[data-mk]");
+  if(mkb){ mkModo=mkb.dataset.mk; renderMercato(); return; }
+  const ann=e.target.closest&&e.target.closest("[data-annullamov]");
+  if(ann){ if(readOnly) return;
+    try{ const m=annullaMovimento(+ann.dataset.annullamov); persist(); renderAll();
+         toast("Movimento annullato"); }
+    catch(err){ toast(err.message||"non riesco ad annullare"); }
+    return; }
+  if(e.target.id==="benchord"){ ordinaPanchina(curG); return; }
+  const io_=e.target.closest&&e.target.closest("#inford button[data-ord]");
+  if(io_){ infOrd=io_.dataset.ord; ME.infOrd=infOrd; saveMe(); renderInfermeria(); return; }
+  const it=e.target.closest&&e.target.closest("[data-inftorna],[data-infout],[data-infpick],[data-infsalta]");
+  if(it){ if(readOnly) return; const d=it.dataset;
+    if(d.inftorna!==undefined){ togliOut(+d.inftorna); toast("Rientrato fra i disponibili"); }
+    else if(d.infout!==undefined){ segnaOut(+d.infout,"espulsione"); toast("Messo fuori"); }
+    else if(d.infpick!==undefined){ segnaOut(+d.infpick,"infortunio");
+      const q=document.getElementById("infq"); if(q) q.value="";
+      toast("Segnato indisponibile"); }
+    else { const [pid,g]=d.infsalta.split("-");
+      S.squalSalta=Object.assign({},S.squalSalta||{}); S.squalSalta[pid+"-"+g]=1;
+      toast("Squalifica annullata"); }
+    persist(); renderAll(); return; }
+  const gt=e.target.closest&&e.target.closest("[data-grptoggle]");
+  if(gt){ apriGruppo(gt.dataset.grptoggle); return; }
+  const vt=e.target.closest&&e.target.closest("[data-vaitab]");
+  if(vt){ const b=document.querySelector(`.tabs button[data-tab="${vt.dataset.vaitab}"]`); if(b) b.click(); return; }
+  const vai=e.target.closest&&e.target.closest("[data-vai]");
+  if(vai){ const c=document.getElementById(vai.dataset.vai);
+    const g=c&&c.closest(".setupgrp");
+    if(g&&g.hasAttribute("data-chiuso")) apriGruppo(g.dataset.grp,true);   // aprilo, se era chiuso
+    if(c){ c.scrollIntoView({behavior:"smooth",block:"center"});
+           c.classList.add("evidenzia"); setTimeout(()=>c.classList.remove("evidenzia"),1400); }
+    return; }
+  if(e.target.id==="risprev"||e.target.id==="risnext"){
+    const gg=giornateGiocate(), i=gg.indexOf(risG)+(e.target.id==="risnext"?1:-1);
+    if(i>=0&&i<gg.length){ risG=gg[i]; renderRisultati(); } return; }
+  if(e.target.id==="rsall"){ roseTutto=true; renderRoseDiff(); return; }
+  if(e.target.id==="rsapply"){ if(readOnly) return; applicaRose(); return; }
+  if(e.target.id==="rsmov"){ if(readOnly) return; applicaMovimenti(); return; }
+  const cell=e.target.closest&&e.target.closest(".lcell[data-gl]");
+  if(cell){ giornateTocco=true; const gi=document.getElementById("lgior");
+    if(gi){ gi.value=cell.dataset.gl; renderScontro(); renderStrip(); } return; }
   const t=e.target.closest("button"); if(!t) return;
   if(t.dataset.i!==undefined&&t.closest("#results")) return choose(+t.dataset.i);
   if(t.id==="doassign"){
@@ -387,6 +452,11 @@ document.addEventListener("click",e=>{
   }
 });
 document.addEventListener("input",e=>{
+  if(e.target.id==="svq"){ renderSvRicerca(); return; }
+  if(e.target.id==="infq"){ renderInfRicerca(); return; }
+  if(e.target.id==="inffiltro"){ renderInfermeria(); return; }
+  if(["svR","svC"].includes(e.target.id)){ renderSvEsito(); return; }
+  if(e.target.id==="lgior"){ giornateTocco=true; renderScontro(); renderStrip(); return; }
   const el=e.target;
   if(el.id==="q") return search();
   if(el.dataset.pmax!==undefined){
@@ -416,12 +486,21 @@ document.addEventListener("change",e=>{
   const el=e.target;
   if(el.id==="filein"&&el.files&&el.files[0]) return importFile(el.files[0]);
   if(el.id==="votifile"&&el.files&&el.files.length) return pickVoti([...el.files]);
+  if(el.id==="calfile"&&el.files&&el.files[0]){ const f=el.files[0]; el.value=""; return pickCalLega(f); }
+  if(el.id==="rosefile"&&el.files&&el.files[0]){ const f=el.files[0]; el.value=""; return pickRoseLega(f); }
   if(el.id==="restorein"&&el.files&&el.files[0]){
     if(readOnly) return;
     const f=el.files[0]; el.value="";
     f.text().then(txt=>{ try{ applyBackup(txt); }catch(err){ toast("Backup non valido: "+(err.message||"")); } });
     return;
   }
+  if(["scA","scB","scPA","scPB","svT","svOut","svIn"].includes(el.id)){ renderMercato(); return; }
+  if(["svR","svC"].includes(el.id)){ renderSvEsito(); return; }
+  if(el.id==="lgior"){ giornateTocco=true; renderScontro(); renderStrip(); return; }
+  if(el.id==="lme"){ ME.myTeam=+el.value; saveMe(); renderLega(); renderBanner(); return; }
+  if(el.id==="lgior"){ renderClaLega(); }
+  if(el.id==="squalon"){ if(readOnly) return; S.squalOn=el.checked; persist(); renderAll(); return; }
+  if(el.dataset.map!==undefined){ if(readOnly) return; setAbbinamento(+el.dataset.map, el.value); return; }
   if(el.dataset.mine!==undefined&&el.checked){
     ME.myTeam=+el.dataset.mine; saveMe(); renderAll(); renderBanner();
   }
@@ -514,7 +593,9 @@ function righeRiepilogo(){
               "P %","D %","C %","A %","Speso vs media %","Titolari","Rigoristi"]];
   for(const t of S.teams){
     const st=stats(t.id), g=giudizio(t.id); if(!g) continue;
-    out.push([t.name, g.pagato, st.left, g.n,
+    // spesa e residuo devono fare il budget: g.pagato è la somma dei prezzi
+    // della rosa di adesso, che dopo uno svincolo non è più quanto ha speso
+    out.push([t.name, st.spent, st.left, g.n,
       st.perRole.P.spent, st.perRole.D.spent, st.perRole.C.spent, st.perRole.A.spent,
       g.dev.P.reale, g.dev.D.reale, g.dev.C.reale, g.dev.A.reale,
       Math.round((1/g.resa-1)*100), g.titolari, g.rig]);
@@ -622,8 +703,8 @@ document.getElementById("reset").addEventListener("click",()=>{
   if(!Object.keys(S.assign).length&&!S.log.length) return toast("L'asta è già vuota");
   S.assign={}; S.log=[]; persist(); renderAll(); toast("Asta azzerata — lega e obiettivi restano");
 });
-document.getElementById("gprev").addEventListener("click",()=>{ if(curG>1){curG--;renderGiornata();} });
-document.getElementById("gnext").addEventListener("click",()=>{ if(curG<38){curG++;renderGiornata();} });
+document.getElementById("gprev").addEventListener("click",()=>{ if(curG>1){giornateTocco=true;curG--;renderGiornata();} });
+document.getElementById("gnext").addEventListener("click",()=>{ if(curG<38){giornateTocco=true;curG++;renderGiornata();} });
 document.getElementById("gauto").addEventListener("click",()=>{
   if(!ROLES.some(r=>myRoster()[r].length)) return toast("La tua rosa è ancora vuota");
   autoFill(curG); renderGiornata(); toast("Formazione proposta per la giornata "+curG);
@@ -690,8 +771,54 @@ function renderAll(){
   renderTabs();
   renderBoard(); renderScarsi(); renderTeams(); renderPlan(); renderLog(); renderList();
   renderRose(); renderRiepilogo(); renderSetup(); renderPick(); renderCal(); renderGiornata(); renderTitolari();
-  renderBalance(); renderRendimento(); renderBanner();
+  renderBalance(); renderRendimento(); renderBanner(); renderLega(); renderAbbinamenti(); renderMercato();
+  renderInfermeria();
+  // il confronto con le rose ufficiali invecchia appena tocchi un'assegnazione
+  if(roseFile&&!roseInCorso){ roseCmp=confrontoRose(roseFile); roseProp=movimentiProposti(roseCmp); renderRoseDiff(); }
 }
+/* ganci per i test automatici: nient'altro li usa */
+// S e PL vengono RIASSEGNATI (ripristino backup, import listone): servono i getter,
+// altrimenti il gancio resta appeso all'oggetto vecchio
+window.__fa={get S(){return S;}, get PL(){return PL;},
+  roster,rosterAt,stats,ownerAt,moves,giocatoreDi,prezzoDi,aggCrediti,storiaPossessi,attesoRosa,
+  registraScambio,registraSvincolo,annullaMovimento,verificaScambio,verificaSvincolo,
+  parseRoseLega,confrontoRose,allineaRose,trovaGiocatore,abbinaRose,
+  cartellini,squalifiche,diffidati,rossiDaVedere,rientri,puliziaInfermeria,
+  segnaOut,togliOut,isOut,nextG,renderAll,persist,giornateGiocate};
+const scfai=document.getElementById("scfai");
+if(scfai) scfai.addEventListener("click",()=>{
+  if(readOnly) return;
+  const a=+val("scPA"), b=+val("scPB"), g=Math.max(1,Math.min(38,num("scG")||nextG()));
+  try{ registraScambio(a,b,g); persist(); renderAll();
+       toast("Scambio registrato dalla giornata "+g); }
+  catch(err){ toast(err.message||"scambio non valido"); }
+});
+const svfai=document.getElementById("svfai");
+if(svfai) svfai.addEventListener("click",()=>{
+  if(readOnly) return;
+  const t=+val("svT"), o=+val("svOut"), i=svSel?svSel.id:0;
+  if(!i){ toast("Scegli chi entra fra gli svincolati"); return; }
+  const R=num("svR"), C=num("svC"), g=Math.max(1,Math.min(38,num("svG")||giornataOggi()));
+  if(stats(t).left+R-C<0){ toast("Non bastano i crediti"); return; }
+  try{ registraSvincolo(t,o,i,R,C,g); svSel=null; persist(); renderAll();
+       toast("Movimento registrato dalla giornata "+g); }
+  catch(err){ toast(err.message||"movimento non valido"); }
+});
+/* All'avvio le giornate partono da oggi, non dalla numero 1.
+   Va chiamata DUE volte: initStore() è asincrona e lo stato salvato —
+   con dentro il calendario di lega e i voti caricati — arriva solo dopo
+   il suo await. La prima passata sistema la serie A, che ha le date
+   incorporate nella pagina; la seconda sistema la lega, che senza lo
+   stato salvato non saprebbe nemmeno di esistere. */
+function allineaGiornate(){
+  if(giornateTocco) return;                 // l'utente ha già scelto: non si tocca
+  const g=giornataOggi();
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=v; };
+  set("gfrom",g); set("cfrom",g); set("scG",g); set("svG",g);
+  curG=g;
+  set("lgior",legaOggi());
+}
+allineaGiornate();
 setSync();
 renderAll();
 try{
@@ -711,5 +838,408 @@ try{
 }catch(e){}
 const q0=document.getElementById("q"); if(q0) q0.focus();
 initStore();
+
+/* ══ 17. Import del calendario di lega ══════════════════════════════
+   Il file che leghe.fantacalcio.it fa scaricare è un foglio a blocchi:
+   ogni blocco si apre con "Nª Giornata lega" e, tre colonne più in là,
+   "Mª Giornata serie a"; sotto ci sono le partite, casa nella colonna
+   del titolo e ospite tre colonne dopo. I blocchi stanno affiancati a
+   coppie, quindi si scandisce tutta la riga, non solo la prima colonna. */
+function parseCalLega(rows){
+  const cel=(r,c)=>{ const v=(rows[r]||[])[c]; return v===undefined||v===null?"":String(v).trim(); };
+  const blocchi=[];
+  for(let i=0;i<rows.length;i++){
+    const larg=(rows[i]||[]).length;
+    for(let c=0;c<larg;c++){
+      const m=cel(i,c).match(/^(\d+)\s*[ªa°]?\s*giornata\s+lega/i);
+      if(!m) continue;
+      let ga=null;
+      for(let k=c+1;k<Math.min(c+5,larg);k++){
+        const m2=cel(i,k).match(/^(\d+)\s*[ªa°]?\s*giornata\s+serie/i);
+        if(m2){ ga=parseInt(m2[1]); break; }
+      }
+      blocchi.push({gl:parseInt(m[1]), ga:ga, riga:i, col:c});
+    }
+  }
+  if(!blocchi.length) throw new Error("non trovo nessuna riga tipo «1ª Giornata lega»: il file non sembra un calendario di lega");
+  const nomi=new Map(), gior=new Map(), off=[];
+  const idx=n=>{ if(!nomi.has(n)) nomi.set(n,nomi.size); return nomi.get(n); };
+  /* Le colonne fra le due squadre non sono decorazione: sono i fantapunti,
+     e cinque colonne più in là c'è il risultato in gol dello scontro. Prima
+     dell'inizio valgono «0», «0» e «-»; a stagione avviata «79.5», «69.5»
+     e «3-1». Da qui vengono classifica e verifica delle previsioni.      */
+  const esiti=new Map();
+  const num=v=>{ const x=parseFloat(String(v).replace(",",".")); return isFinite(x)?x:null; };
+  for(const b of blocchi){
+    const part=[], res=[];
+    for(let j=b.riga+1;j<rows.length;j++){
+      const casa=cel(j,b.col), osp=cel(j,b.col+3);
+      if(!casa||!osp) break;
+      if(/giornata/i.test(casa)) break;
+      part.push([casa,osp]);
+      const pa=num(cel(j,b.col+1)), pb=num(cel(j,b.col+2));
+      const m=cel(j,b.col+4).match(/^(\d+)\s*[-–]\s*(\d+)$/);
+      // giocata solo se c'è un risultato o dei fantapunti veri
+      res.push((m||pa||pb)?{pa:pa, pb:pb, ga:m?+m[1]:null, gb:m?+m[2]:null}:null);
+      if(part.length>=32) break;
+    }
+    if(!part.length) continue;
+    gior.set(b.gl, part);
+    esiti.set(b.gl, res);
+    if(b.ga) off.push(b.ga-b.gl);
+  }
+  if(gior.size<2) throw new Error("ho letto solo "+gior.size+" giornate");
+  // le partite arrivano come nomi: qui diventano indici
+  for(const [,ps] of gior) for(const [a,b] of ps){ idx(a); idx(b); }
+  const teams=[...nomi.keys()];
+  const ordinate=[...gior.keys()].sort((a,b)=>a-b);
+  const fix=ordinate.map(g=>gior.get(g).map(([a,b])=>[nomi.get(a),nomi.get(b)]));
+  // l'offset dovrebbe essere lo stesso ovunque; se non lo è, si prende il più frequente
+  const cnt={}; off.forEach(o=>cnt[o]=(cnt[o]||0)+1);
+  const offv=off.length?+Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]:0;
+  const mal=off.length&&Object.keys(cnt).length>1;
+  // controlli: ogni giornata deve avere metà squadre di partite, e nessuno due volte
+  const avvisi=[];
+  const attese=Math.floor(teams.length/2);
+  fix.forEach((ps,i)=>{
+    if(ps.length!==attese) avvisi.push(`la giornata ${ordinate[i]} ha ${ps.length} partite invece di ${attese}`);
+    const visti=new Set();
+    for(const [a,b] of ps){ if(visti.has(a)||visti.has(b)) avvisi.push(`alla giornata ${ordinate[i]} una squadra compare due volte`); visti.add(a); visti.add(b); }
+  });
+  const ris=ordinate.map(g=>esiti.get(g)||[]);
+  const giocate=ris.reduce((a,r)=>a+(r.some(x=>x)?1:0),0);
+  return {teams:teams, off:offv, gior:fix, ris:ris, giocate:giocate,
+          prime:ordinate[0], offMisto:mal, avvisi:avvisi.slice(0,4)};
+}
+/* Proposta di abbinamento: prima il nome uguale o quasi, poi l'indizio
+   delle rose — chi ha comprato Thuram sta bene in «I Duran Thuram».     */
+function normNome(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,""); }
+function proponiAbbinamenti(teams){
+  const out={}, presi=new Set();
+  const punteggio=(tid,nome)=>{
+    const t=S.teams.find(x=>x.id===tid); if(!t) return 0;
+    const a=normNome(t.name), b=normNome(nome);
+    let p=0;
+    if(a===b) p+=100;
+    else if(a&&b&&(a.includes(b)||b.includes(a))) p+=60;
+    else { // prefisso comune di almeno 4 lettere
+      let k=0; while(k<a.length&&k<b.length&&a[k]===b[k]) k++;
+      if(k>=4) p+=30+k;
+    }
+    // Indizio dalle rose, ma solo sui colpi grossi: una squadra si chiama
+    // come il suo giocatore simbolo, mai come il riempitivo da un credito.
+    // Senza questa regola «Giorgio» finiva su «mazzocchi» per un giocatore
+    // pagato 1, e «Thuram K.» a un credito rubava «I Duran Thuram» a chi
+    // aveva comprato il vero Thuram a 241.
+    const R=roster(tid);
+    const tutti=ROLES.flatMap(r=>R[r]).sort((x,y)=>y.price-x.price).slice(0,3);
+    for(const x of tutti){
+      if(x.price<25) continue;
+      const cog=normNome((x.p.n||"").split(/[ .]/)[0]);
+      if(cog.length>=5&&b.includes(cog)) p+=34+Math.min(12,Math.round(x.price/25));
+    }
+    return p;
+  };
+  const coppie=[];
+  for(const t of S.teams) teams.forEach((nome,i)=>{ const p=punteggio(t.id,nome); if(p>0) coppie.push({tid:t.id,i:i,p:p}); });
+  coppie.sort((a,b)=>b.p-a.p);
+  for(const c of coppie){
+    if(out[c.tid]!==undefined||presi.has(c.i)) continue;
+    if(c.p<28) continue;                       // sotto questa soglia è tirare a indovinare
+    out[c.tid]=c.i; presi.add(c.i);
+  }
+  return out;
+}
+async function pickCalLega(file){
+  const box=document.getElementById("callog");
+  box.innerHTML=`<div class="impok">Leggo ${esc(file.name)}…</div>`;
+  try{
+    let rows;
+    if(/\.csv$/i.test(file.name)){
+      const txt=await file.text();
+      const head=txt.split(/\r?\n/).slice(0,20).join("\n").replace(/"[^"]*"/g,"");
+      const sep=(head.match(/;/g)||[]).length>=(head.match(/,/g)||[]).length?";":",";
+      rows=parseCSV(txt,sep);
+    }else{
+      const X=await loadXLSX();
+      const wb=X.read(await file.arrayBuffer(),{type:"array"});
+      const sh=wb.Sheets[wb.SheetNames[0]];
+      rows=X.utils.sheet_to_json(sh,{header:1,raw:false});
+    }
+    const cal=parseCalLega(rows);
+    cal.nome=file.name;
+    /* Ricaricando il calendario a stagione iniziata i nomi possono essere
+       cambiati: i partecipanti rinominano la squadra quando vogliono. Va
+       letto PRIMA di sovrascrivere S.lega, altrimenti si finisce a
+       confrontare il calendario nuovo con se stesso.                     */
+    const vecchi=S.legaMap||{};
+    const primaGior=(S.lega&&S.lega.gior)||null;
+    const primaTeams=(S.lega&&S.lega.teams)||null;
+    const aveva=!!(primaGior&&Object.keys(vecchi).length);
+    const stessaStruttura=aveva&&primaGior.length===cal.gior.length&&
+      JSON.stringify(primaGior)===JSON.stringify(cal.gior);
+    const rinominate=[], persi=[];
+    if(stessaStruttura&&primaTeams) cal.teams.forEach((n,i)=>{
+      if(primaTeams[i]&&primaTeams[i]!==n) rinominate.push(`${primaTeams[i]} → ${n}`);
+    });
+    if(stessaStruttura&&Object.values(vecchi).every(i=>i>=0&&i<cal.teams.length)){
+      S.legaMap=vecchi;                       // gli incroci sono identici: gli indici valgono ancora
+    }else if(aveva&&primaTeams){
+      // il calendario è cambiato: si tiene quello che si può, per nome
+      const map={}, presi=new Set();
+      for(const tid in vecchi){
+        const nome=primaTeams[vecchi[tid]];
+        const j=nome?cal.teams.indexOf(nome):-1;
+        if(j>=0&&!presi.has(j)){ map[tid]=j; presi.add(j); }
+        else if(nome) persi.push(nome);
+      }
+      const prop=proponiAbbinamenti(cal.teams);
+      for(const tid in prop) if(map[tid]===undefined&&!presi.has(prop[tid])){ map[tid]=prop[tid]; presi.add(prop[tid]); }
+      S.legaMap=map;
+      cal.tenuti=Object.keys(map).length;
+    }else{
+      S.legaMap=proponiAbbinamenti(cal.teams);
+    }
+    S.lega=cal;
+    cal.rinominate=rinominate;
+    cal.persi=persi;
+    cal.rifatto=aveva&&!stessaStruttura;
+    // ora che l'offset è noto, la giornata di lega si riallinea a oggi
+    const lg=document.getElementById("lgior"); if(lg) lg.value=legaOggi();
+    persist(); renderAll();
+    const n=Object.keys(S.legaMap).length;
+    box.innerHTML=`<div class="impok">Calendario caricato: <b>${cal.teams.length} squadre</b>, <b>${cal.gior.length} giornate</b>.
+      La 1ª di lega è la ${legaSerieA(1)}ª di serie A.
+      ${cal.giocate?`Con i risultati di <b>${cal.giocate===1?"una giornata":cal.giocate+" giornate"}</b>.`:"Nessuna giornata ancora giocata."}
+      ${cal.rinominate&&cal.rinominate.length?`<br><span class="warn">Qualcuno ha cambiato nome</span> — ${esc(cal.rinominate.join("; "))} — ma gli incroci sono identici, quindi gli abbinamenti restano validi.`:""}
+      ${cal.rifatto?`<br><span class="warn">Gli incroci sono diversi da quelli di prima</span>: ho tenuto <b>${cal.tenuti||0}</b> abbinamenti riconoscendo i nomi${
+        cal.persi.length?`, ma <b>${esc(cal.persi.join(", "))}</b> ${cal.persi.length===1?"non c'è più":"non ci sono più"}`:""}. Ricontrollali qui sotto.`:""}
+      ${(()=>{ const manca=cal.teams.length-n;
+        const coda=manca>0?` Ne ${manca===1?"resta una":"restano "+manca} da abbinare, qui sotto.`:"";
+        if(!n) return "Ora abbina i nomi qui sotto: uno solo lo fa, e vale per tutti.";
+        return aveva
+          ? `I <b>${n}</b> abbinamenti che avevi restano al loro posto.`+coda
+          : `Ne ho abbinate <b>${n}</b> da solo, per somiglianza del nome o per il giocatore simbolo in rosa: <b>controllale</b>, perché indovinare i soprannomi non è una scienza.`+coda; })()}
+      ${cal.offMisto?`<br><span class="warn">Attenzione: l'aggancio alla serie A non è costante in tutto il file, ho preso il valore più frequente.</span>`:""}
+      ${cal.avvisi.length?`<br><span class="warn">${esc(cal.avvisi.join("; "))}.</span>`:""}</div>`;
+  }catch(err){
+    box.innerHTML=`<div class="imperr">Non sono riuscito a leggere il file: ${esc(err.message||err)}.</div>`;
+  }
+}
+function setAbbinamento(tid,val){
+  if(!S.legaMap) S.legaMap={};
+  const i=val===""?null:+val;
+  if(i!==null) for(const k in S.legaMap) if(S.legaMap[k]===i&&+k!==+tid) delete S.legaMap[k];  // un nome, una squadra
+  if(i===null) delete S.legaMap[tid]; else S.legaMap[tid]=i;
+  persist(); renderAbbinamenti(); renderLega();
+}
+function renderAbbinamenti(){
+  const box=document.getElementById("legamap"); if(!box) return;
+  if(!legaOn()){ box.innerHTML=`<p class="hint">Carica prima il calendario.</p>`; return; }
+  const usati=new Set(Object.values(S.legaMap||{}));
+  const mancanti=S.lega.teams.map((n,i)=>i).filter(i=>!usati.has(i));
+  box.innerHTML=S.teams.map(t=>{
+    const cur=legaIdx(t.id);
+    const opts=S.lega.teams.map((n,i)=>
+      `<option value="${i}"${i===cur?" selected":""}${usati.has(i)&&i!==cur?" disabled":""}>${esc(n)}</option>`).join("");
+    return `<div class="maprow">
+      <span class="mapname">${esc(t.name)}</span>
+      <select data-map="${t.id}"><option value="">— non abbinata —</option>${opts}</select>
+    </div>`;
+  }).join("")+
+  `<p class="hint" style="margin-top:10px">${mancanti.length
+     ? `Ancora da abbinare: <b>${esc(mancanti.map(i=>S.lega.teams[i]).join(", "))}</b>.`
+     : "Tutte abbinate."} L'abbinamento è condiviso: lo fai una volta e vale per tutti.</p>`;
+}
+
+
+/* ══ Rose ufficiali: lettura del file e pannello di controllo ════════ */
+async function pickRoseLega(file){
+  const box=document.getElementById("roselog");
+  const dif=document.getElementById("rosediff");
+  box.innerHTML=`<div class="impok">Leggo ${esc(file.name)}…</div>`;
+  dif.innerHTML="";
+  try{
+    let rows;
+    if(/\.csv$/i.test(file.name)){
+      const txt=await file.text();
+      const head=txt.split(/\r?\n/).slice(0,20).join("\n").replace(/"[^"]*"/g,"");
+      const sep=(head.match(/;/g)||[]).length>=(head.match(/,/g)||[]).length?";":",";
+      rows=parseCSV(txt,sep);
+    }else{
+      const X=await loadXLSX();
+      const wb=X.read(await file.arrayBuffer(),{type:"array"});
+      const sh=wb.Sheets[wb.SheetNames.find(n=>/rose/i.test(n))||wb.SheetNames[0]];
+      rows=X.utils.sheet_to_json(sh,{header:1,raw:false});
+    }
+    roseFile=parseRoseLega(rows); roseFile.nome=file.name;
+    roseCmp=confrontoRose(roseFile); roseProp=movimentiProposti(roseCmp);
+    roseTutto=false;
+    const piene=roseFile.squadre.filter(s=>s.gio.length).length;
+    const ab=readOnly?null:abbinaCalendarioDalleRose(roseFile,roseCmp.map);
+    if(!readOnly) S.roseMeta={nome:file.name, when:Date.now(),
+      squadre:roseFile.squadre.length, diverse:roseCmp.diverse};
+    if(!readOnly){ persist(); renderLega(); renderAbbinamenti(); renderStato(); }
+    box.innerHTML=`<div class="impok">Letto: <b>${roseFile.squadre.length} squadre</b>${
+      piene<roseFile.squadre.length?` (di cui ${piene} con la rosa fatta)`:""}, <b>${
+      roseFile.squadre.reduce((s,x)=>s+x.gio.length,0)} giocatori</b>.
+      ${ab?`Da qui ho sistemato anche gli abbinamenti del calendario di lega: <b>${ab.quanti}</b> su ${S.lega.teams.length}${
+        ab.cambi.length?`, correggendone ${ab.cambi.length} (${esc(ab.cambi.join("; "))})`:""}. Le rose non lasciano dubbi, i soprannomi sì.`:""}</div>`;
+    renderRoseDiff();
+  }catch(err){
+    roseFile=null; roseCmp=null;
+    box.innerHTML=`<div class="imperr">Non sono riuscito a leggere il file: ${esc(err.message||err)}.</div>`;
+  }
+}
+function renderRoseDiff(){
+  const box=document.getElementById("rosediff"); if(!box) return;
+  // il rapporto è lungo: quando c'è, la scheda si prende tutta la riga,
+  // altrimenti resta una colonna vuota alta come una pagina
+  const card=document.getElementById("c-rose");
+  if(card) card.classList.toggle("larga",!!roseCmp);
+  if(!roseCmp){ box.innerHTML=""; return; }
+  const c=Object.assign({},roseCmp.conta);
+  c.soloapp-=roseCmp.dubbi;                     // i dubbi si contano a parte
+  const et={prezzo:"prezzo diverso", squadra:"in un'altra squadra", solofile:"solo nel file",
+            soloapp:"solo nell'asta", ignoto:"nome non riconosciuto"};
+  const cls={prezzo:"warn",squadra:"crit",solofile:"crit",soloapp:"crit",ignoto:"muted"};
+  const pill=k=>c[k]?`<span class="rspill ${cls[k]}">${c[k]} ${et[k]}</span>`:"";
+  // le voci che il blocco dei movimenti spiega già non si ripetono sotto
+  const spiegati=new Set();
+  if(roseProp){
+    for(const x of roseProp.scambi){ spiegati.add(x.a.pid); spiegati.add(x.b.pid); }
+    for(const x of roseProp.svincoli){ spiegati.add(x.fuori.pid); spiegati.add(x.dentro.pid); }
+  }
+  const problemi=roseCmp.righe.filter(r=>r.stato!=="ok"&&!spiegati.has(r.pid));
+  const mostra=roseTutto?problemi:problemi.slice(0,14);
+  const riga=r=>{
+    const sq=teamName(r.tid);
+    if(r.stato==="ignoto") return `<div class="rsrow"><span class="rsn"><span class="nm">${esc(r.nome)}</span></span>
+      <span class="rsq">${esc(sq)}</span>
+      <span class="rsw">questo nome non sta nel listone — o è arrivato dopo l'ultimo listone che hai caricato</span></div>`;
+    const n=`<span class="rsn"><span class="sq ${r.p.r}">${r.p.r}</span><span class="nm">${esc(r.p.n)}</span></span><span class="rsq">${esc(sq)}</span>`;
+    if(r.stato==="prezzo") return `<div class="rsrow">${n}
+      <span class="rsw">nel file <b>${r.cr}</b>, nell'asta <b>${r.prezzoApp}</b></span></div>`;
+    if(r.stato==="squadra") return `<div class="rsrow">${n}
+      <span class="rsw">nell'asta è di <b>${esc(teamName(r.era))}</b> per ${r.prezzoApp}, nel file di <b>${esc(sq)}</b> per ${r.cr}</span></div>`;
+    if(r.stato==="solofile") return `<div class="rsrow">${n}
+      <span class="rsw">nel file a <b>${r.cr}</b>, nell'asta risulta libero</span></div>`;
+    return `<div class="rsrow">${n}
+      <span class="rsw">nell'asta a <b>${r.cr}</b>, nel file non c'è${
+        r.dubbio?" — ma in questa squadra c'è un nome che non riconosco, quindi lo lascio dov'è":""}</span></div>`;
+  };
+  const spese=roseCmp.totali.filter(t=>t.file!==t.app);
+  box.innerHTML=`
+    <div class="rshead">
+      <span class="rspill ok">${c.ok} combaciano</span>
+      ${pill("prezzo")}${pill("squadra")}${pill("solofile")}${pill("soloapp")}${pill("ignoto")}
+      ${roseCmp.dubbi?`<span class="rspill muted">${roseCmp.dubbi} da guardare a mano</span>`:""}
+    </div>
+    ${c.ignoto?`<p class="hint" style="margin-top:9px">I nomi che non riconosco sono quasi sempre giocatori
+       arrivati dopo l'ultimo listone che hai caricato: aggiorna le quotazioni da qui sopra e ricarica il file.</p>`:""}
+    ${roseCmp.senza.length?`<p class="hint" style="margin-top:9px"><span class="warn">Non ho capito a chi corrispondono</span>
+       <b>${esc(roseCmp.senza.join(", "))}</b>: se hai caricato il calendario di lega, sistema gli abbinamenti qui sopra e ricarica il file.</p>`:""}
+    ${roseProp&&roseProp.quanti?`
+      <div class="rsmov">
+        <div class="rsmovh">Sembrano movimenti di mercato, non errori</div>
+        <p class="hint">Uno esce e un altro entra nella stessa squadra e nello stesso ruolo, oppure due si scambiano di posto: registrarli come movimenti lascia i punti del passato a chi possedeva il giocatore allora. Riscriverli e basta, invece, li sposterebbe.</p>
+        <div class="rslist" style="margin-top:9px">${
+          roseProp.scambi.map(x=>`<div class="rsrow">
+            <span class="rsn"><span class="sq ${x.a.p.r}">${x.a.p.r}</span><span class="nm">${esc(x.a.p.n)} ↔ ${esc(x.b.p.n)}</span></span>
+            <span class="rsq">scambio</span>
+            <span class="rsw">${esc(teamName(x.a.era))} e ${esc(teamName(x.b.era))} si scambiano di posto</span></div>`).join("")+
+          roseProp.svincoli.map(x=>`<div class="rsrow">
+            <span class="rsn"><span class="sq ${x.dentro.p.r}">${x.dentro.p.r}</span><span class="nm">${esc(x.fuori.p.n)} → ${esc(x.dentro.p.n)}</span></span>
+            <span class="rsq">svincolo</span>
+            <span class="rsw">${esc(teamName(x.tid))} libera <b>${x.fuori.cr}</b> e prende a <b>${x.dentro.cr}</b></span></div>`).join("")}</div>
+        <div class="rsgo">
+          <label class="fl" for="rsg">Valgono dalla giornata</label>
+          <input type="number" id="rsg" min="1" max="38" value="${nextG()}">
+          <button class="btn primary wr" id="rsmov">Registra ${roseProp.quanti} ${roseProp.quanti===1?"movimento":"movimenti"}</button>
+        </div>
+        <p class="hint">Il rimborso di ogni svincolo è il prezzo pagato a suo tempo: è la regola più comune ed è quella che fa tornare i totali di spesa del file. Se nella tua lega è diverso, correggi da <b>Rose → Mercato</b>.</p>
+      </div>`:""}
+    ${problemi.length?`${roseProp&&roseProp.quanti?`<div class="rsmovh" style="margin-top:14px;color:var(--muted)">Il resto, voce per voce</div>`:""}<div class="rslist">${mostra.map(riga).join("")}</div>
+       ${problemi.length>mostra.length?`<button class="btn wr" id="rsall" style="margin-top:8px">Vedi tutte e ${problemi.length}</button>`:""}`
+     :(roseCmp.totali.length
+        ? `<p class="hint" style="margin-top:9px">Tutto combacia: l'asta che hai segnato è identica alle rose ufficiali.</p>`
+        : `<p class="hint" style="margin-top:9px"><span class="warn">Non ho abbinato nessuna squadra</span>: né i nomi né le rose del file somigliano a quelle di quest'asta. Controlla di aver preso il file della lega giusta.</p>`)}
+    ${spese.length?`<p class="hint" style="margin-top:11px">Somma dei prezzi in rosa diversa: ${
+       spese.map(t=>`<b>${esc(teamName(t.tid))}</b> ${t.file} nel file, ${t.app} qui`).join(" · ")}.
+       È la somma secca, come la fa il file: in <b>Rose</b> la spesa è al netto delle correzioni dei movimenti, quindi può non coincidere.</p>`:""}
+    ${roseCmp.diverse?`<div class="dangerzone" style="margin-top:12px">
+       <button class="btn${roseProp&&roseProp.quanti?"":" primary"} wr" id="rsapply">Allinea l'asta al file</button>
+       <span class="hint">Riscrive ${roseCmp.diverse} ${roseCmp.diverse===1?"voce":"voci"} prendendo il file per buono. I nomi non riconosciuti restano come stanno.${
+         roseProp&&roseProp.quanti?` <span class="warn">Comprese le ${roseProp.quanti} qui sopra</span>: riscritte così diventano correzioni d'asta, e i punti fatti prima seguono il giocatore invece di restare a chi ce l'aveva. Meglio registrare prima i movimenti.`:""}</span>
+     </div>
+     ${moves().length?`<p class="hint" style="margin-top:8px"><span class="warn">Hai ${moves().length} ${moves().length===1?"movimento registrato":"movimenti registrati"}</span>: il file fotografa le rose di oggi, quindi dopo l'allineamento controlla i crediti in Rose.</p>`:""}`:""}`;
+}
+function applicaMovimenti(){
+  if(!roseProp||!roseProp.quanti) return;
+  const gi=document.getElementById("rsg");
+  const g=Math.max(1,Math.min(38,parseInt(gi&&gi.value)||nextG()));
+  const r=registraProposti(roseProp,g);
+  roseInCorso=true; persist(); renderAll(); roseInCorso=false;
+  roseCmp=confrontoRose(roseFile); roseProp=movimentiProposti(roseCmp);
+  renderRoseDiff();
+  toast(r.guai.length?`${r.fatti} registrati, ${r.guai.length} no: ${r.guai[0]}`
+                     :`${r.fatti} ${r.fatti===1?"movimento registrato":"movimenti registrati"} dalla ${g}ª`);
+}
+function applicaRose(){
+  if(!roseCmp) return;
+  const r=allineaRose(roseCmp);
+  roseInCorso=true; persist(); renderAll(); roseInCorso=false;
+  roseCmp=confrontoRose(roseFile); roseProp=movimentiProposti(roseCmp);
+  renderRoseDiff();
+  const p=[]; if(r.corretti) p.push(`${r.corretti} ${r.corretti===1?"corretto":"corretti"}`);
+  if(r.messi) p.push(`${r.messi} ${r.messi===1?"aggiunto":"aggiunti"}`);
+  if(r.tolti) p.push(`${r.tolti} ${r.tolti===1?"tolto":"tolti"}`);
+  toast(p.length?"Rose allineate: "+p.join(", "):"Niente da allineare");
+}
+
+
+/* i gruppi aperti sono una preferenza di chi guarda, non un dato di lega:
+   stanno in ME, cioè in questo browser e basta */
+function apriGruppo(key,forza){
+  const g=document.querySelector(`.setupgrp[data-grp="${key}"]`); if(!g) return;
+  const chiuso=g.hasAttribute("data-chiuso");
+  const ora=forza?true:chiuso;
+  if(ora) g.removeAttribute("data-chiuso"); else g.setAttribute("data-chiuso","1");
+  const b=g.querySelector(".grptit"); if(b) b.setAttribute("aria-expanded",ora?"true":"false");
+  ME.gruppi=ME.gruppi||{}; ME.gruppi[key]=ora; saveMe();
+}
+function applicaGruppi(){
+  const G=ME.gruppi||{};
+  for(const g of document.querySelectorAll(".setupgrp")){
+    const k=g.dataset.grp; if(G[k]===undefined) continue;
+    if(G[k]) g.removeAttribute("data-chiuso"); else g.setAttribute("data-chiuso","1");
+    const b=g.querySelector(".grptit"); if(b) b.setAttribute("aria-expanded",G[k]?"true":"false");
+  }
+}
+
+
+/* Quello che l'import dei voti ha cambiato in infermeria: i guariti che
+   sono rientrati da soli, le squalifiche scattate, i rossi da guardare.
+   Va calcolato PRIMA di persist(), perché la pulizia tocca S.out.      */
+function ecoInfermeria(){
+  const prima=squalifiche().map(s=>s.pid+"-"+s.g);
+  const tornati=puliziaInfermeria();
+  const nuove=squalifiche().filter(s=>!prima.includes(s.pid+"-"+s.g));
+  const rossi=rossiDaVedere();
+  const dif=diffidati();
+  const nome=pid=>{ const p=giocatoreDi(pid)||byId.get(+pid); return p?p.n:"#"+pid; };
+  const pezzi=[];
+  if(nuove.length) pezzi.push(`<div class="ecorow squal"><b>${nuove.length===1?"Squalificato":"Squalificati"}</b>
+    ${nuove.map(s=>`${esc(nome(s.pid))} <i>(${s.n}ª ammonizione, salta la ${s.g}ª)</i>`).join(" · ")}</div>`);
+  if(rossi.length) pezzi.push(`<div class="ecorow rosso"><b>${rossi.length===1?"Espulso":"Espulsi"}</b>
+    ${rossi.map(r=>esc(nome(r.pid))).join(" · ")} — quante giornate lo decide il giudice sportivo, segnalo tu in <b>Infermeria</b></div>`);
+  if(tornati.length) pezzi.push(`<div class="ecorow torna"><b>${tornati.length===1?"Rientrato":"Rientrati"}</b>
+    ${tornati.map(t=>`${esc(nome(t.pid))} <i>(ha giocato la ${t.g}ª)</i>`).join(" · ")} — tolt${tornati.length===1?"o":"i"} dall'infermeria</div>`);
+  if(dif.length) pezzi.push(`<div class="ecorow diff"><b>${dif.length===1?"Diffidato":"Diffidati"}</b>
+    ${dif.slice(0,8).map(d=>`${esc(nome(d.pid))} <i>(${d.amm})</i>`).join(" · ")}${dif.length>8?` e altri ${dif.length-8}`:""}</div>`);
+  return pezzi.length?`<div class="ecoinf">${pezzi.join("")}</div>`:"";
+}
+
 })();
+
 </script>

@@ -1,0 +1,25 @@
+# Dati reali della lega (listone vero, voti, statistiche, calendario ufficiale,
+# backup dell'asta) — non vanno mai in un repo pubblico. Solo LEGGIMI.md è testo
+# di istruzioni, non dato: resta tracciato.
+dati/*
+!dati/LEGGIMI.md
+
+# File Excel: possono contenere listoni o voti reali
+*.xlsx
+
+# Output della build: si rigenera con ./build.sh, non va committato
+Fantaregia.html
+SalaAsta-Fantacalcio.html
+
+# Backup dell'asta esportati dall'app: portano i nomi dei partecipanti alla lega
+asta_reale.json
+*asta_reale*.json
+
+# Scratch della build
+.check.js
+
+# Dipendenze e segreti (la webapp in web/ ha anche un suo .gitignore)
+node_modules/
+.env
+.env.*
+!.env.example

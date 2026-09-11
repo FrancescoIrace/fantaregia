@@ -2,7 +2,7 @@
 <header class="board">
   <div class="board-in">
     <div class="brand">
-      <h1>Sala d'Asta</h1>
+      <h1>Fantaregia</h1>
       <span class="season">SERIE&nbsp;A · 2026/27</span>
       <span class="synced" id="sync" title="Stato del salvataggio"></span>
       <button class="modo" id="modo" role="switch" aria-checked="true"
@@ -17,9 +17,11 @@
     <button role="tab" data-tab="listone" aria-selected="false">Listone</button>
     <button role="tab" data-tab="titolari" aria-selected="false">Titolari</button>
     <button role="tab" data-tab="rendimento" aria-selected="false">Rendimento</button>
-    <button role="tab" data-tab="giornate" aria-selected="false">Giornate</button>
+    <button role="tab" data-tab="infermeria" aria-selected="false">Infermeria</button>
+    <button role="tab" data-tab="giornate" aria-selected="false">Formazioni</button>
     <button role="tab" data-tab="calendario" aria-selected="false">Calendario</button>
     <button role="tab" data-tab="rose" aria-selected="false">Rose</button>
+    <button role="tab" data-tab="lega" aria-selected="false">Lega</button>
     <button role="tab" data-tab="setup" aria-selected="false">Lega e dati</button>
   </nav>
 </header>
@@ -49,7 +51,7 @@
       <p>Prima che il campionato dica qualcosa è dedotta dalle quotazioni, cioè da quanto il mercato si aspetta che uno giochi: dentro ogni squadra e ruolo, chi costa di più è dato titolare. Alla controprova, 17 dei 18 primi rigoristi risultano titolari.</p>
       <p>Su questa stima pesano anche le <b>presenze del 2025/26</b>, per il 40%: quotazione e presenze si correlano solo a 0,50, cioè ciascuna delle due dice qualcosa che l'altra non dice — la quotazione conosce il mercato estivo, le presenze sono un fatto. Il correttivo sposta 74 giocatori su 376: scendono quelli dati per titolari che l'anno scorso hanno giocato poco (Martinez Jo. 5 presenze, Meret 11, Frattesi 14), salgono quelli sottovalutati che giocavano sempre (Soulè 32, Saelemaekers 35, Castro 35). Chi non ha storico in Serie A resta sulla sola quotazione.</p>
       <p>Appena carichi i voti passa ai fatti: quante volte è sceso davvero in campo. Una presenza con voto vale una titolarità piena, uno spezzone senza voto vale un terzo. La fiducia nei dati cresce con le giornate e diventa piena alla sesta — prima una panchina isolata non ribalta il giudizio, dopo sei giornate le quotazioni di agosto non contano più. Il pallino con l'anello (<span class="tdot t1 reale"></span>) segnala che quel giudizio viene dal campo e non dal listino; passandoci sopra si legge su quante giornate.</p>
-      <p class="warn">Gli <b>indisponibili</b> — infortunati e squalificati — sono l'unica cosa che nessun file dà e che decide la giornata: si segnano a mano dalla scheda del giocatore. Un indisponibile azzera la sua titolarità in tutti gli indici e resta fuori dalla formazione automatica finché non lo rimetti dentro.</p>
+      <p class="warn">Gli <b>infortunati</b> sono l'unica cosa che nessun file dà e che decide la giornata: si segnano dalla scheda del giocatore o dalla pagina <b>Infermeria</b>, e rientrano da soli appena ricompaiono nei voti. Le <b>squalifiche</b> da cartellino invece le trova l'app: conta le ammonizioni dei voti e applica la regola vera — 5ª, 9ª, 13ª, 16ª, 18ª. Un indisponibile azzera la sua titolarità in tutti gli indici e resta fuori dalla formazione automatica.</p>
       <p class="src">Dal listone in uso più le giornate caricate in <b>Lega e dati</b>.</p>
     </div>
     <div>
@@ -275,17 +277,250 @@
   <div class="card" style="overflow:hidden">
     <div class="tablewrap"><table class="list" id="caltable"><tbody id="calbody"></tbody></table></div>
   </div>
+  <div class="card" style="margin-top:18px" id="riscard">
+    <div class="card-h"><h2>Come sta andando davvero</h2><span class="hint" id="risnote"></span></div>
+    <div class="card-b">
+      <p class="hint" id="risvuoto" style="max-width:74ch" hidden>Qui compaiono i risultati veri e la classifica, appena carichi i voti di una giornata da <b>Lega e dati → Voti di giornata</b>. Non serve altro: i gol stanno già dentro quel file.</p>
+      <div id="riswrap">
+      <div class="risbar">
+        <button class="btn wr" id="risprev">‹</button>
+        <span class="risg" id="risg"></span>
+        <button class="btn wr" id="risnext">›</button>
+      </div>
+      <div class="risgrid" id="risgrid"></div>
+      <div class="clatop">Classifica</div>
+      <div class="tablewrap"><table class="list clatab"><tbody id="clabody"></tbody></table></div>
+      <p class="hint" id="risfonte" style="margin-top:11px"></p>
+      </div>
+    </div>
+  </div>
+
   <div class="card" style="margin-top:18px">
     <div class="card-h"><h2>Come nasce questo indice</h2></div>
     <div class="card-b">
-      <p class="hint" style="max-width:76ch;margin-bottom:12px">La forza di ogni squadra è ricavata dalle quotazioni stesse del listone, cioè dal giudizio del mercato: l'<b>attacco</b> pesa le quotazioni dei tre attaccanti e dei quattro centrocampisti più cari, la <b>difesa</b> quelle del portiere titolare e dei quattro difensori più cari. Sono valori di partenza, non risultati sul campo: reggono in agosto e vanno riletti quando il campo dice altro. Il fattore campo vale mezzo gradino di difficoltà.</p>
+      <p class="hint" id="forcenote" style="max-width:76ch;margin-bottom:12px"></p>
       <div class="forcegrid" id="forcetable"></div>
     </div>
   </div>
 </section>
 
+<!-- ══════════ INFERMERIA ══════════ -->
+<section class="view" id="v-infermeria">
+  <div class="card">
+    <div class="card-h"><h2>Segna un infortunato</h2>
+      <span class="hint" style="margin-left:auto">rientra da solo quando rigioca</span></div>
+    <div class="card-b">
+      <p class="hint" style="margin-bottom:9px">Gli infortuni sono l'unica cosa che nessun file dà. Cerca il giocatore e mettilo fuori: sparisce dagli indici e dalla formazione automatica, e <b>rientra da solo</b> appena ricompare nei voti di una giornata. I tuoi vengono prima nei risultati.</p>
+      <input type="text" id="infq" class="wr" placeholder="Cerca per cognome o squadra — almeno due lettere" autocomplete="off">
+      <div id="infres" class="infres"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="card-h"><h2>Chi non puoi schierare</h2><span class="hint" id="infnota" style="margin-left:auto"></span></div>
+    <div class="card-b">
+      <div class="infbar">
+        <input type="text" id="inffiltro" class="wr" placeholder="Filtra la lista…" autocomplete="off">
+        <div class="roleseg" id="inford">
+          <button data-ord="ruolo" aria-pressed="true">Ruolo</button>
+          <button data-ord="da" aria-pressed="false">Da quando</button>
+          <button data-ord="nome" aria-pressed="false">Nome</button>
+        </div>
+      </div>
+      <div id="inffuori"></div>
+    </div>
+  </div>
+
+  <div class="astagrid" style="margin-top:18px">
+    <div class="card">
+      <div class="card-h"><h2>Diffidati</h2>
+        <span class="hint" style="margin-left:auto">a un giallo dallo stop</span></div>
+      <div class="card-b"><div id="infdiff"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Da controllare</h2>
+        <span class="hint" style="margin-left:auto">espulsi: le giornate le dà il giudice</span></div>
+      <div class="card-b"><div id="infrossi"></div></div>
+    </div>
+  </div>
+
+  <details class="disc" style="margin-top:18px">
+    <summary>Come funzionano le squalifiche, e cosa l'app non può sapere</summary>
+    <div class="body">
+      <div>
+        <h4>Le ammonizioni si sommano, non si contano di fila</h4>
+        <p>In serie A la squalifica di una giornata scatta alla <b>5ª ammonizione</b> della stagione, poi alla 9ª, 13ª, 16ª, 18ª, e dalla 19ª a ogni giallo. Due gialli in due partite diverse non sono niente: sono due su cinque. Due gialli nella <i>stessa</i> partita invece sono un'espulsione — e quei due non entrano nel conteggio verso la quinta, perché sono già stati pagati col rosso.</p>
+        <p><b>Diffidato</b> è chi sta a un'ammonizione dalla soglia: al momento 4, 8, 12, 15, 17, e da 18 in poi sempre.</p>
+        <p class="src">Il conteggio si ricava dalla colonna Amm dei voti che carichi, giornata per giornata. Non viene accumulato: se togli o risostituisci una giornata, il conto si rifà da capo e resta giusto.</p>
+      </div>
+      <div>
+        <h4>Il rosso resta a mano</h4>
+        <p>Un'espulsione vale da una giornata in su, ma quante lo decide il giudice sportivo il martedì: nessun file lo dice e non c'è modo di indovinarlo. L'app ti segnala chi è stato espulso nell'ultima giornata caricata e lo lascia decidere a te.</p>
+      </div>
+      <div>
+        <h4>Se la tua lega non applica le squalifiche</h4>
+        <p>Molte leghe ignorano le squalifiche di serie A: il giocatore non gioca, prende <i>sv</i>, e amen. Se è il tuo caso puoi spegnere l'automatismo qui sotto, oppure annullare la singola squalifica dal suo bottone.</p>
+        <label class="mineradio" style="margin-top:7px"><input type="checkbox" id="squalon"> tieni conto delle squalifiche da cartellino</label>
+      </div>
+    </div>
+  </details>
+</section>
+
+<!-- ══════════ LEGA ══════════ -->
+<section class="view" id="v-lega">
+  <div id="leganodata" class="card" style="margin-bottom:18px">
+    <div class="card-h"><h2>Il calendario della lega non c'è ancora</h2></div>
+    <div class="card-b">
+      <p class="hint" style="max-width:74ch">Questa pagina dice <b>chi affronti</b> ogni giornata e quanto ci si aspetta che faccia la sua rosa — cose che il listone da solo non sa. Serve il calendario della tua lega: lo scarichi dalla pagina della lega su leghe.fantacalcio.it e lo carichi da <b>Lega e dati → Calendario di lega</b>.</p>
+    </div>
+  </div>
+
+  <div id="legabody" hidden>
+    <div class="filters">
+      <div class="f" style="max-width:150px"><label class="fl" for="lgior">Giornata di lega</label>
+        <input type="number" id="lgior" min="1" max="38" value="1"></div>
+      <div class="f" style="max-width:170px"><label class="fl">Chi sono io</label>
+        <select id="lme"></select></div>
+      <div class="f" style="flex:1;min-width:200px;text-align:right"><span class="hint" id="leganote"></span></div>
+    </div>
+
+    <div class="card" id="sccard">
+      <div class="card-b">
+        <div class="schead" id="schead"></div>
+        <div id="scontro"></div>
+      </div>
+    </div>
+
+    <div class="astagrid" style="margin-top:18px">
+      <div class="card">
+        <div class="card-h"><h2>Rosa contro rosa</h2>
+          <span class="hint" style="margin-left:auto">punti attesi per reparto</span></div>
+        <div class="card-b"><div id="cmpreparti"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Chi mi porta i punti</h2>
+          <span class="hint" style="margin-left:auto">il mio undici, per quella giornata</span></div>
+        <div class="card-b"><div id="cmpundici"></div></div>
+      </div>
+    </div>
+
+    <div class="card" id="pericard" style="margin-top:18px">
+      <div class="card-h"><h2>Da chi mi arriva il pericolo</h2>
+        <span class="hint" style="margin-left:auto">i più temibili della rosa avversaria</span></div>
+      <div class="card-b"><div id="pericolosi"></div></div>
+    </div>
+
+    <div class="astagrid" style="margin-top:18px" id="lclagrid">
+      <div class="card">
+        <div class="card-h"><h2>Classifica di lega</h2>
+          <span class="hint" style="margin-left:auto" id="lclanote"></span></div>
+        <div class="card-b">
+          <div class="tablewrap"><table class="list clatab"><tbody id="lclabody"></tbody></table></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Le previsioni tengono?</h2>
+          <span class="hint" style="margin-left:auto">previsto contro successo</span></div>
+        <div class="card-b"><div id="lverifica"></div></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-h"><h2>Le trentasei giornate</h2>
+        <span class="hint" style="margin-left:auto">avversario di lega × calendario di serie A</span></div>
+      <div class="card-b"><div id="legastrip"></div></div>
+    </div>
+
+    <details class="disc" style="margin-top:18px">
+      <summary>Come nascono questi numeri, e quanto valgono</summary>
+      <div class="body">
+        <div>
+          <h4>Il punteggio atteso</h4>
+          <p>Per ogni giocatore del miglior undici possibile: la sua pagella media — dai voti di quest'anno se ce ne sono almeno quattro, altrimenti dal 2025/26, altrimenti da un valore prudente del ruolo — più i bonus per presenza, corretti dalla durezza della partita di serie A di quella giornata. Il tutto pesato dalla probabilità che giochi davvero: chi non scende in campo lascia il posto a una riserva che rende meno.</p>
+          <p class="src">Prima che arrivino i voti è una stima costruita sulle quotazioni e sulla stagione scorsa. Ogni giornata caricata la migliora.</p>
+        </div>
+        <div>
+          <h4>Lo scarto, e perché conta più della media</h4>
+          <p>Il fantavoto di un attaccante che segna spesso oscilla molto più di quello di un difensore: modellando i gol come eventi rari, ogni gol vale 3 e porta varianza 9λ. Sommando i giocatori viene lo scarto della squadra, e da media e scarto esce la probabilità di vincere lo scontro.</p>
+          <p class="src">I giocatori sono trattati come indipendenti. Non è del tutto vero — due compagni di squadra si trascinano — quindi lo scarto vero è un po' più largo di quello scritto qui.</p>
+        </div>
+        <div>
+          <h4>Prudenza o rischio</h4>
+          <p>Se sei sfavorito ti conviene <b>alzare</b> lo scarto: con la media sotto quella dell'avversario, è solo la varianza che ti fa vincere ogni tanto. Se sei favorito conviene <b>abbassarlo</b> e non regalare nulla al caso. È il motivo per cui la stessa rosa va schierata diversamente contro il primo e contro l'ultimo.</p>
+          <p class="src">Vale quando il divario è netto. Sotto i due punti di differenza la scelta cambia poco: lì conta di più chi gioca davvero.</p>
+        </div>
+        <div>
+          <h4>Le due difficoltà</h4>
+          <p>La colonna <b>lega</b> è quanto è forte l'avversario di turno; la colonna <b>serie A</b> è quanto è dura la giornata per i tuoi giocatori. Sono indipendenti, e la giornata da segnare in rosso è quella in cui sono cattive tutte e due.</p>
+          <p class="src">La giornata 1 di lega non è la 1ª di serie A: l'offset è letto dal file e vale <span id="offnota">—</span>.</p>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+
 <!-- ══════════ ROSE ══════════ -->
 <section class="view" id="v-rose">
+
+  <details class="disc" id="mercato" style="margin-bottom:18px">
+    <summary>Mercato: scambi e svincoli</summary>
+    <div class="body" style="display:block">
+      <div class="roleseg" id="mkseg" style="margin-bottom:14px">
+        <button data-mk="scambio" aria-pressed="true">Scambio fra squadre</button>
+        <button data-mk="svincolo" aria-pressed="false">Svincolo e ripescaggio</button>
+      </div>
+
+      <div id="mkscambio">
+        <div class="mkgrid">
+          <div class="mkside">
+            <label class="fl">Squadra</label><select id="scA"></select>
+            <label class="fl" style="margin-top:8px">Cede</label><select id="scPA"></select>
+          </div>
+          <div class="mkvs">⇄</div>
+          <div class="mkside">
+            <label class="fl">Squadra</label><select id="scB"></select>
+            <label class="fl" style="margin-top:8px">Cede</label><select id="scPB"></select>
+          </div>
+        </div>
+        <div class="mkfoot">
+          <div><label class="fl" for="scG">Vale dalla giornata</label><input type="number" id="scG" min="1" max="38"></div>
+          <div class="mkesito" id="scesito"></div>
+          <button class="btn primary" id="scfai">Registra scambio</button>
+        </div>
+      </div>
+
+      <div id="mksvincolo" hidden>
+        <div class="mkgrid">
+          <div class="mkside">
+            <label class="fl">Squadra</label><select id="svT"></select>
+            <label class="fl" style="margin-top:8px">Svincola</label><select id="svOut"></select>
+            <label class="fl" style="margin-top:8px" for="svR">Rimborso in crediti</label>
+            <input type="number" id="svR" min="0" value="0">
+          </div>
+          <div class="mkvs">→</div>
+          <div class="mkside">
+            <label class="fl" for="svq">Prende fra gli svincolati</label>
+            <div class="searchbox" style="position:relative">
+              <input type="text" id="svq" placeholder="Cerca per cognome o squadra…" autocomplete="off" spellcheck="false">
+              <div class="results" id="svres"></div>
+            </div>
+            <div id="svscelto" class="mkscelto"></div>
+            <label class="fl" style="margin-top:8px" for="svC">Costo in crediti</label>
+            <input type="number" id="svC" min="0" value="1">
+          </div>
+        </div>
+        <div class="mkfoot">
+          <div><label class="fl" for="svG">Vale dalla giornata</label><input type="number" id="svG" min="1" max="38"></div>
+          <div class="mkesito" id="svesito"></div>
+          <button class="btn primary" id="svfai">Registra movimento</button>
+        </div>
+      </div>
+
+      <div id="mkstoria" style="margin-top:16px"></div>
+      <p class="hint" style="margin-top:12px;max-width:80ch">La <b>giornata</b> non è un dettaglio: i punti fatti prima restano a chi possedeva il giocatore allora, quindi il Rendimento del passato non cambia. Uno scambio non muove i crediti di nessuno, anche quando i due giocatori costavano molto diverso: il residuo che vedi resta quello vero.</p>
+    </div>
+  </details>
+
   <div class="card" id="riepcard">
     <div class="card-h"><h2>Riepilogo asta</h2>
       <span class="hint" id="riepnote" style="margin-left:auto"></span>
@@ -308,80 +543,134 @@
 
 <!-- ══════════ SETUP ══════════ -->
 <section class="view" id="v-setup">
-  <div class="setupgrid">
-    <div class="card">
-      <div class="card-h"><h2>Partecipanti</h2></div>
-      <div class="card-b">
-        <div class="teamedit" id="teamedit"></div>
-        <div style="display:flex;gap:9px;margin-top:13px">
-          <button class="btn sm wr" id="addteam">+ Aggiungi squadra</button>
-          <button class="btn sm danger wr" id="delteam">− Rimuovi ultima</button>
-        </div>
-        <p class="hint" style="margin-top:11px">Il pallino segna la tua squadra. È una scelta di questo dispositivo: ogni partecipante apre la stessa pagina e sceglie la propria.</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>Regole della lega</h2></div>
-      <div class="card-b">
-        <label class="fl" for="budget">Crediti a disposizione</label>
-        <input type="number" id="budget" min="1" style="max-width:150px" class="wr">
-        <label class="fl" style="margin-top:16px">Slot per reparto</label>
-        <div class="slotgrid" id="slotgrid"></div>
-        <label class="fl" style="margin-top:16px">Piano di spesa — % del budget per reparto</label>
-        <div class="slotgrid" id="plangrid"></div>
-        <p class="hint" id="plansum" style="margin-top:8px"></p>
-        <button class="btn sm wr" id="planmed" style="margin-top:6px"
-          title="Portieri 7, difensori 19, centrocampisti 32, attaccanti 42">Usa il piano mediano delle aste vere</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>Listone</h2></div>
-      <div class="card-b">
-        <p class="hint" id="listinfo" style="margin-bottom:12px"></p>
-        <label class="fl" for="filein">Carica quotazioni aggiornate</label>
-        <input type="file" id="filein" accept=".xlsx,.xls,.csv" class="wr" style="font-size:13px;padding:7px 0">
-        <p class="hint" style="margin-top:9px">Accetta il file ufficiale delle quotazioni (xlsx) o un csv con le colonne <span class="mono">Id, R, Nome, Squadra, Qt.A, FVM</span>. Le assegnazioni già fatte restano al loro posto.</p>
-        <div id="importlog" style="margin-top:11px"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>Voti di giornata</h2></div>
-      <div class="card-b">
-        <p class="hint" id="votiinfo" style="margin-bottom:12px"></p>
-        <label class="fl" for="votifile">Carica il file dei voti — puoi sceglierne anche più di uno</label>
-        <input type="file" id="votifile" accept=".xlsx,.xls" multiple class="wr" style="font-size:13px;padding:7px 0">
-        <div class="votirow wr">
-          <div><label class="fl" for="votig">Giornata</label><input type="number" id="votig" min="1" max="38" value="1"></div>
-          <div><label class="fl" for="votisheet">Foglio</label><select id="votisheet"><option>Fantacalcio</option></select></div>
-          <button class="btn primary" id="votiapply" disabled>Aggiungi</button>
-        </div>
-        <p class="hint" style="margin-top:9px">Il file ufficiale delle pagelle si scarica da
-          <a href="https://www.fantacalcio.it/voti-fantacalcio-serie-a" target="_blank" rel="noopener noreferrer">fantacalcio.it/voti-fantacalcio-serie-a</a>.
-          Contiene tre fogli — Fantacalcio, Statistico, Italia — che sono tre redazioni diverse: scegli quella che usa la tua lega.
-          Ricaricare una giornata già inserita la sostituisce.</p>
-        <div id="votilog" style="margin-top:11px"></div>
-        <div id="votigiornate" style="margin-top:11px"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>Backup</h2></div>
-      <div class="card-b">
-        <p class="hint" id="backupnote" style="margin-bottom:12px"></p>
-        <div class="dangerzone">
-          <button class="btn" id="export">Esporta asta</button>
-          <label class="btn wr" for="restorein" style="display:inline-block">Importa da file</label>
-          <input type="file" id="restorein" accept=".json,application/json" style="display:none">
-          <button class="btn wr" id="importbtn">Incolla</button>
-          <button class="btn danger wr" id="reset">Azzera asta</button>
-        </div>
-        <textarea id="importbox" rows="4" style="display:none;width:100%;margin-top:11px;font-family:var(--f-mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:7px;padding:9px" placeholder="Incolla qui il backup e premi di nuovo Importa"></textarea>
-      </div>
+  <div class="setupsolo">
+<div class="card" id="statocard">
+      <div class="card-h"><h2>A che punto sei</h2><span class="hint" id="statonota" style="margin-left:auto"></span></div>
+      <div class="card-b"><div id="statolist"></div></div>
     </div>
   </div>
+
+  <section class="setupgrp" data-grp="settimana">
+    <button class="grptit" type="button" data-grptoggle="settimana" aria-expanded="true">
+      <span class="grpt"><b>Ogni settimana</b><i>I due file che tengono viva la stagione. Puoi caricarli in qualsiasi ordine, non dipendono l&rsquo;uno dall&rsquo;altro.</i></span>
+      <span class="grpchev" aria-hidden="true"></span>
+    </button>
+    <div class="setupgrid">
+  <div class="card" id="c-voti">
+        <div class="card-h"><h2>Voti di giornata</h2></div>
+        <div class="card-b">
+          <p class="hint" id="votiinfo" style="margin-bottom:12px"></p>
+          <label class="fl" for="votifile">Carica il file dei voti — puoi sceglierne anche più di uno</label>
+          <input type="file" id="votifile" accept=".xlsx,.xls" multiple class="wr" style="font-size:13px;padding:7px 0">
+          <div class="votirow wr">
+            <div><label class="fl" for="votig">Giornata</label><input type="number" id="votig" min="1" max="38" value="1"></div>
+            <div><label class="fl" for="votisheet">Foglio</label><select id="votisheet"><option>Fantacalcio</option></select></div>
+            <button class="btn primary" id="votiapply" disabled>Aggiungi</button>
+          </div>
+          <p class="hint" style="margin-top:9px">Il file ufficiale delle pagelle si scarica da
+            <a href="https://www.fantacalcio.it/voti-fantacalcio-serie-a" target="_blank" rel="noopener noreferrer">fantacalcio.it/voti-fantacalcio-serie-a</a>.
+            Contiene tre fogli — Fantacalcio, Statistico, Italia — che sono tre redazioni diverse: scegli quella che usa la tua lega.
+            Ricaricare una giornata già inserita la sostituisce.</p>
+          <div id="votilog" style="margin-top:11px"></div>
+          <div id="votigiornate" style="margin-top:11px"></div>
+        </div>
+      </div>
+  <div class="card" id="c-cal">
+        <div class="card-h"><h2>Calendario di lega</h2></div>
+        <div class="card-b">
+          <p class="hint" style="margin-bottom:9px">Il calendario della tua lega — chi affronti in ognuna delle giornate. Si scarica dalla pagina della lega su <b>leghe.fantacalcio.it</b>, voce Calendario, e serve alla pagina <b>Lega</b>.</p>
+          <input type="file" id="calfile" accept=".xlsx,.xls,.csv" class="wr" style="font-size:13px;padding:7px 0">
+          <div id="callog" style="margin-top:11px"></div>
+          <div id="legamap" class="legamap" style="margin-top:13px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="setupgrp" data-grp="tanto">
+    <button class="grptit" type="button" data-grptoggle="tanto" aria-expanded="true">
+      <span class="grpt"><b>Ogni tanto</b><i>Solo quando in lega si muove qualcosa, o quando esce un listone nuovo.</i></span>
+      <span class="grpchev" aria-hidden="true"></span>
+    </button>
+    <div class="setupgrid">
+  <div class="card" id="c-rose">
+        <div class="card-h"><h2>Rose della lega</h2></div>
+        <div class="card-b">
+          <p class="hint" style="margin-bottom:9px">Il file delle rose che la lega pubblica su <b>leghe.fantacalcio.it</b> è la versione ufficiale: caricalo qui e ti dico dove non combacia con quello che hai segnato all'asta. Non tocca niente da solo — decidi tu se allineare.</p>
+          <input type="file" id="rosefile" accept=".xlsx,.xls,.csv" class="wr" style="font-size:13px;padding:7px 0">
+          <div id="roselog" style="margin-top:11px"></div>
+          <div id="rosediff" style="margin-top:13px"></div>
+        </div>
+      </div>
+  <div class="card" id="c-listone">
+        <div class="card-h"><h2>Listone</h2></div>
+        <div class="card-b">
+          <p class="hint" id="listinfo" style="margin-bottom:12px"></p>
+          <label class="fl" for="filein">Carica quotazioni aggiornate</label>
+          <input type="file" id="filein" accept=".xlsx,.xls,.csv" class="wr" style="font-size:13px;padding:7px 0">
+          <p class="hint" style="margin-top:9px">Accetta il file ufficiale delle quotazioni (xlsx) o un csv con le colonne <span class="mono">Id, R, Nome, Squadra, Qt.A, FVM</span>. Le assegnazioni già fatte restano al loro posto.</p>
+          <div id="importlog" style="margin-top:11px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="setupgrp" data-grp="sempre" data-chiuso="1">
+    <button class="grptit" type="button" data-grptoggle="sempre" aria-expanded="false">
+      <span class="grpt"><b>Una volta sola</b><i>Partecipanti e regole: impostati a inizio stagione, poi non si toccano pi&ugrave;.</i></span>
+      <span class="grpchev" aria-hidden="true"></span>
+    </button>
+    <div class="setupgrid">
+  <div class="card" id="c-squadre">
+        <div class="card-h"><h2>Partecipanti</h2></div>
+        <div class="card-b">
+          <div class="teamedit" id="teamedit"></div>
+          <div style="display:flex;gap:9px;margin-top:13px">
+            <button class="btn sm wr" id="addteam">+ Aggiungi squadra</button>
+            <button class="btn sm danger wr" id="delteam">− Rimuovi ultima</button>
+          </div>
+          <p class="hint" style="margin-top:11px">Il pallino segna la tua squadra. È una scelta di questo dispositivo: ogni partecipante apre la stessa pagina e sceglie la propria.</p>
+        </div>
+      </div>
+  <div class="card" id="c-regole">
+        <div class="card-h"><h2>Regole della lega</h2></div>
+        <div class="card-b">
+          <label class="fl" for="budget">Crediti a disposizione</label>
+          <input type="number" id="budget" min="1" style="max-width:150px" class="wr">
+          <label class="fl" style="margin-top:16px">Slot per reparto</label>
+          <div class="slotgrid" id="slotgrid"></div>
+          <label class="fl" style="margin-top:16px">Piano di spesa — % del budget per reparto</label>
+          <div class="slotgrid" id="plangrid"></div>
+          <p class="hint" id="plansum" style="margin-top:8px"></p>
+          <button class="btn sm wr" id="planmed" style="margin-top:6px"
+            title="Portieri 7, difensori 19, centrocampisti 32, attaccanti 42">Usa il piano mediano delle aste vere</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="setupgrp" data-grp="backup">
+    <button class="grptit" type="button" data-grptoggle="backup" aria-expanded="true">
+      <span class="grpt"><b>Al sicuro</b><i>Una copia da tenere da parte, per non perdere tutto.</i></span>
+      <span class="grpchev" aria-hidden="true"></span>
+    </button>
+    <div class="setupgrid">
+  <div class="card" id="c-backup">
+        <div class="card-h"><h2>Backup</h2></div>
+        <div class="card-b">
+          <p class="hint" id="backupnote" style="margin-bottom:12px"></p>
+          <div class="dangerzone">
+            <button class="btn" id="export">Esporta asta</button>
+            <label class="btn wr" for="restorein" style="display:inline-block">Importa da file</label>
+            <input type="file" id="restorein" accept=".json,application/json" style="display:none">
+            <button class="btn wr" id="importbtn">Incolla</button>
+            <button class="btn danger wr" id="reset">Azzera asta</button>
+          </div>
+          <textarea id="importbox" rows="4" style="display:none;width:100%;margin-top:11px;font-family:var(--f-mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:7px;padding:9px" placeholder="Incolla qui il backup e premi di nuovo Importa"></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
 </section>
 
 </main>
@@ -391,3 +680,4 @@
 <div class="modal" id="cmodal"><div class="pcard" id="ccard"></div></div>
 <div class="toast" id="toast"></div>
 </div>
+

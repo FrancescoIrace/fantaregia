@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* I token sono quelli di src/part1.html, copiati tali e quali: la webapp
+   deve avere la faccia di Fantaregia, non quella di un template. Tailwind
+   li espone come classi (bg-surface, text-muted, border-line, …).        */
+:root {
+  --bg: #F1F3F4; --surface: #FFFFFF; --surface-2: #F7F9FA; --ink: #10191D; --muted: #5C6B72;
+  --line: #DCE3E5; --line-strong: #C3CFD3;
+  --accent: #0A6B87; --accent-ink: #FFFFFF; --accent-soft: #E2F0F5; --accent-line: #9CC9D9;
+  --ok: #1F7A4C; --ok-soft: #E1F1E8; --warn: #B5661A; --warn-soft: #FAEDDF; --crit: #B3261E; --crit-soft: #FAE6E4;
+  --rP: #B8760F; --rD: #237349; --rC: #33619F; --rA: #B03A32;
+  --rP-soft: #FAEEDA; --rD-soft: #E0F0E7; --rC-soft: #E3EBF7; --rA-soft: #F9E5E3;
+  --shadow: 0 1px 2px rgba(16,25,29,.06), 0 8px 24px -12px rgba(16,25,29,.18);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1417; --surface: #141F24; --surface-2: #18262C; --ink: #E6EDEF; --muted: #93A3AA;
+    --line: #233238; --line-strong: #33474F;
+    --accent: #4FC3E8; --accent-ink: #06222C; --accent-soft: #123039; --accent-line: #245A6D;
+    --ok: #5BC98E; --ok-soft: #122E22; --warn: #E0A055; --warn-soft: #32240F; --crit: #EC7A70; --crit-soft: #331714;
+    --rP: #DDA344; --rD: #5FBE98; --rC: #7FA8E8; --rA: #E58079;
+    --rP-soft: #2E2312; --rD-soft: #122C1F; --rC-soft: #151F31; --rA-soft: #2E1715;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1417; --surface: #141F24; --surface-2: #18262C; --ink: #E6EDEF; --muted: #93A3AA;
+  --line: #233238; --line-strong: #33474F;
+  --accent: #4FC3E8; --accent-ink: #06222C; --accent-soft: #123039; --accent-line: #245A6D;
+  --ok: #5BC98E; --ok-soft: #122E22; --warn: #E0A055; --warn-soft: #32240F; --crit: #EC7A70; --crit-soft: #331714;
+  --rP: #DDA344; --rD: #5FBE98; --rC: #7FA8E8; --rA: #E58079;
+  --rP-soft: #2E2312; --rD-soft: #122C1F; --rC-soft: #151F31; --rA-soft: #2E1715;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-r-p: var(--rP);
+  --color-r-d: var(--rD);
+  --color-r-c: var(--rC);
+  --color-r-a: var(--rA);
+  --color-r-p-soft: var(--rP-soft);
+  --color-r-d-soft: var(--rD-soft);
+  --color-r-c-soft: var(--rC-soft);
+  --color-r-a-soft: var(--rA-soft);
+  --shadow-card: var(--shadow);
+  --radius-card: var(--radius);
+  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+}
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+}
