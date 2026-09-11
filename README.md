@@ -1,4 +1,4 @@
-# Sala d'Asta Fantacalcio
+# Fantaregia
 
 Un'app a **file singolo** per condurre l'asta del fantacalcio e poi gestirci la stagione. Si apre con un doppio clic su un `.html`, non ha bisogno di un server, di un account o di una connessione: i dati stanno dentro la pagina e i tuoi restano sul tuo computer.
 
@@ -35,12 +35,12 @@ Non è un altro listone con i filtri. La differenza è che quasi ogni numero qui
 ## Come si costruisce
 
 ```bash
-git clone https://github.com/<tuo-utente>/sala-asta-fantacalcio.git
-cd sala-asta-fantacalcio
+git clone https://github.com/FrancescoIrace/fantaregia.git
+cd fantaregia
 ./build.sh
 ```
 
-Ne esce `SalaAsta-Fantacalcio.html`: aprilo con un doppio clic. Parte **vuota** e ti chiede un listone, che puoi importare direttamente da *Lega e dati* senza toccare la riga di comando.
+Ne esce `Fantaregia.html`: aprilo con un doppio clic. Parte **vuota** e ti chiede un listone, che puoi importare direttamente da *Lega e dati* senza toccare la riga di comando.
 
 Per vedere subito l'app in funzione con dati finti:
 

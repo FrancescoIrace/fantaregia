@@ -450,8 +450,13 @@ table.list.riep{min-width:820px}
 }
 
 /* ── Setup ────────────────────────────────── */
+/* Su schermo largo auto-fit dava quattro colonne da 296px, ma ogni gruppo
+   ha due schede: metà griglia restava vuota e il contenuto era costretto a
+   impilarsi in colonnine strette. Meglio due schede larghe, e le liste
+   dentro che si dispongono in orizzontale per conto loro.               */
 .setupgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start}
-.teamedit{display:flex;flex-direction:column;gap:7px}
+@media(min-width:900px){ .setupgrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.teamedit{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:7px}
 .teamedit .row{display:flex;gap:8px;align-items:center}
 .teamedit .row input[type=text]{flex:1}
 .mineradio{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;cursor:pointer}
@@ -490,4 +495,431 @@ body.readonly .wr{display:none!important}
 .fl-p{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12.5px}
 .impok{padding:9px 12px;border-radius:8px;font-size:13px;background:var(--ok-soft);color:var(--ok);font-weight:500}
 .imperr{padding:9px 12px;border-radius:8px;font-size:13px;background:var(--crit-soft);color:var(--crit);font-weight:500}
+/* ── Lega: lo scontro di giornata ─────────────────────────────────── */
+.legasc{display:grid;grid-template-columns:1fr minmax(150px,1.15fr) 1fr;gap:14px;align-items:center}
+.lsq{text-align:center;padding:12px 8px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+.lslab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsnum{font-family:var(--f-mono);font-size:30px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+.lssd{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.lsmid{text-align:center}
+.lsprob{font-family:var(--f-mono);font-size:36px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.lsplab{font-size:11.5px;color:var(--muted);margin-top:3px}
+.lsbar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;margin:9px 0 6px}
+.lsbar i{display:block;height:100%;border-radius:4px}
+.lsdiff{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.lscons{margin-top:14px;padding:12px 14px;border-radius:var(--radius);border-left:3px solid var(--muted);background:var(--bg)}
+.lscons.rischio{border-left-color:var(--crit)}
+.lscons.prudenza{border-left-color:var(--ok)}
+.lscons.pari{border-left-color:var(--warn)}
+.lscons b{font-size:14.5px;display:block;margin-bottom:3px}
+.lscons p{margin:0;font-size:13px;color:var(--muted);line-height:1.5;max-width:78ch}
+/* ── confronto per reparto ───────────────────────────────────────── */
+.cmprow{display:grid;grid-template-columns:96px 1fr 52px;gap:11px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.cmprow:last-of-type{border-bottom:0}
+.cmplab{font-size:13px;font-weight:600}
+.cmpbars{display:grid;gap:3px}
+/* il valore sta FUORI dalla barra: dentro, su fondo pieno, non si legge */
+.cmpb{display:grid;grid-template-columns:1fr 56px;gap:9px;align-items:center}
+.cmpb .tr{display:block;height:14px;background:var(--line);border-radius:3px;overflow:hidden}
+.cmpb i{display:block;height:100%;border-radius:3px}
+.cmpb.mine i{background:var(--accent)}
+.cmpb.his i{background:var(--muted);opacity:.62}
+.cmpb .v{font-family:var(--f-mono);font-size:11px;color:var(--text);text-align:right;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.cmpd{font-family:var(--f-mono);font-size:13px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+/* ── il mio undici di giornata ───────────────────────────────────── */
+.undlist{display:grid;gap:2px}
+.undrow{display:grid;grid-template-columns:22px 1fr auto 10px 40px;gap:8px;align-items:center;
+  padding:5px 0;border-bottom:1px solid var(--line)}
+.undrow:last-child{border-bottom:0}
+.undn{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.undn em{font-style:normal;color:var(--muted);font-size:11.5px;margin-left:6px}
+.undsd{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.undd{width:8px;height:8px;border-radius:50%}
+.undv{font-family:var(--f-mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+/* ── le trentasei giornate ───────────────────────────────────────── */
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:7px}
+.lcell{display:grid;gap:3px;text-align:left;padding:8px 9px;border:1px solid var(--line);
+  border-radius:var(--radius);background:var(--surface);cursor:pointer;font:inherit;color:inherit}
+.lcell:hover{border-color:var(--accent)}
+.lcell.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.lcell .lg{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);letter-spacing:.06em}
+.lcell .lavv{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lcell .lprob{font-family:var(--f-mono);font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.lcell .lner{display:block;height:4px;border-radius:3px;background:var(--line);overflow:hidden}
+.lcell .lner i{display:block;height:100%;border-radius:3px}
+/* ── abbinamento dei nomi ────────────────────────────────────────── */
+.legamap{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:9px 12px}
+.maprow{display:grid;grid-template-columns:1fr;gap:2px;align-items:center;min-width:0}
+.mapname{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.maprow select{width:100%;min-width:0}
+@media(max-width:720px){
+  .legasc{grid-template-columns:1fr;gap:10px}
+  .cmprow{grid-template-columns:78px 1fr 46px}
+}
+.cmpb .v em{font-style:normal;color:var(--muted);font-size:9.5px;margin-left:1px}
+
+/* ── Lega: intestazione dello scontro ─────────────────────────────── */
+.schead{text-align:center;padding:6px 0 20px;border-bottom:1px solid var(--line);margin-bottom:20px}
+.scocc{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:11px}
+.scmatch{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap}
+.scteam{font-family:var(--f-display);font-size:27px;font-weight:700;line-height:1.12;
+  max-width:15ch;overflow-wrap:anywhere}
+.scteam.io{color:var(--accent)}
+.scvs{font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;flex:none}
+.scdove{display:inline-block;margin-top:11px;font-family:var(--f-mono);font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;padding:3px 11px;border-radius:99px;
+  border:1px solid var(--line);color:var(--muted)}
+.scdove.casa{color:var(--ok);border-color:var(--ok)}
+@media(max-width:560px){ .scteam{font-size:21px;max-width:none} .scmatch{gap:8px} }
+
+/* ── da chi arriva il pericolo ───────────────────────────────────── */
+.perlist{display:grid;gap:2px}
+.perrow{display:grid;grid-template-columns:22px minmax(0,1fr) 74px 40px 44px;gap:9px;
+  align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.perrow:last-child{border-bottom:0}
+.perrow.primo .pertet{color:var(--crit)}
+.pern{font-size:13px;min-width:0}
+.pern em{display:block;font-style:normal;color:var(--muted);font-size:11.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perig{display:inline-block;margin-left:5px;font-size:9.5px;font-weight:700;line-height:13px;
+  width:14px;height:14px;text-align:center;border-radius:3px;background:var(--warn);color:#fff;
+  vertical-align:1px}
+.perbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.perbar i{display:block;height:100%;border-radius:3px;background:var(--crit);opacity:.72}
+.permed{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);text-align:right;
+  font-variant-numeric:tabular-nums}
+.pertet{font-family:var(--f-mono);font-size:14px;text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:560px){ .perrow{grid-template-columns:20px minmax(0,1fr) 34px 40px;gap:7px}
+  .perbar{display:none} }
+
+/* ── Mercato: scambi e svincoli ───────────────────────────────────── */
+.mkgrid{display:grid;grid-template-columns:1fr 42px 1fr;gap:14px;align-items:start}
+.mkside{display:flex;flex-direction:column;min-width:0}
+.mkside select,.mkside input{width:100%}
+.mkvs{align-self:center;text-align:center;font-size:20px;color:var(--muted);padding-top:22px}
+.mkfoot{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;
+  padding-top:13px;border-top:1px solid var(--line)}
+.mkfoot > div:first-child{max-width:150px}
+.mkesito{flex:1;min-width:200px;font-size:13px;padding-bottom:7px}
+.mkok{color:var(--ok)} .mkno{color:var(--crit)}
+.gt2{font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.mklist{display:grid;gap:2px}
+.mkrow{display:grid;grid-template-columns:38px 74px 1fr auto;gap:10px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--line)}
+.mkrow:last-child{border-bottom:0}
+.mkg{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.mktipo{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  text-align:center;padding:3px 0;border-radius:4px}
+.mktipo.scambio{background:var(--accent-soft);color:var(--accent)}
+.mktipo.svincolo{background:var(--warn-soft);color:var(--warn)}
+.mkchi{font-size:13px;min-width:0}
+.mkmv{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkchi em{font-style:normal;color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
+@media(max-width:640px){
+  .mkgrid{grid-template-columns:1fr;gap:10px}
+  .mkvs{padding-top:0;transform:rotate(90deg)}
+  .mkrow{grid-template-columns:34px 1fr auto;gap:8px}
+  .mktipo{display:none}
+}
+.poss{display:inline-flex;align-items:baseline;gap:5px;margin-right:10px}
+.poss em{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.oggi{display:inline-block;font-family:var(--f-mono);font-size:9.5px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:99px;
+  background:var(--accent-soft);color:var(--accent);vertical-align:1px}
+.mkscelto{margin-top:7px}
+.mkpick{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:var(--radius);
+  background:var(--accent-soft);border:1px solid var(--accent-line)}
+.mkpn{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mkside .searchbox input{width:100%}
+/* rose ufficiali: il verdetto del confronto */
+.rshead{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.rspill{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.01em}
+.rspill.ok{background:var(--ok-soft);color:var(--ok)}
+.rspill.warn{background:var(--warn-soft);color:var(--warn)}
+.rspill.crit{background:var(--crit-soft);color:var(--crit)}
+.rspill.muted{background:var(--surface-2);color:var(--muted)}
+.rslist{margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+/* due righe invece di tre colonne: questa scheda sta in una colonna
+   stretta, e tre colonne qui dentro spezzerebbero le parole a metà */
+.rsrow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;
+  padding:8px 11px;font-size:13px;border-top:1px solid var(--line)}
+.rsrow:first-child{border-top:0}
+.rsrow:nth-child(even){background:var(--surface-2)}
+.rsn{font-weight:600;display:flex;align-items:baseline;gap:6px;min-width:0}
+.rsn .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsq{color:var(--muted);font-size:11.5px;text-align:right;white-space:nowrap;align-self:baseline}
+.rsw{grid-column:1/-1;color:var(--muted);font-size:12.5px;line-height:1.45}
+.rsw b{color:var(--text);font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.rsmov{margin-top:13px;padding:12px;border:1px solid var(--accent);border-radius:9px;background:var(--surface-2)}
+.rsmovh{font-weight:650;font-size:13.5px;margin-bottom:5px;color:var(--accent)}
+.rsmov .rslist{background:var(--surface)}
+.rsgo{display:flex;flex-wrap:wrap;align-items:flex-end;gap:9px;margin:11px 0 8px}
+.rsgo input{width:78px}
+.rsgo .fl{margin-bottom:3px}
+/* risultati veri di serie A e classifica */
+.risbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.risbar .btn{padding:3px 11px;font-size:15px;line-height:1.3}
+.risg{font-weight:650;font-size:14px}
+.risgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:7px}
+.rispart{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;
+  padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:13px}
+.rispart.dubbia{border-style:dashed;border-color:var(--warn)}
+.rispart .rt{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rispart .rt:last-child{text-align:right}
+.rispart .rt.win{color:var(--text);font-weight:650}
+.rispart .rs{font-family:var(--f-mono);font-weight:650;font-variant-numeric:tabular-nums;
+  padding:1px 8px;border-radius:5px;font-size:13px}
+.rispart .rs i{font-style:normal;opacity:.45;padding:0 2px}
+.rispart .rs{background:var(--surface);color:var(--text);border:1px solid var(--line)}
+.rispart .rs.pari{color:var(--muted)}
+.clatop{font-weight:650;font-size:13.5px;margin:18px 0 7px}
+table.list.clatab{width:100%;min-width:0;table-layout:auto}
+.clatab td{padding:4px 7px;font-size:13px}
+.clatab .clahead td{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);font-weight:650;border-bottom:1px solid var(--line-strong);padding-bottom:5px}
+.clatab .cpos{color:var(--muted);width:26px}
+/* il nome cede tutto lo spazio alle colonne numeriche invece di spingerle
+   fuori dalla scheda: width 100% + max-width 0 è il trucco classico */
+.clatab .tname{width:100%;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clatab .cpt{font-family:var(--f-mono);font-weight:700;font-variant-numeric:tabular-nums;width:34px}
+.clatab .csm{font-family:var(--f-mono);font-size:12px;color:var(--muted);
+  font-variant-numeric:tabular-nums;width:34px;white-space:nowrap}
+/* risultato vero dello scontro di lega */
+.scfatta{display:inline-flex;align-items:baseline;gap:9px;margin-top:9px;
+  padding:4px 12px;border-radius:20px;font-size:13px;border:1px solid var(--line-strong)}
+.scfatta.vinta{background:var(--ok-soft);border-color:var(--ok)}
+.scfatta.persa{background:var(--crit-soft);border-color:var(--crit)}
+.scfatta .sfl{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.scfatta .sfg{font-family:var(--f-mono);font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
+.scfatta .sfg i{font-style:normal;opacity:.45;padding:0 2px}
+.scfatta .sfp{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.scfatta .sfp i{font-style:normal;opacity:.6}
+.clatab tr.claio td{background:var(--accent-soft)}
+.clatab tr.claio .tname{font-weight:700;color:var(--accent)}
+/* verifica delle previsioni */
+.vsint{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:13px}
+.vs1{flex:1;min-width:96px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.vsv{font-family:var(--f-mono);font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.vsk{font-size:11px;color:var(--muted);margin-top:2px}
+.vlist{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.vrow{display:grid;grid-template-columns:30px minmax(0,1fr) 62px 56px 56px 46px;gap:8px;
+  align-items:baseline;padding:7px 10px;font-size:13px;border-top:1px solid var(--line)}
+.vrow:first-child{border-top:0}
+.vrow:nth-child(even){background:var(--surface-2)}
+.vg{font-family:var(--f-mono);color:var(--muted);font-size:12px}
+.vavv{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.vavv i{font-style:normal;color:var(--muted);font-weight:400;font-size:11.5px;padding-left:6px}
+.vpt{font-family:var(--f-mono);font-size:12px;text-align:center;padding:1px 6px;border-radius:5px}
+.vpt.vinta{background:var(--ok-soft);color:var(--ok)}
+.vpt.persa{background:var(--crit-soft);color:var(--crit)}
+.vpt.pari{background:var(--surface);color:var(--muted)}
+.vnum{font-family:var(--f-mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.vnum i{display:block;font-style:normal;font-size:10px;color:var(--muted);font-family:var(--f-sans)}
+.vsc{font-family:var(--f-mono);font-size:13px;font-weight:650;text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:560px){
+  .vrow{grid-template-columns:28px 1fr 58px;row-gap:2px}
+  .vnum,.vsc{grid-column:span 1;text-align:left}
+}
+/* Lega e dati: gruppi e pannello «a che punto sei» */
+/* i gruppi si aprono e si chiudono: quello che si imposta ad agosto non
+   deve stare fra i piedi ogni domenica */
+.setupsolo{margin-bottom:18px}
+.setupgrp{margin-bottom:20px}
+.grptit{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;
+  background:none;border:0;padding:6px 2px;cursor:pointer;color:inherit;border-radius:8px}
+.grptit:hover .grpt b{color:var(--accent)}
+.grptit:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grpt{display:block;flex:1;min-width:0}
+.grpt b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--muted);font-weight:700;margin-bottom:3px}
+.grpt i{display:block;font-style:normal;font-size:12.5px;color:var(--muted);
+  max-width:70ch;line-height:1.5}
+.grpchev{flex:none;width:16px;height:16px;margin-top:2px;position:relative}
+.grpchev::before{content:"";position:absolute;left:3px;top:4px;width:7px;height:7px;
+  border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);
+  transform:rotate(45deg);transition:transform .18s}
+.setupgrp[data-chiuso] .grpchev::before{transform:rotate(-45deg);margin-top:2px}
+.setupgrp[data-chiuso] .setupgrid{display:none}
+.setupgrp .setupgrid{margin-top:10px}
+@media(prefers-reduced-motion:reduce){ .grpchev::before{transition:none} }
+.setupgrid .card.larga{grid-column:1/-1}
+.setupgrid .card.larga .rsgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.strow{display:grid;grid-template-columns:10px minmax(150px,1.1fr) minmax(96px,.7fr) minmax(0,1.6fr) auto;
+  gap:11px;align-items:center;padding:7px 2px;border-top:1px solid var(--line)}
+.strow:first-child{border-top:0;padding-top:2px}
+.stpal{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.strow.ok .stpal{background:var(--ok)}
+.strow.todo .stpal{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.strow.opz .stpal{background:var(--line-strong)}
+.stn{font-weight:650;font-size:13.5px;display:flex;flex-direction:column;gap:0;line-height:1.35}
+.stn i{font-style:normal;font-weight:400;font-size:11px;color:var(--muted)}
+.stv{font-size:13px;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.strow.todo .stv{color:var(--warn);font-weight:650}
+.stnota{font-size:12.5px;color:var(--muted);line-height:1.45}
+.stvuoto{display:block;width:1px}
+.card.evidenzia{outline:2px solid var(--accent);outline-offset:2px;transition:outline-color .3s}
+@media(max-width:700px){
+  .strow{grid-template-columns:10px 1fr auto;row-gap:3px}
+  .stnota{grid-column:2/-1}
+  .stv{text-align:right}
+}
+@media(prefers-reduced-motion:reduce){ .card.evidenzia{transition:none} }
+.benchrow.reparto{border-top:1px solid var(--line-strong)}
+/* infermeria */
+.infres{margin-top:8px;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;background:var(--surface)}
+.infres:empty{display:none}
+.infres button{display:flex;width:100%;align-items:center;gap:9px;background:none;border:0;
+  border-bottom:1px solid var(--line);padding:8px 11px;text-align:left;color:var(--text);font:inherit}
+.infres button:last-child{border-bottom:0}
+.infres button:hover:not([disabled]){background:var(--accent-soft)}
+.infres .pnome{flex:1;min-width:0;display:flex;align-items:center;gap:6px;font-size:13.5px}
+.infres .pnome b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.infres .pnome .pteam{white-space:nowrap}
+.infbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+.infbar input{flex:1;min-width:150px}
+.infbar[hidden]{display:none}
+.infrow{display:grid;grid-template-columns:auto minmax(0,1.5fr) minmax(0,1.6fr) auto;gap:10px;
+  align-items:center;padding:8px 2px;border-top:1px solid var(--line)}
+.infrow:first-child{border-top:0}
+.infn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.inftag{font-size:12.5px;color:var(--muted)}
+.inftag i{font-style:normal;opacity:.75}
+.inftag.inf{color:var(--warn)}
+.inftag.squal{color:var(--crit)}
+.inftag.diff{color:var(--warn)}
+.inftag.rosso{color:var(--crit)}
+.outb.squal{background:var(--crit-soft);color:var(--crit)}
+/* l'eco dell'import dei voti */
+.ecoinf{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.ecorow{font-size:12.5px;padding:7px 11px;border-radius:8px;line-height:1.5;
+  background:var(--surface-2);border-left:3px solid var(--line-strong)}
+.ecorow b{font-weight:650}
+.ecorow i{font-style:normal;color:var(--muted)}
+.ecorow.squal{border-left-color:var(--crit);background:var(--crit-soft)}
+.ecorow.rosso{border-left-color:var(--crit)}
+.ecorow.torna{border-left-color:var(--ok);background:var(--ok-soft)}
+.ecorow.diff{border-left-color:var(--warn)}
+@media(max-width:640px){
+  .infrow{grid-template-columns:auto 1fr auto;row-gap:2px}
+  .inftag{grid-column:2/-1}
+}
+/* ── Il campo ─────────────────────────────────────────────────────────
+   Un modulo si legge meglio guardandolo che leggendolo: le caselle sono
+   maglie appoggiate sull'erba, e cliccandone una si apre il confronto
+   fra i candidati, che è dove la scelta si fa davvero.                 */
+.distinta{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.dst{flex:1;min-width:118px;padding:10px 13px;border:1px solid var(--line);
+  border-radius:var(--radius);background:var(--surface)}
+.dsv{font-family:var(--f-mono);font-size:23px;font-weight:700;line-height:1.05;
+  font-variant-numeric:tabular-nums}
+.dsv span{font-size:14px;font-weight:500;color:var(--muted)}
+.dsk{font-size:11px;color:var(--muted);margin-top:3px}
+
+.campo{position:relative;border:1px solid var(--line);border-radius:var(--radius);
+  padding:22px 16px 26px;display:flex;flex-direction:column;gap:14px;overflow:hidden;
+  background:repeating-linear-gradient(180deg,var(--erba) 0 74px,var(--erba-2) 74px 148px)}
+.campo .linee{position:absolute;inset:0;pointer-events:none}
+/* i margini in percentuale si calcolano sulla larghezza del CONTENITORE:
+   con un max-width addosso l'elemento si sposta di lato. Va centrato con
+   translate, che invece guarda l'elemento stesso.                       */
+.campo .linee span{position:absolute;border:2px solid var(--erba-linea);
+  left:50%;transform:translateX(-50%)}
+/* si guarda dalla propria porta: metà campo in alto, area in basso */
+.linee .lmezzo{left:0;right:0;top:10px;width:auto;height:0;transform:none;border-width:0 0 2px 0}
+.linee .lcerchio{top:10px;width:132px;height:66px;border-radius:0 0 132px 132px;border-top:0}
+.linee .larea{bottom:0;width:60%;max-width:460px;height:146px;border-bottom:0;border-radius:7px 7px 0 0}
+.linee .lareola{bottom:0;width:30%;max-width:220px;height:62px;border-bottom:0;border-radius:5px 5px 0 0}
+.greparto{position:relative;z-index:1}
+/* l'etichetta del reparto sta sulla riga di metà campo: le serve un fondo,
+   altrimenti la linea le passa dentro le lettere */
+.campo .rowlab{margin-bottom:7px}
+.campo .rowlab{color:color-mix(in srgb,var(--ink) 62%,transparent)}
+.campo .rowlab span{background:var(--erba);padding:1px 11px;border-radius:20px;display:inline-block}
+
+/* ── La card del giocatore ─────────────────────────────────────────────
+   Impaginata come una figurina: il voto grande a sinistra col ruolo
+   sotto, il nome in evidenza, e in fondo una riga di numeri. La fascia
+   (oro, argento, bronzo) non è un vezzo: è il punteggio di giornata
+   letto a colpo d'occhio, la stessa scala dei colori di tutta l'app.  */
+.gslot{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;min-width:0;
+  text-align:left;padding:0;border-radius:11px;border:1px solid var(--line);
+  background:var(--surface);box-shadow:var(--shadow);cursor:pointer;overflow:hidden;
+  position:relative;transition:transform .12s,border-color .12s}
+/* il taglio di luce diagonale delle figurine: solo sulla fascia, sennò
+   sbianca il testo della scheda */
+.gs-rate{position:relative}
+.gs-rate::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.22) 0 38%,rgba(255,255,255,.04) 38.5%)}
+.gslot:hover{border-color:var(--accent);transform:translateY(-2px)}
+.gslot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gslot.ko{border-color:var(--crit)}
+.gslot.meglio{border-color:var(--warn)}
+
+.gs-rate{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding:9px 4px;background:linear-gradient(160deg,var(--fa),var(--fb))}
+.gslot.f-oro{--fa:var(--oro-2);--fb:var(--oro)}
+.gslot.f-arg{--fa:var(--arg-2);--fb:var(--arg)}
+.gslot.f-bro{--fa:var(--bro-2);--fb:var(--bro)}
+.gslot.f-gre{--fa:var(--gre-2);--fb:var(--gre)}
+/* la fascia metallica è scura in entrambi i temi: così il numero resta
+   bianco sempre, invece di cambiare colore e diventare illeggibile */
+.gs-rate b{font-family:var(--f-mono);font-size:21px;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.gs-rate i{font-style:normal;font-family:var(--f-mono);font-size:11px;font-weight:700;
+  letter-spacing:.08em;color:#fff;opacity:.85;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.gs-rig{line-height:0;margin-top:1px}
+
+.gs-main{display:flex;flex-direction:column;gap:1px;min-width:0;padding:8px 10px 8px 0}
+.gs-nome{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:-.015em;
+  line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-sq{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-stat{display:flex;align-items:center;gap:7px;margin-top:4px;padding-top:5px;
+  border-top:1px solid var(--line);min-width:0;flex-wrap:wrap}
+.gsv{display:flex;align-items:baseline;gap:3px}
+.gsv i{font-style:normal;font-size:8.5px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--muted);font-weight:700}
+.gsv b{font-family:var(--f-mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.gs-why{font-size:10.5px;color:var(--muted);line-height:1.3;margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-meglio{font-size:10.5px;color:var(--warn);font-weight:650;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.gslot.vuoto{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;min-height:96px;border-style:dashed;background:transparent;box-shadow:none;
+  color:var(--muted)}
+.gslot.vuoto::after{display:none}
+.gslot.vuoto:hover{border-style:solid;color:var(--accent);background:var(--surface)}
+.gs-piu{font-size:22px;line-height:1;font-weight:300}
+.gs-vuoto{font-size:11.5px}
+.benchlist{max-height:min(56vh,540px);overflow-y:auto}
+@media(prefers-reduced-motion:reduce){ .gslot:hover{transform:none} }
+@media(max-width:640px){
+  /* la forma del modulo è il motivo per cui c'è il campo: su telefono si
+     stringono le maglie, non si spezzano le righe */
+  .campo{padding:14px 8px 20px;gap:10px}
+  .campo .prow{gap:6px}
+  .campo .prow[data-n="3"]{grid-template-columns:repeat(3,minmax(0,1fr));max-width:none}
+  .campo .prow[data-n="4"]{grid-template-columns:repeat(4,minmax(0,1fr));max-width:none}
+  .campo .prow[data-n="5"]{grid-template-columns:repeat(3,minmax(0,1fr));max-width:none}
+  /* su schermo stretto la fascia va SOPRA: di lato mangia metà card e i
+     nomi si riducono a tre lettere e i puntini */
+  .gslot{grid-template-columns:minmax(0,1fr);gap:0}
+  .gs-rate{flex-direction:row;justify-content:space-between;align-items:center;padding:3px 7px}
+  .gs-rate .gs-rig{margin:0}
+  .gs-main{padding:6px 7px}
+  .gs-why,.gs-meglio,.gsv{display:none}
+  .gs-rate b{font-size:16px} .gs-rate i{font-size:9.5px}
+  .gs-nome{font-size:12.5px}
+  .gs-sq{font-size:9.5px}
+  .gs-stat{gap:4px;margin-top:3px;padding-top:4px}
+  .linee .larea{height:126px}
+  .dst{flex:1 1 calc(50% - 5px);min-width:0;padding:8px 10px}
+  .dsv{font-size:19px}
+}
 </style>

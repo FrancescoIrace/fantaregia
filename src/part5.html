@@ -1,3 +1,163 @@
+/* ══ 23. I risultati della lega ══════════════════════════════════════
+   Il calendario porta con sé i fantapunti di ogni scontro e il risultato
+   in gol. Da lì escono due cose: la classifica, e la verifica — perché
+   una previsione che nessuno controlla non è una previsione, è un'opinione. */
+const legaRis=()=>legaOn()&&Array.isArray(S.lega.ris)?S.lega.ris:[];
+const legaGiocate=()=>{ const R=legaRis(), out=[];
+  R.forEach((r,i)=>{ if(r&&r.some(x=>x)) out.push(i+1); }); return out; };
+/* lo scontro vero di una squadra a una giornata di lega */
+function esitoDi(tid,gl){
+  const i=legaIdx(tid); if(i===null||i===undefined||i<0) return null;
+  const ps=(S.lega.gior||[])[gl-1], rs=legaRis()[gl-1];
+  if(!ps||!rs) return null;
+  for(let k=0;k<ps.length;k++){
+    const [a,b]=ps[k], r=rs[k]; if(!r) continue;
+    if(a===i) return {casa:true, avvIdx:b, pf:r.pa, pc:r.pb, gf:r.ga, gc:r.gb};
+    if(b===i) return {casa:false, avvIdx:a, pf:r.pb, pc:r.pa, gf:r.gb, gc:r.ga};
+  }
+  return null;
+}
+/* la classifica di lega: punti, poi i fantapunti totali come si usa */
+function classificaLega(){
+  if(!legaOn()) return [];
+  const T=S.lega.teams.map((n,i)=>({i:i, nome:n, tid:legaTid(i), pt:0, g:0, v:0, n:0, p:0,
+                                    gf:0, gs:0, pf:0, pc:0}));
+  const gg=legaGiocate();
+  for(const gl of gg){
+    const ps=S.lega.gior[gl-1], rs=legaRis()[gl-1];
+    ps.forEach(([a,b],k)=>{
+      const r=rs[k]; if(!r) return;
+      const A=T[a], B=T[b]; if(!A||!B) return;
+      A.g++; B.g++;
+      A.pf+=r.pa||0; A.pc+=r.pb||0; B.pf+=r.pb||0; B.pc+=r.pa||0;
+      if(r.ga!==null&&r.gb!==null){ A.gf+=r.ga; A.gs+=r.gb; B.gf+=r.gb; B.gs+=r.ga; }
+      const va=r.ga!==null?r.ga:(r.pa||0), vb=r.gb!==null?r.gb:(r.pb||0);
+      if(va>vb){ A.v++; A.pt+=3; B.p++; }
+      else if(va<vb){ B.v++; B.pt+=3; A.p++; }
+      else { A.n++; B.n++; A.pt++; B.pt++; }
+    });
+  }
+  return T.filter(x=>x.g).sort((a,b)=>b.pt-a.pt||(b.gf-b.gs)-(a.gf-a.gs)||b.pf-a.pf||a.nome.localeCompare(b.nome));
+}
+/* ── la verifica delle previsioni ────────────────────────────────────
+   Per ogni giornata già giocata si rimette l'app al giorno prima e le si
+   chiede cosa si aspettava: quanto avrebbe fatto la rosa, e con che
+   probabilità avrebbe vinto. Poi si guarda com'è andata. Serve a sapere
+   se questi numeri valgono qualcosa — e a smettere di crederci se no.  */
+function verifica(tid){
+  const out=[]; if(!legaOn()) return out;
+  for(const gl of legaGiocate()){
+    const e=esitoDi(tid,gl); if(!e) continue;
+    const s=scontro(tid,gl);
+    out.push({gl:gl, ga:legaSerieA(gl), avv:e.avvIdx, casa:e.casa,
+      pf:e.pf, pc:e.pc, gf:e.gf, gc:e.gc,
+      atteso:s&&s.mia?s.mia.media:null, attesoAvv:s&&s.sua?s.sua.media:null,
+      pVinco:s?s.pVinco:null,
+      vinta:e.gf!==null?(e.gf>e.gc?1:e.gf<e.gc?-1:0):(e.pf>e.pc?1:e.pf<e.pc?-1:0)});
+  }
+  return out;
+}
+function sintesiVerifica(v){
+  const con=v.filter(x=>x.atteso!==null);
+  if(!con.length) return null;
+  let sc=0, scAvv=0, nAvv=0;
+  for(const x of con){ sc+=x.pf-x.atteso; if(x.attesoAvv!==null){ scAvv+=x.pc-x.attesoAvv; nAvv++; } }
+  const centrate=con.filter(x=>x.pVinco!==null&&((x.pVinco>=0.5&&x.vinta>=0)||(x.pVinco<0.5&&x.vinta<=0))).length;
+  return {n:con.length, scarto:sc/con.length, scartoAvv:nAvv?scAvv/nAvv:null, centrate:centrate};
+}
+
+
+/* ══ 26. Infermeria: infortuni, squalifiche, diffide ═════════════════
+   Le squalifiche NON si contano a gialli consecutivi. In serie A si
+   sommano su tutta la stagione e scattano alla 5ª ammonizione, poi alla
+   9ª, 13ª, 16ª, 18ª, e dalla 19ª a ogni giallo. Un giornata di stop
+   ogni volta. Diffidato è chi sta a un'ammonizione dalla soglia.
+
+   Due dettagli che cambiano il conto:
+   · la doppia ammonizione nella stessa partita diventa espulsione, e
+     quei gialli non entrano nel conteggio verso la quinta;
+   · il rosso vale da una giornata in su, ma quante lo decide il
+     giudice sportivo — nessun file lo dice, quindi resta a mano.
+
+   Tutto questo si RICAVA dai voti, non si accumula: così caricando le
+   giornate in disordine, o rimuovendone una, il conto resta giusto. */
+const SOGLIE=[5,9,13,16,18];
+const scattaA=n=>SOGLIE.includes(n)||n>=19;
+const diffidatoA=n=>scattaA(n+1);
+let _cartSig="", _CART=null;
+function cartellini(){
+  const sig=giornateGiocate().join(",")+"|"+(S.rev||0);
+  if(sig===_cartSig) return _CART;
+  const out={};
+  for(const g of giornateGiocate()){
+    const V=S.stats[g]||{};
+    for(const pid in V){
+      const a=V[pid], amm=a[7]||0, esp=a[8]||0;
+      const o=out[pid]||(out[pid]={amm:0, esp:0, stop:[], rossi:[]});
+      // doppia ammonizione: i gialli sono già stati "spesi" nel rosso
+      const contano=(esp>0&&amm>0)?0:amm;
+      for(let k=0;k<contano;k++){
+        o.amm++;
+        if(scattaA(o.amm)) o.stop.push({g:g+1, n:o.amm});
+      }
+      if(esp>0){ o.esp+=esp; o.rossi.push(g); }
+    }
+  }
+  _cartSig=sig; _CART=out;
+  return out;
+}
+const saltata=(pid,g)=>!!(S.squalSalta&&S.squalSalta[pid+"-"+g]);
+/* le squalifiche ancora da scontare: quelle la cui giornata non è caricata */
+function squalifiche(){
+  if(S.squalOn===false) return [];
+  const gg=giornateGiocate(), C=cartellini(), out=[];
+  for(const pid in C) for(const s of C[pid].stop){
+    if(s.g>38||gg.includes(s.g)||saltata(pid,s.g)) continue;   // già scontata, o annullata
+    out.push({pid:+pid, g:s.g, n:s.n});
+  }
+  return out.sort((a,b)=>a.g-b.g);
+}
+const squalificatoA=(pid,g)=>squalifiche().some(s=>s.pid===+pid&&s.g===g);
+/* chi è a un giallo dalla squalifica */
+function diffidati(){
+  const C=cartellini(), out=[];
+  for(const pid in C) if(diffidatoA(C[pid].amm)) out.push({pid:+pid, amm:C[pid].amm});
+  return out.sort((a,b)=>b.amm-a.amm);
+}
+/* i rossi da controllare a mano: il giudice sportivo dà da una giornata in su */
+function rossiDaVedere(){
+  const C=cartellini(), gg=giornateGiocate(), ultima=gg.length?Math.max(...gg):0, out=[];
+  for(const pid in C){ const r=C[pid].rossi;
+    if(r.length&&r[r.length-1]===ultima) out.push({pid:+pid, g:ultima}); }
+  return out;
+}
+
+/* ── l'infermeria vera e propria ────────────────────────────────────
+   S.out tiene i segnati a mano. Era una mappa di 1; ora la voce può
+   essere un oggetto con il motivo e da quando, e il vecchio 1 continua
+   a valere come "fuori" senza dettagli.                              */
+const infoOut=id=>{ const v=S.out&&S.out[id]; return (v&&typeof v==="object")?v:(v?{}:null); };
+function segnaOut(id,motivo){
+  S.out=Object.assign({},S.out||{});
+  S.out[id]={motivo:motivo||"infortunio", da:nextG(), ts:Date.now()};
+}
+function togliOut(id){ S.out=Object.assign({},S.out||{}); delete S.out[id]; }
+/* Chi rigioca è guarito: appena ricompare nei voti l'indisponibilità cade
+   da sola. Vale solo per i segnati a mano — le squalifiche si scontano. */
+function rientri(){
+  const gg=giornateGiocate(), out=[];
+  for(const id in (S.out||{})){
+    const inf=infoOut(id)||{}, da=inf.da||0;
+    for(const g of gg) if(g>=da && S.stats[g] && S.stats[g][id]){ out.push({pid:+id, g:g}); break; }
+  }
+  return out;
+}
+function puliziaInfermeria(){
+  const r=rientri();
+  for(const x of r) togliOut(x.pid);
+  return r;
+}
+
 
 /* ══ 7. Tabellone ═══════════════════════════════════════════════════ */
 function renderBoard(){
@@ -51,8 +211,8 @@ function renderScarsi(){
    quelle che servono a comprare, spenta quelle che servono a giocare le
    giornate. È una preferenza di chi guarda, quindi resta sul dispositivo. */
 const ORDINE={
-  asta:     ["asta","listone","titolari","rose","calendario","rendimento","giornate","setup"],
-  stagione: ["giornate","rendimento","titolari","listone","calendario","rose","asta","setup"]
+  asta:     ["asta","listone","titolari","rose","calendario","rendimento","giornate","lega","infermeria","setup"],
+  stagione: ["giornate","lega","infermeria","titolari","rendimento","calendario","listone","rose","asta","setup"]
 };
 const PRIME=4;   // quante voci sono "quelle del momento"
 function modoAsta(){
@@ -207,6 +367,15 @@ function renderCal(){
       <td class="tname">${esc(r.t)}</td>
       <td>${fixStrip(r.t,role,from,span)}</td>
       <td class="num"><span class="calscore" style="color:${scoreCol(r.s)}">${r.s.toFixed(2)}</span></td></tr>`).join("");
+  renderRisultati();
+  const nf=document.getElementById("forcenote");
+  if(nf){
+    const w=pesoRisultati(), ng=giornateGiocate().length;
+    nf.innerHTML=`La forza di ogni squadra parte dalle quotazioni del listone, cioè dal giudizio del mercato: l'<b>attacco</b> pesa le quotazioni dei tre attaccanti e dei quattro centrocampisti più cari, la <b>difesa</b> quelle del portiere titolare e dei quattro difensori più cari. `+
+      (ng?`Poi arriva il campo: con <b>${ng===1?"una giornata":ng+" giornate"}</b> caricat${ng===1?"a":"e"} i risultati veri pesano già il <b>${Math.round(w*100)}%</b>, e a dieci giornate conteranno metà.`
+         :`Finché non carichi i voti sono solo valori di partenza: reggono in agosto e vanno riletti quando il campo dice altro.`)+
+      ` Il fattore campo vale mezzo gradino di difficoltà.`;
+  }
   const F=CALTEAMS.map(t=>({t,a:FORCE[t].att,d:FORCE[t].dif})).sort((x,y)=>(y.a+y.d)-(x.a+x.d));
   document.getElementById("forcetable").innerHTML=F.map(x=>`
     <div class="forcerow"><span class="fn">${esc(x.t)}</span>
@@ -482,7 +651,7 @@ function openPlayer(id){
     <div class="pact">
       <button class="btn sm wr ${isOut(p.id)?"danger":""}" data-pout="${p.id}"
         title="Toglilo dagli indici e dalla formazione automatica finché non torna">${isOut(p.id)?"↩ È tornato":"⛑ Indisponibile"}</button>
-      ${a?`<span>Preso da <b>${esc(teamName(a.team))}</b> per <b>${a.price}</b> crediti</span>
+      ${a?`<span>${storiaPossessi(p.id)||`Preso da <b>${esc(teamName(a.team))}</b> per <b>${a.price}</b> crediti`}</span>
            <button class="btn sm wr" data-pfree="${p.id}" style="margin-left:auto">Libera</button>`
         :`<span class="tag ok">svincolato</span>
           <button class="btn sm" data-pstar="${p.id}">${t?"★ Obiettivo":"☆ Segna obiettivo"}</button>
@@ -761,8 +930,10 @@ function autoFill(g){
       if(p){ taken.add(p.id); L.start[r].push(p.id); } else L.start[r].push(null);
     }
   }
+  // la panchina si legge per reparto: si sostituisce ruolo per ruolo, non
+  // a punteggio. Dentro ogni reparto, davanti chi rende di più.
   L.bench=ROLES.flatMap(r=>R[r].map(x=>x.p)).filter(p=>!taken.has(p.id))
-    .sort((x,y)=>dayScore(y,g)-dayScore(x,g)).map(p=>p.id);
+    .sort((x,y)=>ordRuolo(x.r)-ordRuolo(y.r)||dayScore(y,g)-dayScore(x,g)).map(p=>p.id);
   saveMe();
 }
 /* ── Chi schierare: i candidati per una casella, uno sotto l'altro, con
@@ -812,12 +983,21 @@ function putInSlot(pid){
   L.start[r][+i]=pid;
   saveMe(); closeSwap(); renderGiornata();
 }
+const ordRuolo=r=>({P:0,D:1,C:2,A:3})[r]??9;
+/* rimettere in fila la panchina per reparto: l'ordine resta modificabile
+   a mano con le frecce, questo è solo un punto di partenza pulito */
+function ordinaPanchina(g){
+  const L=lineup(g);
+  const key=id=>{ const p=byId.get(id)||(S.assign[id]||{}).snap; return p?ordRuolo(p.r):9; };
+  L.bench=(L.bench||[]).slice().sort((a,b)=>key(a)-key(b)||dayScore(byId.get(b)||{},g)-dayScore(byId.get(a)||{},g));
+  saveMe(); renderGiornata();
+}
 function syncBench(g){
   const L=lineup(g), R=myRoster(), used=usedIds(L);
   const all=ROLES.flatMap(r=>R[r].map(x=>x.p)).filter(p=>!used.has(p.id));
   const ids=new Set(all.map(p=>p.id));
   L.bench=(L.bench||[]).filter(id=>ids.has(id));
-  for(const p of all.sort((x,y)=>dayScore(y,g)-dayScore(x,g)))
+  for(const p of all.sort((x,y)=>ordRuolo(x.r)-ordRuolo(y.r)||dayScore(y,g)-dayScore(x,g)))
     if(!L.bench.includes(p.id)) L.bench.push(p.id);
 }
 function renderGiornata(){
@@ -825,7 +1005,10 @@ function renderGiornata(){
   const roster_n=ROLES.reduce((n,r)=>n+R[r].length,0);
   const it=s=>{ if(!s) return ""; const p=s.split("-"); return p[2]+"/"+p[1]+"/"+p[0].slice(2); };
   document.getElementById("glab").textContent="Giornata "+g;
-  document.getElementById("gdate").textContent=it(CAL.dates[g-1]);
+  // il segno "oggi" c'è solo sulla giornata che si sta preparando davvero
+  const oggi=giornataOggi();
+  document.getElementById("gdate").innerHTML=esc(it(CAL.dates[g-1]))+
+    (g===oggi?` <span class="oggi">oggi</span>`:"");
   document.getElementById("gprev").disabled=g<=1;
   document.getElementById("gnext").disabled=g>=38;
   const sel=document.getElementById("gmod");
@@ -842,30 +1025,43 @@ function renderGiornata(){
   }
   syncBench(g);
   const used=usedIds(L);
+  /* Il campo. Le caselle non sono più menu a tendina ma maglie: si vede la
+     forma del modulo, e cliccandone una si apre il confronto fra i
+     candidati, che è dove la scelta si fa davvero.                      */
+  /* La fascia della card viene dal punteggio di giornata: non è decorazione,
+     è la stessa scala dei colori usata ovunque, letta a colpo d'occhio. */
+  const fascia=n=>n>=80?"f-oro":n>=65?"f-arg":n>=50?"f-bro":"f-gre";
   const rows=[["A","Attacco"],["C","Centrocampo"],["D","Difesa"],["P","Porta"]].map(([r,lab])=>{
     const slots=L.start[r].map((id,i)=>{
       const p=id?byId.get(id)||(S.assign[id]||{}).snap:null;
-      const opts=R[r].map(x=>x.p)
-        .filter(x=>!used.has(x.id)||x.id===id)
-        .sort((x,y)=>dayScore(y,g)-dayScore(x,g))
-        .map(x=>`<option value="${x.id}"${x.id===id?" selected":""}>${esc(x.n)} (${esc(x.s)})</option>`).join("");
       const ko=p&&isOut(p.id);
       const sc=p?dayScore(p,g):null;
       const alt=R[r].map(x=>x.p).filter(x=>!used.has(x.id)&&!isOut(x.id));
       const meglio=p&&alt.length?alt.reduce((m,x)=>dayScore(x,g)>dayScore(m,g)?x:m,alt[0]):null;
       const su=meglio&&dayScore(meglio,g)>sc+4;
-      return `<div class="slot${p?"":" empty"}${ko?" ko":""}">
-        <div class="slotop">
-          <select data-lineup="${r}:${i}"><option value="">— vuoto —</option>${opts}</select>
-          <button class="btn sm alt" data-swap="${r}:${i}" title="Confronta con chi hai in panchina">⇄</button>
-        </div>
-        <div class="meta">${p?(ko?outBadge(p):"")+fixStrip(p.s,p.r,g,1)
-            +`<span class="dsc" style="color:${appetCol(sc)}">${sc}</span>`:'<span class="hint">nessuno</span>'}</div>
-        ${p?`<div class="why">${esc(dayWhy(p,g))}</div>`:""}
-        ${su?`<div class="why alt2">meglio <b>${esc(meglio.n)}</b> · ${dayScore(meglio,g)}</div>`:""}
-      </div>`;
+      if(!p) return `<button class="gslot vuoto" data-swap="${r}:${i}">
+        <span class="gs-piu">+</span><span class="gs-vuoto">scegli</span></button>`;
+      const st=statFor(p.id), fo=formaOf(p.id,3);
+      return `<button class="gslot ${fascia(sc)}${ko?" ko":""}${su?" meglio":""}" data-swap="${r}:${i}">
+        <span class="gs-rate">
+          <b>${sc}</b>
+          <i class="r-${p.r}">${p.r}</i>
+          ${rigBadge(p)?`<span class="gs-rig">${rigBadge(p)}</span>`:""}
+        </span>
+        <span class="gs-main">
+          <span class="gs-nome">${esc(p.n)}</span>
+          <span class="gs-sq">${titDot(p)} ${esc(p.s)}${ko?" "+outBadge(p):""}</span>
+          <span class="gs-stat">
+            ${fixStrip(p.s,p.r,g,1)}
+            ${st&&st.pres?`<span class="gsv"><i>fm</i><b style="color:${fmCol(st.fm)}">${st.fm.toFixed(1)}</b></span>`:""}
+            ${fo?`<span class="gsv"><i>for</i><b style="color:${fo.delta>=0.5?"var(--ok)":fo.delta<=-0.5?"var(--crit)":"var(--muted)"}">${fo.delta>=0?"+":"−"}${Math.abs(fo.delta).toFixed(1)}</b></span>`:""}
+          </span>
+          <span class="gs-why">${esc(dayWhy(p,g))}</span>
+          ${su?`<span class="gs-meglio">↑ ${esc(meglio.n)} ${dayScore(meglio,g)}</span>`:""}
+        </span>
+      </button>`;
     }).join("");
-    return `<div><div class="rowlab">${lab}</div><div class="prow" data-n="${L.start[r].length}">${slots}</div></div>`;
+    return `<div class="greparto"><div class="rowlab"><span>${lab}</span></div><div class="prow" data-n="${L.start[r].length}">${slots}</div></div>`;
   }).join("");
 
   const xi=ROLES.flatMap(r=>L.start[r]).filter(Boolean).map(id=>byId.get(id)||(S.assign[id]||{}).snap).filter(Boolean);
@@ -878,9 +1074,11 @@ function renderGiornata(){
     : (L.bench.length?`<span class="tag ok">formazione completa</span>`:""))
     + (ko?` <span class="tag crit">${ko} in campo ${ko>1?"sono segnati indisponibili":"è segnato indisponibile"}</span>`:"");
 
+  let ruoloPrec=null;
   const bench=L.bench.map((id,i)=>{
     const p=byId.get(id)||(S.assign[id]||{}).snap; if(!p) return "";
-    return `<div class="benchrow">
+    const nuovoReparto=ruoloPrec!==null&&p.r!==ruoloPrec; ruoloPrec=p.r;
+    return `<div class="benchrow${nuovoReparto?" reparto":""}">
       <span class="ord">${i+1}</span>
       <span class="chip ${p.r}">${p.r}</span>
       <span class="bn">${esc(p.n)} <span class="pteam">${esc(p.s)}</span></span>
@@ -892,17 +1090,28 @@ function renderGiornata(){
     </div>`;
   }).join("");
 
+  const mediaSc=xi.length?Math.round(xi.reduce((a,p)=>a+dayScore(p,g),0)/xi.length):null;
+  const dato=(v,k,col)=>`<div class="dst"><div class="dsv"${col?` style="color:${col}"`:""}>${v}</div><div class="dsk">${k}</div></div>`;
   box.innerHTML=`
-    <div class="pitch">${rows}</div>
+    <div class="distinta">
+      ${dato(`${xi.length}<span>/11</span>`,"titolari",missing?"var(--warn)":"var(--ok)")}
+      ${dato(mediaSc===null?"—":mediaSc,"punteggio medio",mediaSc===null?null:appetCol(mediaSc))}
+      ${dato(xi.length?avgD.toFixed(1)+'<span>/5</span>':"—","difficoltà del turno")}
+      ${dato(casa+`<span>/${xi.length||11}</span>`,"in casa")}
+      ${ko?dato(ko,"indisponibili in campo","var(--crit)"):""}
+    </div>
+    <div class="campo">
+      <div class="linee" aria-hidden="true">
+        <span class="lmezzo"></span><span class="lcerchio"></span>
+        <span class="larea"></span><span class="lareola"></span>
+      </div>
+      ${rows}
+    </div>
     <div class="card" style="margin-top:18px">
       <div class="card-h"><h2>Panchina</h2>
-        <span class="hint" style="margin-left:auto">nell'ordine in cui vuoi che entrino</span></div>
+        <span class="hint" style="margin-left:auto">nell'ordine in cui vuoi che entrino</span>
+        ${L.bench.length>1?`<button class="btn sm wr" id="benchord" title="Rimette in fila per reparto: portieri, difensori, centrocampisti, attaccanti">Ordina per ruolo</button>`:""}</div>
       <div class="benchlist">${bench||'<div class="empty">Nessuno in panchina.</div>'}</div>
-      <div class="gsum">
-        <span>Titolari: <b>${xi.length}</b>/11</span>
-        <span>In casa: <b>${casa}</b></span>
-        <span>Difficoltà media dell'undici: <b style="color:${avgD?scoreCol(6-avgD):"inherit"}">${avgD?avgD.toFixed(2):"—"}</b> su 5</span>
-      </div>
     </div>
     <p class="hint" style="margin-top:11px;max-width:76ch">Le formazioni restano su questo dispositivo: nessuno degli altri partecipanti le vede. <b>Schiera la migliore</b> ordina i tuoi per valore corretto con la difficoltà della partita di giornata — è un punto di partenza, non il tuo ultimo giudizio.</p>`;
 }
@@ -952,7 +1161,7 @@ function renderRiepilogo(){
         <td class="mono" style="color:var(--muted)">${i+1}</td>
         <td><b>${esc(x.t.name)}</b>${isMine(x.t.id)?' <span class="tag neu">io</span>':""}
           <div class="pteam">${g.mod} · ${g.n} giocatori</div></td>
-        <td class="num">${g.pagato}</td>
+        <td class="num">${st.spent}</td>
         <td class="num" style="color:var(--muted)">${st.left}</td>
         <td class="num" style="font-size:12px">${rip}</td>
         <td class="num" style="color:${d<=-0.05?"var(--ok)":d>=0.05?"var(--crit)":"var(--muted)"}">${d>=0?"+":"−"}${Math.abs(Math.round(d*100))}%</td>
@@ -1016,3 +1225,616 @@ function renderRose(){
   if(c) c.textContent=q?`${trovati} ${trovati===1?"giocatore":"giocatori"} in ${squadre} ${squadre===1?"rosa":"rose"}`
                       :`${S.teams.length} rose · ${Object.keys(S.assign).length} giocatori assegnati`;
 }
+
+/* ══ 16. Lega: chi affronti, e come giocartela ══════════════════════ */
+const legaG=()=>Math.max(1,Math.min(legaGiornate()||38,parseInt(document.getElementById("lgior").value)||1));
+function mySquadra(){
+  if(ME.myTeam&&S.teams.some(t=>t.id===ME.myTeam)) return ME.myTeam;
+  return S.teams.length?S.teams[0].id:null;
+}
+const p1=x=>(x>=0?"+":"−")+Math.abs(x).toFixed(1);
+
+function renderLega(){
+  const vuoto=document.getElementById("leganodata"), corpo=document.getElementById("legabody");
+  if(!vuoto||!corpo) return;
+  const ok=legaOn();
+  vuoto.hidden=ok; corpo.hidden=!ok;
+  if(!ok) return;
+  const off=document.getElementById("offnota");
+  if(off) off.textContent="+"+(S.lega.off||0)+" (la 1ª di lega è la "+legaSerieA(1)+"ª di serie A)";
+  const sel=document.getElementById("lme");
+  const mine=mySquadra();
+  if(sel) sel.innerHTML=S.teams.map(t=>`<option value="${t.id}"${t.id===mine?" selected":""}>${esc(t.name)}</option>`).join("");
+  const gi=document.getElementById("lgior");
+  if(gi) gi.max=legaGiornate();
+  const nota=document.getElementById("leganote");
+  if(nota){ const o=legaOggi(), gl=legaG();
+    nota.innerHTML=`${legaGiornate()} giornate · ${S.lega.teams.length} squadre`+
+      (gl===o?` · <span class="oggi">oggi</span>`:` · oggi è la <b>${o}</b>`); }
+  renderScontro(); renderStrip(); renderClaLega();
+}
+
+function renderScontro(){
+  const box=document.getElementById("scontro"); if(!box) return;
+  const tid=mySquadra(), gl=legaG();
+  const s=tid?scontro(tid,gl):null;
+  if(!s||!s.avv){
+    box.innerHTML=`<p class="hint">Questa squadra non è ancora abbinata a un nome del calendario di lega. Vai in <b>Lega e dati → Calendario di lega</b> e scegli quale nome le corrisponde.</p>`;
+    const h=document.getElementById("schead");
+    if(h) h.innerHTML=`<div class="scocc">Giornata ${gl} di lega</div>`;
+    document.getElementById("cmpreparti").innerHTML="";
+    document.getElementById("cmpundici").innerHTML="";
+    document.getElementById("pericolosi").innerHTML="";
+    return;
+  }
+  const mio=S.teams.find(t=>t.id===tid);
+  const head=document.getElementById("schead");
+  if(head) head.innerHTML=`
+    <div class="scocc">Giornata ${gl} di lega · ${s.ga}ª di serie A</div>
+    <div class="scmatch">
+      <span class="scteam io">${esc(mio?mio.name:"Io")}</span>
+      <span class="scvs">vs</span>
+      <span class="scteam loro">${esc(s.avv.nome)}</span>
+    </div>
+    <div class="scdove ${s.avv.casa?"casa":"fuori"}">${s.avv.casa?"in casa":"fuori casa"}</div>
+    ${(()=>{ const e=esitoDi(tid,gl); if(!e) return "";
+      const es=e.gf!==null?(e.gf>e.gc?"vinta":e.gf<e.gc?"persa":"pari")
+                          :(e.pf>e.pc?"vinta":e.pf<e.pc?"persa":"pari");
+      return `<div class="scfatta ${es}">
+        <span class="sfl">giocata</span>
+        ${e.gf!==null?`<span class="sfg">${e.gf}<i>–</i>${e.gc}</span>`:""}
+        <span class="sfp">${(e.pf||0).toFixed(1)} <i>a</i> ${(e.pc||0).toFixed(1)}</span></div>`; })()}`;
+
+  if(!s.sua){
+    box.innerHTML=`<div class="scmain"><div class="scnum" style="color:var(--accent)">${s.mia.media.toFixed(1)}</div>
+      <div><b>${esc(s.avv.nome)}</b> non è abbinato a nessuna squadra dell'asta, quindi la sua rosa non la conosco.
+      <div class="hint">Il tuo atteso per questa giornata è ${s.mia.media.toFixed(1)} con il ${esc(s.mia.mod)}.</div></div></div>`;
+    renderReparti(s); renderUndici(s); renderPericolosi(s);
+    return;
+  }
+  const pv=Math.round(s.pVinco*100);
+  const col=s.pVinco>=0.58?"var(--ok)":s.pVinco<=0.42?"var(--crit)":"var(--warn)";
+  const cons={
+    rischio:["Alza il rischio","Sei sfavorito: con la media sotto, è la varianza a farti vincere. Meglio l'attaccante che segna o niente della punta da 6 fisso, e il portiere di una squadra che può fare clean sheet."],
+    prudenza:["Gioca prudente","Sei favorito: ogni scelta bizzarra lavora contro di te. Titolari sicuri, niente scommesse, e chi gioca poco resta fuori anche se costa tanto."],
+    pari:["È una partita aperta","Meno di due punti di scarto: qui la varianza conta poco e conta molto chi scende davvero in campo. Guarda le titolarità prima dei nomi."]
+  }[s.strategia];
+  box.innerHTML=`
+    <div class="legasc">
+      <div class="lsq">
+        <div class="lslab">tu</div>
+        <div class="lsnum">${s.mia.media.toFixed(1)}</div>
+        <div class="lssd">± ${s.mia.sd.toFixed(1)} · ${esc(s.mia.mod)}</div>
+      </div>
+      <div class="lsmid">
+        <div class="lsprob" style="color:${col}">${pv}%</div>
+        <div class="lsplab">probabilità di vincere</div>
+        <div class="lsbar"><i style="width:${pv}%;background:${col}"></i></div>
+        <div class="lsdiff">${p1(s.diff)} punti attesi</div>
+      </div>
+      <div class="lsq">
+        <div class="lslab">${esc(s.avv.nome)}</div>
+        <div class="lsnum">${s.sua.media.toFixed(1)}</div>
+        <div class="lssd">± ${s.sua.sd.toFixed(1)} · ${esc(s.sua.mod)}</div>
+      </div>
+    </div>
+    <div class="lscons ${s.strategia}">
+      <b>${cons[0]}</b>
+      <p>${cons[1]}</p>
+    </div>`;
+  renderReparti(s); renderUndici(s); renderPericolosi(s);
+}
+
+function renderReparti(s){
+  const box=document.getElementById("cmpreparti"); if(!box) return;
+  if(!s.sua){ box.innerHTML=`<p class="hint">Serve l'abbinamento dell'avversario per fare il confronto.</p>`; return; }
+  const nomi={P:"Portiere",D:"Difesa",C:"Centrocampo",A:"Attacco"};
+  box.innerHTML=ROLES.map(r=>{
+    const a=s.mia.perRuolo[r]||0, b=s.sua.perRuolo[r]||0;
+    // quanti ne schiera ciascuno: con moduli diversi i totali non sono confrontabili
+    const na=s.mia.xi.filter(x=>x.p.r===r).length, nb=s.sua.xi.filter(x=>x.p.r===r).length;
+    const tot=Math.max(a,b,1), pa=a/tot*100, pb=b/tot*100;
+    const d=a-b, col=d>=1.5?"var(--ok)":d<=-1.5?"var(--crit)":"var(--muted)";
+    return `<div class="cmprow">
+      <div class="cmplab">${nomi[r]}</div>
+      <div class="cmpbars">
+        <div class="cmpb mine"><span class="tr"><i style="width:${pa.toFixed(1)}%"></i></span><span class="v">${a.toFixed(1)} <em>×${na}</em></span></div>
+        <div class="cmpb his"><span class="tr"><i style="width:${pb.toFixed(1)}%"></i></span><span class="v">${b.toFixed(1)} <em>×${nb}</em></span></div>
+      </div>
+      <div class="cmpd" style="color:${col}">${p1(d)}</div>
+    </div>`;
+  }).join("")+`<p class="hint" style="margin-top:10px">La barra chiara sei tu, quella scura l'avversario; <b>×n</b> è quanti ne schiera ciascuno. Con moduli diversi il totale di un reparto non basta: tre attaccanti fanno più punti di due anche quando valgono meno, quindi guarda il ×n prima del segno.</p>`;
+}
+
+function renderUndici(s){
+  const box=document.getElementById("cmpundici"); if(!box) return;
+  box.innerHTML=`<div class="undlist">`+s.mia.xi.map(x=>{
+    const a=x.a, fx=a.fx;
+    const dur=fx?fixDiff(fx.opp,isOff(x.p.r),fx.home):3;
+    const c=dur<=2.2?"var(--ok)":dur>=3.6?"var(--crit)":"var(--warn)";
+    return `<div class="undrow">
+      <span class="rm ${x.p.r}">${x.p.r}</span>
+      <span class="undn">${esc(x.p.n)}<em>${esc(x.p.s||"")}${fx?" · "+(fx.home?"":"a ")+ABBR(fx.opp):""}</em></span>
+      <span class="undsd" title="quanto oscilla">±${a.sd.toFixed(1)}</span>
+      <span class="undd" style="background:${c}"></span>
+      <b class="undv">${x.atteso.toFixed(1)}</b>
+    </div>`;
+  }).join("")+`</div>
+  <p class="hint" style="margin-top:10px">Il pallino è la durezza della partita di serie A; ± è quanto quel giocatore può oscillare. Chi ha il ± alto è la tua arma quando sei sfavorito.</p>`;
+}
+
+function renderStrip(){
+  const box=document.getElementById("legastrip"); if(!box) return;
+  const tid=mySquadra();
+  const righe=tid?legaIncroci(tid):[];
+  if(!righe.length){ box.innerHTML=`<p class="hint">Abbina le squadre dell'asta ai nomi del calendario per vedere le giornate.</p>`; return; }
+  const cur=legaG();
+  const nerCol=n=>n>=68?"var(--crit)":n>=50?"var(--warn)":"var(--ok)";
+  box.innerHTML=`<div class="lgrid">`+righe.map(r=>{
+    const p=Math.round(r.pVinco*100);
+    return `<button class="lcell${r.gl===cur?" on":""}" data-gl="${r.gl}" title="giornata ${r.gl} di lega · ${r.ga}ª di serie A">
+      <span class="lg">g${r.gl}</span>
+      <span class="lavv">${esc(r.avv.nome)}</span>
+      <span class="lprob" style="color:${p>=58?"var(--ok)":p<=42?"var(--crit)":"var(--warn)"}">${p}%</span>
+      <span class="lner"><i style="width:${r.nera}%;background:${nerCol(r.nera)}"></i></span>
+    </button>`;
+  }).join("")+`</div>
+  <p class="hint" style="margin-top:10px">La percentuale è la probabilità di vincere quella giornata; la barra sotto mette insieme la forza dell'avversario e la durezza del turno di serie A per i tuoi. Clicca una giornata per aprirla sopra.</p>`;
+  const peggio=righe.slice().sort((a,b)=>b.nera-a.nera)[0];
+  const meglio=righe.slice().sort((a,b)=>a.nera-b.nera)[0];
+  if(peggio&&meglio) box.insertAdjacentHTML("beforeend",
+    `<p class="hint" style="margin-top:4px">La giornata peggiore è la <b>${peggio.gl}</b> contro ${esc(peggio.avv.nome)} (${peggio.ga}ª di serie A); la più comoda la <b>${meglio.gl}</b> contro ${esc(meglio.avv.nome)}.</p>`);
+}
+
+/* ── da chi arriva il pericolo ───────────────────────────────────── */
+function renderPericolosi(s){
+  const box=document.getElementById("pericolosi"); if(!box) return;
+  const card=document.getElementById("pericard");
+  if(!s.avv||!s.avv.tid){
+    if(card) card.hidden=true;
+    box.innerHTML=""; return;
+  }
+  if(card) card.hidden=false;
+  const lista=pericolosi(s.avv.tid,s.ga,6);
+  if(!lista.length){ box.innerHTML=`<p class="hint">Non conosco la rosa di ${esc(s.avv.nome)}.</p>`; return; }
+  const max=lista[0].tetto||1;
+  box.innerHTML=`<div class="perlist">`+lista.map((x,i)=>{
+    const fx=x.a.fx;
+    return `<div class="perrow${i===0?" primo":""}">
+      <span class="rm ${x.p.r}">${x.p.r}</span>
+      <span class="pern">${esc(x.p.n)}${x.rig?`<b class="perig" title="primo rigorista">R</b>`:""}
+        <em>${esc(x.p.s||"")}${fx?" · "+(fx.home?"":"a ")+ABBR(fx.opp):""} · ${esc(x.perche)}</em></span>
+      <span class="perbar"><i style="width:${(x.tetto/max*100).toFixed(0)}%"></i></span>
+      <span class="permed">${x.atteso.toFixed(1)}</span>
+      <b class="pertet">${x.tetto.toFixed(1)}</b>
+    </div>`;
+  }).join("")+`</div>
+  <p class="hint" style="margin-top:10px">Ordinati per <b>tetto</b>, non per media: il tetto è quanto quel giocatore fa in una giornata buona — il valore che supera circa una volta su dieci. Il primo numero è la sua media attesa. Un difensore da 6 fisso non ti ribalta una giornata, una punta che segna una volta su tre sì, ed è per questo che l'ordine è questo. <b>R</b> è il primo rigorista.</p>`;
+}
+
+/* ══ 19. Mercato: scambi e svincoli ═════════════════════════════════ */
+let mkModo="scambio";
+const optSq=sel=>S.teams.map(t=>`<option value="${t.id}"${t.id===sel?" selected":""}>${esc(t.name)}</option>`).join("");
+function optRosa(tid,sel,ruolo){
+  const R=roster(tid);
+  const tutti=ROLES.flatMap(r=>R[r].map(x=>x.p)).filter(p=>!ruolo||p.r===ruolo);
+  if(!tutti.length) return `<option value="">— nessuno ${ruolo?"in questo ruolo":""} —</option>`;
+  // il cognome per primo: la ricerca a tastiera dei menu confronta dall'inizio
+  // della riga, e con "P · " davanti digitare il cognome non trovava niente
+  return tutti.map(p=>`<option value="${p.id}"${+sel===p.id?" selected":""}>${esc(p.n)} · ${esc(p.r)} ${esc(p.s||"")} — ${prezzoDi(p.id)} cr</option>`).join("");
+}
+/* ── la ricerca fra gli svincolati ──────────────────────────────────
+   Erano quattrocento voci in un menu a tendina, e la ricerca a tastiera
+   del browser confronta dall'inizio della riga: con "A · " davanti,
+   digitare il cognome non trovava mai niente. Qui si cerca DENTRO il
+   nome e dentro la squadra, come nella console di chiamata. */
+let svSel=null, svHits=[], svCur=-1;
+function liberiDi(ruolo,q){
+  const s=(q||"").trim().toLowerCase();
+  let l=PL.filter(p=>!S.assign[p.id]&&(!ruolo||p.r===ruolo));
+  if(s) l=l.filter(p=>p.n.toLowerCase().includes(s)||(p.s||"").toLowerCase().includes(s));
+  return l.sort((a,b)=>{
+    if(s){ const an=a.n.toLowerCase().startsWith(s)?0:1, bn=b.n.toLowerCase().startsWith(s)?0:1;
+           if(an!==bn) return an-bn; }
+    return b.q-a.q||a.n.localeCompare(b.n);
+  }).slice(0,12);
+}
+function renderSvRicerca(){
+  const inp=document.getElementById("svq"), res=document.getElementById("svres");
+  if(!inp||!res) return;
+  const o=+val("svOut"), gO=o?giocatoreDi(o):null, ruolo=gO?gO.r:null;
+  // con l'articolo giusto: "fra gli attaccanti", non "fra i attaccanti"
+  const RNOME={P:["i portieri","portiere"],D:["i difensori","difensore"],
+               C:["i centrocampisti","centrocampista"],A:["gli attaccanti","attaccante"]};
+  const rn=RNOME[ruolo]||["i giocatori","giocatore"];
+  inp.placeholder=ruolo?`Cerca fra ${rn[0]} svincolati…`:"Cerca per cognome o squadra…";
+  const q=inp.value.trim();
+  if(q.length<2){ svHits=[]; res.innerHTML=""; return; }
+  svHits=liberiDi(ruolo,q); svCur=svHits.length?0:-1;
+  res.innerHTML=svHits.length
+    ? svHits.map((p,i)=>`<button data-svi="${i}" class="${i===svCur?"cur":""}">
+        <span class="chip ${p.r}">${p.r}</span>
+        <span style="flex:1;min-width:0"><b>${esc(p.n)}</b> ${titDot(p)}${rigBadge(p)} <span class="pteam">${esc(p.s||"")}</span></span>
+        <span class="mono" style="font-size:12.5px;color:var(--muted)">q ${p.q}</span></button>`).join("")
+    : `<button disabled style="opacity:.6">Nessun ${rn[1]} svincolato con questo nome</button>`;
+}
+function scegliSvincolato(i){
+  if(i<0||i>=svHits.length) return;
+  svSel=svHits[i];
+  document.getElementById("svq").value="";
+  svHits=[]; document.getElementById("svres").innerHTML="";
+  renderSvScelto(); renderSvEsito();
+}
+function renderSvScelto(){
+  const box=document.getElementById("svscelto"); if(!box) return;
+  // se nel frattempo è stato assegnato o ha cambiato ruolo, la scelta decade
+  const o=+val("svOut"), gO=o?giocatoreDi(o):null;
+  if(svSel&&(S.assign[svSel.id]||(gO&&svSel.r!==gO.r))) svSel=null;
+  box.innerHTML=svSel
+    ? `<div class="mkpick"><span class="chip ${svSel.r}">${svSel.r}</span>
+         <span class="mkpn"><b>${esc(svSel.n)}</b> <span class="pteam">${esc(svSel.s||"")}</span> · q ${svSel.q}</span>
+         <button class="btn sm" id="svclear">Cambia</button></div>`
+    : `<p class="hint" style="margin:6px 0 0">Nessuno scelto: digita almeno due lettere del cognome.</p>`;
+}
+const val=id=>{const e=document.getElementById(id);return e?e.value:"";};
+const num=id=>{const e=document.getElementById(id);const n=parseInt(e?e.value:"");return isFinite(n)?n:0;};
+
+function renderMercato(){
+  const box=document.getElementById("mercato"); if(!box) return;
+  if(!S.teams.length) return;
+  document.getElementById("mkscambio").hidden=mkModo!=="scambio";
+  document.getElementById("mksvincolo").hidden=mkModo!=="svincolo";
+  document.querySelectorAll("#mkseg button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.mk===mkModo?"true":"false"));
+  for(const id of ["scG","svG"]){ const e=document.getElementById(id); if(e&&!e.value) e.value=giornataOggi(); }
+
+  // ── scambio: scelta la prima squadra, la seconda non può essere la stessa;
+  //    scelto il primo giocatore, il secondo elenco si restringe al suo ruolo
+  const ta=+val("scA")||S.teams[0].id;
+  let tb=+val("scB"); if(!tb||tb===ta) tb=(S.teams.find(t=>t.id!==ta)||{}).id;
+  document.getElementById("scA").innerHTML=optSq(ta);
+  document.getElementById("scB").innerHTML=S.teams.filter(t=>t.id!==ta)
+    .map(t=>`<option value="${t.id}"${t.id===tb?" selected":""}>${esc(t.name)}</option>`).join("");
+  const pa=+val("scPA");
+  document.getElementById("scPA").innerHTML=optRosa(ta,pa);
+  const paNow=+val("scPA"), gA=paNow?giocatoreDi(paNow):null;
+  document.getElementById("scPB").innerHTML=optRosa(tb,+val("scPB"),gA?gA.r:null);
+  renderScEsito();
+
+  // ── svincolo
+  const tv=+val("svT")||S.teams[0].id;
+  document.getElementById("svT").innerHTML=optSq(tv);
+  document.getElementById("svOut").innerHTML=optRosa(tv,+val("svOut"));
+  renderSvScelto(); renderSvRicerca(); renderSvEsito();
+
+  renderStoriaMercato();
+}
+function renderScEsito(){
+  const el=document.getElementById("scesito"); if(!el) return;
+  const a=+val("scPA"), b=+val("scPB");
+  if(!a||!b){ el.innerHTML=`<span class="hint">Scegli i due giocatori.</span>`; return; }
+  const err=verificaScambio(a,b);
+  if(err){ el.innerHTML=`<span class="mkno">${esc(err)}</span>`; return; }
+  const ga=giocatoreDi(a), gb=giocatoreDi(b);
+  el.innerHTML=`<span class="mkok">${esc(ga.n)} (${prezzoDi(a)} cr) ⇄ ${esc(gb.n)} (${prezzoDi(b)} cr)
+    · crediti invariati per entrambi</span>`;
+}
+function renderSvEsito(){
+  const el=document.getElementById("svesito"); if(!el) return;
+  const t=+val("svT"), o=+val("svOut"), i=svSel?svSel.id:0;
+  if(!t||!o||!i){ el.innerHTML=`<span class="hint">Scegli chi esce e chi entra.</span>`; return; }
+  const err=verificaSvincolo(t,o,i);
+  if(err){ el.innerHTML=`<span class="mkno">${esc(err)}</span>`; return; }
+  const R=num("svR"), C=num("svC"), ora=stats(t).left, poi=ora+R-C;
+  const male=poi<0;
+  el.innerHTML=`<span class="${male?"mkno":"mkok"}">crediti ${ora} → <b>${poi}</b>${male?" — non bastano":""}</span>`;
+}
+function renderStoriaMercato(){
+  const box=document.getElementById("mkstoria"); if(!box) return;
+  const ms=moves().slice().reverse();
+  if(!ms.length){ box.innerHTML=`<p class="hint">Nessun movimento registrato.</p>`; return; }
+  box.innerHTML=`<div class="gt2">Movimenti registrati</div><div class="mklist">`+ms.map(m=>{
+    const righe=m.voci.map(v=>{
+      const g=giocatoreDi(v.pid);
+      const da=v.da===null?"svincolati":teamName(v.da), a=v.a===null?"svincolati":teamName(v.a);
+      return `<span class="mkmv">${esc(g?g.r:"?")} · <b>${esc(g?g.n:"?")}</b> ${esc(da)} → ${esc(a)}</span>`;
+    }).join("");
+    const cr=m.tipo==="svincolo"?` · rimborso ${m.rimborso} cr, costo ${m.costo} cr`:"";
+    return `<div class="mkrow">
+      <span class="mkg">g${m.g}</span>
+      <span class="mktipo ${m.tipo}">${m.tipo}</span>
+      <span class="mkchi">${righe}<em>${new Date(m.ts).toLocaleDateString("it-IT",{day:"numeric",month:"short"})}${cr}</em></span>
+      <button class="btn sm" data-annullamov="${m.id}">Annulla</button>
+    </div>`;
+  }).join("")+`</div>`;
+}
+
+/* La riga dei passaggi di proprietà: compare solo se il giocatore si è
+   davvero mosso, altrimenti resta il semplice "preso da X per Y crediti". */
+function storiaPossessi(pid){
+  const suoi=moves().filter(m=>m.voci.some(v=>+v.pid===+pid));
+  if(!suoi.length) return "";
+  const tappe=[];
+  let da=1, chi=ownerAt(pid,1);
+  for(const m of suoi){
+    if(m.g>da) tappe.push({da:da, a:m.g-1, chi:chi});
+    chi=(m.voci.find(v=>+v.pid===+pid)||{}).a;
+    da=m.g;
+  }
+  tappe.push({da:da, a:null, chi:chi});
+  return tappe.map(t=>{
+    const nome=t.chi===null?"svincolato":teamName(t.chi);
+    const arco=t.a?`g${t.da}\u2013${t.a}`:`g${t.da}\u2013`;
+    return `<span class="poss"><em>${arco}</em> <b>${esc(nome)}</b></span>`;
+  }).join(" ");
+}
+
+/* ══ 22. Risultati e classifica di serie A ══════════════════════════ */
+let risG=null;
+function renderRisultati(){
+  const card=document.getElementById("riscard"); if(!card) return;
+  const gg=giornateGiocate();
+  const note=document.getElementById("risnote");
+  const vuoto=document.getElementById("risvuoto"), wrap=document.getElementById("riswrap");
+  if(vuoto) vuoto.hidden=!!gg.length;
+  if(wrap) wrap.hidden=!gg.length;
+  if(!gg.length){ if(note) note.textContent=""; return; }
+  if(risG===null||!gg.includes(risG)) risG=gg[gg.length-1];
+  const lista=risultatiDi(risG);
+  if(note) note.textContent=gg.length===1?"1 giornata caricata":`${gg.length} giornate caricate`;
+  const gel=document.getElementById("risg"); if(gel) gel.textContent=`${risG}ª giornata`;
+  const pre=document.getElementById("risprev"), nex=document.getElementById("risnext");
+  if(pre) pre.disabled=gg.indexOf(risG)<=0;
+  if(nex) nex.disabled=gg.indexOf(risG)>=gg.length-1;
+
+  const box=document.getElementById("risgrid");
+  if(box) box.innerHTML=lista.length?lista.map(r=>
+    `<div class="rispart${r.torna===false?" dubbia":""}"${r.torna===false?' title="i gol dei giocatori e quelli subiti dal portiere non tornano: forse il file di quella giornata è parziale"':""}>
+      <span class="rt ${r.gc>r.go?"win":""}">${esc(r.casa)}</span>
+      <span class="rs${r.gc===r.go?" pari":""}">${r.gc}<i>–</i>${r.go}</span>
+      <span class="rt ${r.go>r.gc?"win":""}">${esc(r.osp)}</span></div>`
+  ).join(""):`<p class="hint">Di questa giornata non ho abbastanza voti per ricostruire le partite.</p>`;
+
+  const cla=classificaSerieA();
+  const cb=document.getElementById("clabody");
+  if(cb) cb.innerHTML=`<tr class="clahead"><td></td><td>Squadra</td>
+      <td class="num">G</td><td class="num">V</td><td class="num">N</td><td class="num">P</td>
+      <td class="num">Gol</td><td class="num">DR</td><td class="num">Pt</td></tr>`+
+    cla.map((x,i)=>{ const dr=x.gf-x.gs;
+    return `<tr><td class="mono cpos">${i+1}</td>
+      <td class="tname">${esc(x.t)}</td>
+      <td class="num csm">${x.g}</td>
+      <td class="num csm">${x.v}</td>
+      <td class="num csm">${x.n}</td>
+      <td class="num csm">${x.p}</td>
+      <td class="num csm">${x.gf}:${x.gs}</td>
+      <td class="num csm" style="color:${dr>0?"var(--ok)":dr<0?"var(--crit)":"var(--muted)"}">${dr>0?"+":""}${dr}</td>
+      <td class="num cpt">${x.pt}</td></tr>`; }).join("");
+
+  const f=document.getElementById("risfonte");
+  const dubbie=Object.values(risultati()).flat().filter(r=>r.torna===false).length;
+  if(f) f.innerHTML=`Ricavati dai voti, senza importare altro: i gol dei giocatori di una squadra da una parte, i gol subiti dal suo portiere dall'altra. Le due strade si controllano a vicenda${
+    dubbie?` — e in <b>${dubbie}</b> ${dubbie===1?"partita non tornano":"partite non tornano"}, segno che quel file di voti è parziale.`:", e tornano tutte."}
+    La classifica vale ${gg.length===1?"sull'unica <b>giornata</b>":"sulle <b>"+gg.length+" giornate</b>"} di cui hai caricato i voti, non sul campionato intero.`;
+}
+
+/* ══ 24. Classifica di lega e verifica delle previsioni ═════════════ */
+function renderClaLega(){
+  const grid=document.getElementById("lclagrid"); if(!grid) return;
+  const gg=legaGiocate();
+  grid.hidden=!gg.length;
+  if(!gg.length) return;
+  const nota=document.getElementById("lclanote");
+  if(nota) nota.textContent=gg.length===1?"dopo 1 giornata":`dopo ${gg.length} giornate`;
+  const cla=classificaLega(), me=mySquadra(), mio=me!==null?legaIdx(me):null;
+  const cb=document.getElementById("lclabody");
+  if(cb) cb.innerHTML=`<tr class="clahead"><td></td><td>Squadra</td>
+      <td class="num">G</td><td class="num">V</td><td class="num">N</td><td class="num">P</td>
+      <td class="num">Gol</td><td class="num">Fantapunti</td><td class="num">Pt</td></tr>`+
+    cla.map((x,i)=>`<tr${x.i===mio?' class="claio"':""}>
+      <td class="mono cpos">${i+1}</td>
+      <td class="tname">${esc(x.nome)}</td>
+      <td class="num csm">${x.g}</td><td class="num csm">${x.v}</td>
+      <td class="num csm">${x.n}</td><td class="num csm">${x.p}</td>
+      <td class="num csm">${x.gf}:${x.gs}</td>
+      <td class="num csm">${x.pf.toFixed(1)}</td>
+      <td class="num cpt">${x.pt}</td></tr>`).join("");
+  renderVerifica();
+}
+function renderVerifica(){
+  const box=document.getElementById("lverifica"); if(!box) return;
+  const tid=mySquadra();
+  if(tid===null||tid===undefined){ box.innerHTML=`<p class="hint">Scegli qui sopra quale squadra sei.</p>`; return; }
+  const v=verifica(tid);
+  if(!v.length){ box.innerHTML=`<p class="hint">Nessuna giornata giocata ancora.</p>`; return; }
+  const s=sintesiVerifica(v);
+  const seg=x=>x>0?"+":"";
+  box.innerHTML=(s?`<div class="vsint">
+      <div class="vs1"><div class="vsv" style="color:${Math.abs(s.scarto)<4?"var(--ok)":Math.abs(s.scarto)<8?"var(--warn)":"var(--crit)"}">${seg(s.scarto)}${s.scarto.toFixed(1)}</div>
+        <div class="vsk">il mio scarto medio</div></div>
+      ${s.scartoAvv!==null?`<div class="vs1"><div class="vsv">${seg(s.scartoAvv)}${s.scartoAvv.toFixed(1)}</div>
+        <div class="vsk">quello degli avversari</div></div>`:""}
+      <div class="vs1"><div class="vsv">${s.centrate}<span style="color:var(--muted);font-size:16px">/${s.n}</span></div>
+        <div class="vsk">pronostici azzeccati</div></div>
+    </div>`:"")+
+    `<div class="vlist">`+v.map(x=>{
+      const sc=x.atteso!==null?x.pf-x.atteso:null;
+      const es=x.vinta>0?"vinta":x.vinta<0?"persa":"pari";
+      return `<div class="vrow">
+        <span class="vg">${x.gl}ª</span>
+        <span class="vavv">${esc(S.lega.teams[x.avv]||"?")}<i>${x.casa?"in casa":"fuori"}</i></span>
+        <span class="vpt ${es}">${x.gf!==null?`${x.gf}–${x.gc}`:es}</span>
+        <span class="vnum">${x.pf!==null?x.pf.toFixed(1):"—"}<i>fatti</i></span>
+        <span class="vnum">${x.atteso!==null?x.atteso.toFixed(1):"—"}<i>attesi</i></span>
+        <span class="vsc" style="color:${sc===null?"var(--muted)":sc>0?"var(--ok)":sc<0?"var(--crit)":"var(--muted)"}">${
+          sc===null?"":seg(sc)+sc.toFixed(1)}</span>
+      </div>`;
+    }).join("")+`</div>
+    <p class="hint" style="margin-top:10px">Lo scarto è quanto la tua rosa ha reso <b>in più o in meno</b> di quello che l'app si aspettava. Uno scarto grosso e sempre nello stesso verso vuol dire che la stima è tarata male; uno che salta di segno è solo la domenica che fa la domenica${
+      s&&s.n<4?" — e con così poche giornate non si può ancora dire niente":""}.</p>`;
+}
+
+/* ══ 25. «A che punto sei» ═══════════════════════════════════════════
+   La pagina dei dati era un elenco di sette schede tutte uguali, e per
+   sapere se mancava qualcosa bisognava aprirle una per una. Qui invece
+   c'è la risposta prima delle domande: cosa è caricato, fino a quando,
+   e cosa manca rispetto a oggi.                                        */
+function statoDati(){
+  const righe=[];
+  const oggi=giornataOggi();
+  const attesa=Math.max(0,oggi-1);          // l'ultima giornata già giocata
+  const gv=giornateGiocate(), ultimoV=gv.length?Math.max(...gv):0;
+  righe.push({
+    id:"c-voti", nome:"Voti di giornata", ogni:"ogni settimana",
+    stato: !gv.length?"todo" : ultimoV>=attesa?"ok":"todo",
+    valore: gv.length?`fino alla ${ultimoV}ª`:"nessuna",
+    nota: !gv.length ? "senza questi non c'è rendimento, né risultati di serie A"
+        : ultimoV>=attesa ? "in pari"
+        : attesa-ultimoV===1 ? `manca la ${attesa}ª` : `mancano dalla ${ultimoV+1}ª alla ${attesa}ª`
+  });
+  const gl=legaOn()?legaGiocate():[], ultimoL=gl.length?Math.max(...gl):0;
+  const attesaL=legaOn()?Math.max(0,legaOggi()-1):0;
+  righe.push({
+    id:"c-cal", nome:"Calendario di lega", ogni:"ogni settimana",
+    stato: !legaOn()?"todo" : ultimoL>=attesaL?"ok":"todo",
+    valore: !legaOn()?"non caricato" : gl.length?`risultati fino alla ${ultimoL}ª`:"solo gli incroci",
+    nota: !legaOn() ? "serve alla pagina Lega: chi affronti, e come giocartela"
+        : ultimoL>=attesaL ? "in pari"
+        : `riscaricalo: in lega si è giocato fino alla ${attesaL}ª`
+  });
+  const rm=S.roseMeta;
+  righe.push({
+    id:"c-rose", nome:"Rose della lega", ogni:"quando si muove il mercato", opz:true,
+    stato: rm?"ok":"opz",
+    valore: rm?`viste il ${new Date(rm.when).toLocaleDateString("it-IT",{day:"2-digit",month:"short"})}`:"mai",
+    nota: rm ? (rm.diverse?`allora ${rm.diverse} ${rm.diverse===1?"voce non combaciava":"voci non combaciavano"}`:"allora combaciava tutto")
+             : "il controllo che trova scambi e svincoli che nessuno ti ha detto"
+  });
+  const when=LISTMETA.when?new Date(LISTMETA.when).toLocaleDateString("it-IT",{day:"numeric",month:"short"}):null;
+  righe.push({
+    id:"c-listone", nome:"Listone quotazioni", ogni:"quando ne esce uno nuovo", opz:true,
+    stato:"ok", valore:`${PL.length} giocatori`,
+    nota: when?`caricato il ${when}`:"quello di partenza"
+  });
+  const fuori=Object.keys(S.out||{}).filter(k=>S.out[k]).length;
+  const sq=squalifiche().length, dif=diffidati().length;
+  righe.push({
+    tab:"infermeria", nome:"Infermeria", ogni:"gli infortuni a mano, le squalifiche da sole", opz:true,
+    stato: fuori||sq?"ok":"opz",
+    valore: (fuori||sq)?`${fuori+sq} fuori`:"nessuno fuori",
+    nota: sq?`${fuori?`${fuori} infortunat${fuori===1?"o":"i"}, `:""}${sq} squalificat${sq===1?"o":"i"}${dif?` · ${dif} in diffida`:""}`
+        : dif?`nessuno fuori, ma ${dif} in diffida`
+        : "gli infortuni nessun file li dà: li segni tu, e rientrano da soli"
+  });
+  return righe;
+}
+function renderStato(){
+  const box=document.getElementById("statolist"); if(!box) return;
+  const R=statoDati();
+  const manca=R.filter(x=>x.stato==="todo").length;
+  const nota=document.getElementById("statonota");
+  if(nota) nota.innerHTML=manca?`<span class="warn">${manca} ${manca===1?"cosa da fare":"cose da fare"}</span>`:"tutto in pari";
+  box.innerHTML=R.map(x=>`<div class="strow ${x.stato}">
+      <span class="stpal" title="${x.stato==="ok"?"a posto":x.stato==="todo"?"da fare":"facoltativo"}"></span>
+      <span class="stn">${esc(x.nome)}<i>${esc(x.ogni)}</i></span>
+      <span class="stv">${esc(x.valore)}</span>
+      <span class="stnota">${esc(x.nota)}</span>
+      ${x.id?`<button class="btn sm wr" data-vai="${x.id}">Apri</button>`
+            :x.tab?`<button class="btn sm wr" data-vaitab="${x.tab}">Apri</button>`:`<span class="stvuoto"></span>`}
+    </div>`).join("");
+}
+
+/* ══ 27. Infermeria ═════════════════════════════════════════════════ */
+let infHits=[], infOrd=(ME.infOrd||"ruolo");
+function nomeDi(pid){ const p=giocatoreDi(pid)||byId.get(+pid); return p?p:null; }
+function rigaInf(p,pid,tag,testo,bottone){
+  return `<div class="infrow">
+    <span class="chip ${p?p.r:"?"}">${p?p.r:"?"}</span>
+    <span class="infn"><b>${esc(p?p.n:"#"+pid)}</b> <span class="pteam">${esc(p&&p.s||"")}</span></span>
+    <span class="inftag ${tag}">${testo}</span>
+    ${bottone||""}
+  </div>`;
+}
+function renderInfermeria(){
+  const box=document.getElementById("inffuori"); if(!box) return;
+  const sq=squalifiche(), g=nextG();
+  const manuali=Object.keys(S.out||{}).filter(k=>S.out[k]);
+  const nota=document.getElementById("infnota");
+  const tot=manuali.length+sq.length;
+  if(nota) nota.innerHTML=tot?`<b>${tot}</b> fuori · prossima giornata la <b>${g}ª</b>`:`nessuno fuori · prossima giornata la <b>${g}ª</b>`;
+
+  /* una riga sola per due cose diverse: l'infortunio comincia quando lo
+     segni, la squalifica quando scatta. «da» è quel numero, e serve a
+     mettere in cima chi è fuori da più tempo.                          */
+  let righe=manuali.map(pid=>{
+    const inf=infoOut(pid)||{};
+    return {pid:+pid, p:nomeDi(pid), tipo:"inf", da:inf.da||0, ts:inf.ts||0};
+  }).concat(sq.map(s=>({pid:s.pid, p:nomeDi(s.pid), tipo:"squal", da:s.g, n:s.n, g:s.g})));
+
+  const q=(document.getElementById("inffiltro")||{}).value||"";
+  const qn=q.trim().toLowerCase();
+  const totPrima=righe.length;
+  if(qn.length) righe=righe.filter(x=>x.p&&((x.p.n||"").toLowerCase().includes(qn)||(x.p.s||"").toLowerCase().includes(qn)));
+
+  const RO={P:0,D:1,C:2,A:3};
+  const perNome=(a,b)=>((a.p&&a.p.n)||"").localeCompare((b.p&&b.p.n)||"");
+  if(infOrd==="da") righe.sort((a,b)=>a.da-b.da||a.ts-b.ts||perNome(a,b));
+  else if(infOrd==="nome") righe.sort(perNome);
+  else righe.sort((a,b)=>(RO[a.p&&a.p.r]??9)-(RO[b.p&&b.p.r]??9)||a.da-b.da||perNome(a,b));
+
+  for(const b of document.querySelectorAll("#inford button"))
+    b.setAttribute("aria-pressed", b.dataset.ord===infOrd?"true":"false");
+
+  box.innerHTML=righe.length? righe.map(x=>{
+    const quante=x.da?Math.max(0,g-x.da):0;
+    if(x.tipo==="squal") return rigaInf(x.p,x.pid,"squal",
+      `squalificato · salta la <b>${x.g}ª</b> <i>(${x.n}ª ammonizione)</i>`,
+      `<button class="btn sm wr" data-infsalta="${x.pid}-${x.g}" title="La tua lega non applica questa squalifica">Annulla</button>`);
+    return rigaInf(x.p,x.pid,"inf",
+      `infortunato${x.da?` · fuori dalla <b>${x.da}ª</b>${quante?` <i>(${quante} giornat${quante===1?"a":"e"})</i>`:" <i>(da questa)</i>"}`:""}`,
+      `<button class="btn sm wr" data-inftorna="${x.pid}">È tornato</button>`);
+  }).join("")
+   : totPrima ? `<p class="hint">Nessuno corrisponde a «${esc(q)}».</p>`
+   : `<p class="hint">Nessuno fuori. Gli infortunati li segni qui sopra; le squalifiche da cartellino le trova l'app da sola quando carichi i voti.</p>`;
+
+  const bar=document.querySelector(".infbar");
+  if(bar) bar.hidden=totPrima<2;      // con zero o un nome, filtrare non serve
+
+  const d=diffidati(), bd=document.getElementById("infdiff");
+  if(bd) bd.innerHTML=d.length
+    ? d.map(x=>{ const p=nomeDi(x.pid);
+        return rigaInf(p,x.pid,"diff",`<b>${x.amm}</b> ammonizioni — al prossimo giallo salta`,""); }).join("")
+    : `<p class="hint">Nessuno in diffida. Si diventa diffidati alla 4ª ammonizione, poi all'8ª, 12ª, 15ª, 17ª.</p>`;
+
+  const r=rossiDaVedere(), br=document.getElementById("infrossi");
+  if(br) br.innerHTML=r.length
+    ? r.map(x=>{ const p=nomeDi(x.pid);
+        return rigaInf(p,x.pid,"rosso",`espulso alla <b>${x.g}ª</b>`,
+          `<button class="btn sm wr" data-infout="${x.pid}">Mettilo fuori</button>`); }).join("")
+      +`<p class="hint" style="margin-top:9px">Quante giornate lo decide il giudice sportivo il martedì: nessun file lo dice, quindi decidi tu. Se lo metti fuori rientrerà da solo appena rigioca.</p>`
+    : `<p class="hint">Nessun espulso nell'ultima giornata caricata.</p>`;
+
+  const sw=document.getElementById("squalon");
+  if(sw) sw.checked=S.squalOn!==false;
+  renderInfRicerca();
+}
+function renderInfRicerca(){
+  const inp=document.getElementById("infq"), res=document.getElementById("infres");
+  if(!inp||!res) return;
+  const q=inp.value.trim().toLowerCase();
+  if(q.length<2){ infHits=[]; res.innerHTML=""; return; }
+  const mio=mySquadra();
+  infHits=PL.filter(p=>!isOut(p.id)&&(p.n.toLowerCase().includes(q)||(p.s||"").toLowerCase().includes(q)))
+    // prima i miei: sono quelli che ti interessa davvero mettere fuori
+    .sort((a,b)=>{ const am=(S.assign[a.id]||{}).team===mio?0:1, bm=(S.assign[b.id]||{}).team===mio?0:1;
+                   return am-bm||b.q-a.q||a.n.localeCompare(b.n); })
+    .slice(0,10);
+  res.innerHTML=infHits.length
+    ? infHits.map(p=>{ const a=S.assign[p.id];
+        return `<button data-infpick="${p.id}">
+        <span class="chip ${p.r}">${p.r}</span>
+        <span class="pnome"><b>${esc(p.n)}</b> ${titDot(p)} <span class="pteam">${esc(p.s||"")}</span></span>
+        <span class="mono" style="font-size:12px;white-space:nowrap;color:${a&&a.team===mio?"var(--accent)":"var(--muted)"}">${
+          a?esc(teamName(a.team)):"svincolato"}</span></button>`; }).join("")
+    : `<button disabled style="opacity:.6">Nessun giocatore disponibile con questo nome</button>`;
+}
+

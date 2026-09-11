@@ -4,12 +4,12 @@
 #   ./build.sh                 → app vuota, il listone lo importi dall'interfaccia
 #   ./build.sh dati/           → app con i dati già dentro (vedi dati/LEGGIMI.md)
 #
-# Il risultato è SalaAsta-Fantacalcio.html: si apre con un doppio clic, non ha
+# Il risultato è Fantaregia.html: si apre con un doppio clic, non ha
 # bisogno di un server e non chiama la rete se non per i font e per il lettore
 # xlsx, che serve solo quando importi un file.
 set -euo pipefail
 DATI="${1:-}"
-OUT="${OUT:-SalaAsta-Fantacalcio.html}"
+OUT="${OUT:-Fantaregia.html}"
 
 python3 - "$DATI" "$OUT" <<'PY'
 import json, os, re, sys
