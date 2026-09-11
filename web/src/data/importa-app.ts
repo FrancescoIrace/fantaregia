@@ -55,21 +55,26 @@ export function leggiFileApp(testo: string): FileApp {
     if (!sh.teams || !sh.assign) throw new Error('non è un backup di Fantaregia')
     return { origine: 'backup', players: [], cal: null, rig: null, hist: null, shared: sh, meta: d.meta ?? null }
   }
+  const p = leggiPagina(testo)
+  if (!p.shared || !p.shared.teams || !p.shared.assign)
+    throw new Error('la pagina non contiene una lega: puoi usarla per caricare listone, calendario, rigoristi e statistiche in una lega che hai già')
+  return { ...p, origine: 'pagina', shared: p.shared }
+}
+
+/** i file che una pagina dell'app porta con sé, anche quando non c'è una lega dentro */
+export function leggiPagina(testo: string): Omit<FileApp, 'origine' | 'shared'> & { shared: Partial<StatoLega> | null } {
   const i = testo.indexOf(APERTURA)
   if (i < 0) throw new Error('non trovo i dati: il file non sembra una pagina di Fantaregia')
   const fine = testo.indexOf('</script>', i)
   const v = leggiBlocco(testo.slice(i + APERTURA.length, fine < 0 ? undefined : fine))
-  const sh = v.SHARED as Partial<StatoLega> | null
-  if (!sh || !sh.teams || !sh.assign)
-    throw new Error('la pagina non contiene una lega: è una build vuota, non quella scaricata dall\'app in uso')
   const cal = v.CAL as Calendario | undefined
+  const rig = v.RIG as Rigoristi | undefined, hist = v.HIST as Storico | undefined
   return {
-    origine: 'pagina',
     players: (v.PLAYERS as GiocatoreGrezzo[] | undefined) ?? [],
     cal: cal && cal.teams && cal.teams.length ? cal : null,
-    rig: (v.RIG as Rigoristi | undefined) ?? null,
-    hist: (v.HIST as Storico | undefined) ?? null,
-    shared: sh,
+    rig: rig && Object.keys(rig).length ? rig : null,
+    hist: hist && Object.keys(hist).length ? hist : null,
+    shared: (v.SHARED as Partial<StatoLega> | null | undefined) ?? null,
     meta: (v.LISTMETA as FileApp['meta']) ?? null,
   }
 }

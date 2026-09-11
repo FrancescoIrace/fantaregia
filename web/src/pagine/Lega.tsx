@@ -5,6 +5,7 @@ import { useLega } from '../data/useLega.ts'
 import { ROLES } from '../domain/motore.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
+import CaricaDati from './CaricaDati.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -87,6 +88,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         </div>
         <div className="mt-3"><Suggerimento>Crediti, tetto e giudizio vengono dal motore dell'app a file singolo, sui dati di questa lega.</Suggerimento></div>
       </Card>
+
+      {io && io.ruolo !== 'lettore' && <CaricaDati legaId={id} righe={righe} motore={motore} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card titolo="Cosa c'è">

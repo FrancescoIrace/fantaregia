@@ -8,9 +8,10 @@ CLAUDE.md
 # File Excel: possono contenere listoni o voti reali
 *.xlsx
 
-# Output della build: si rigenera con ./build.sh, non va committato
-Fantaregia.html
-SalaAsta-Fantacalcio.html
+# Output della build e pagine scaricate dall'app (Fantaregia_6.html, …):
+# portano dentro listone, voti e la lega, ovunque stiano nel repo
+Fantaregia*.html
+SalaAsta*.html
 
 # Backup dell'asta esportati dall'app: portano i nomi dei partecipanti alla lega
 asta_reale.json

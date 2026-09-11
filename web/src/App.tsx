@@ -1,11 +1,14 @@
+import { lazy, Suspense } from 'react'
 import { Link, Route, Routes } from 'react-router'
 import { supabase, supabaseConfigurato } from './lib/supabase.ts'
 import { useSessione } from './lib/sessione.ts'
 import Accesso from './pagine/Accesso.tsx'
 import Invito from './pagine/Invito.tsx'
-import Lega from './pagine/Lega.tsx'
 import Leghe from './pagine/Leghe.tsx'
 import { Avviso } from './ui.tsx'
+
+// la pagina della lega porta con sé motore e caricamenti: si scarica quando serve
+const Lega = lazy(() => import('./pagine/Lega.tsx'))
 
 export default function App() {
   const { sessione, pronto } = useSessione()
@@ -31,11 +34,13 @@ export default function App() {
         ) : !pronto ? (
           <p className="text-muted">Un attimo…</p>
         ) : (
-          <Routes>
-            <Route path="/invito/:codice" element={<Invito haSessione={!!sessione} />} />
-            <Route path="/lega/:id" element={sessione ? <Lega utenteId={sessione.user.id} /> : <Accesso />} />
-            <Route path="*" element={sessione ? <Leghe utenteId={sessione.user.id} /> : <Accesso />} />
-          </Routes>
+          <Suspense fallback={<p className="text-muted">Un attimo…</p>}>
+            <Routes>
+              <Route path="/invito/:codice" element={<Invito haSessione={!!sessione} />} />
+              <Route path="/lega/:id" element={sessione ? <Lega utenteId={sessione.user.id} /> : <Accesso />} />
+              <Route path="*" element={sessione ? <Leghe utenteId={sessione.user.id} /> : <Accesso />} />
+            </Routes>
+          </Suspense>
         )}
       </main>
     </div>
