@@ -73,6 +73,30 @@ export async function assegna(legaId: string, giocatoreId: number, squadraId: nu
   return data
 }
 
+/* ── infermeria: S.out, S.squalSalta, S.squalOn ── */
+export async function segnaIndisponibile(legaId: string, giocatoreId: number, motivo: string, daGiornata: number) {
+  const { error } = await supabase.from('indisponibili').upsert(
+    { lega_id: legaId, giocatore_id: giocatoreId, motivo, da_giornata: daGiornata, segnato_il: new Date().toISOString() },
+    { onConflict: 'lega_id,giocatore_id' },
+  )
+  if (error) throw new Error(error.message)
+}
+export async function togliIndisponibile(legaId: string, giocatoreId: number) {
+  const { error } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).eq('giocatore_id', giocatoreId)
+  if (error) throw new Error(error.message)
+}
+/** la lega non applica questa squalifica: resta annotata e il motore la salta */
+export async function annullaSqualifica(legaId: string, giocatoreId: number, giornata: number) {
+  const { error } = await supabase.from('squalifiche_annullate').upsert(
+    { lega_id: legaId, giocatore_id: giocatoreId, giornata }, { onConflict: 'lega_id,giocatore_id,giornata' },
+  )
+  if (error) throw new Error(error.message)
+}
+export async function impostaSqualifiche(legaId: string, attive: boolean) {
+  const { error } = await supabase.from('leghe').update({ squal_on: attive }).eq('id', legaId)
+  if (error) throw new Error(error.message)
+}
+
 /** «la mia squadra»: privata anche lei, in preferenze */
 export async function salvaMiaSquadra(legaId: string, utenteId: string, squadraId: number | null) {
   const { error } = await supabase.from('preferenze').upsert(
