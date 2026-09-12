@@ -403,6 +403,96 @@ table.list tbody tr:hover{background:var(--surface-2)}
   .vnum,.vsc{grid-column:span 1;text-align:left}
 }
 
+/* ══ Rose: riepilogo e giudizi ═══════════════════════════════════════ */
+table.list.riep{min-width:820px}
+.rosegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:15px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.rosecard{overflow:hidden}
+.rosecard>summary.rosehead{display:flex;align-items:center;gap:9px;padding:11px 14px;
+  border-bottom:1px solid var(--line);cursor:pointer;list-style:none;user-select:none}
+.rosecard>summary::-webkit-details-marker{display:none}
+.rosecard>summary:hover{background:var(--surface-2)}
+.rosecard>summary .tw{font-size:11px;color:var(--muted);transition:transform .15s ease;flex:none}
+.rosecard[open]>summary .tw{transform:rotate(90deg)}
+.rosecard:not([open])>summary{border-bottom:0}
+@media(prefers-reduced-motion:reduce){.rosecard>summary .tw{transition:none}}
+.rosehead{display:flex;align-items:baseline;gap:9px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.rosehead h3{font-family:var(--f-display);font-size:15px;font-weight:600;margin:0;flex:1;letter-spacing:-.01em}
+.rosehead .voto{font-family:var(--f-mono);font-size:19px;font-weight:800;line-height:1;margin-left:auto;padding-right:9px}
+.rosesec{padding:7px 14px;border-bottom:1px solid var(--line)}
+.rosesec:last-child{border-bottom:0}
+.rosesec .sh{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600;
+  margin-bottom:4px;display:flex;justify-content:space-between}
+.rp{display:flex;align-items:center;gap:7px;font-size:13.5px;padding:2px 0}
+.rp .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp .pz{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rp .x{background:none;border:0;color:var(--line-strong);font-size:14px;padding:0 2px;line-height:1}
+.rp .x:hover{color:var(--crit)}
+.rp.hole{color:var(--muted);font-style:italic;font-size:12.5px}
+.rp.trovato{background:var(--warn-soft);border-radius:6px;margin:0 -4px;padding-left:4px;padding-right:4px}
+.giud{padding:11px 14px;border-top:1px solid var(--line);background:var(--surface-2)}
+.gh{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-bottom:9px}
+.gh b{font-family:var(--f-mono);font-size:15px;letter-spacing:0}
+.gparts{display:flex;flex-direction:column;gap:5px}
+.gpart{display:grid;grid-template-columns:86px 1fr 44px;gap:8px;align-items:center;font-size:11.5px}
+.gpl{color:var(--ink)}
+.gpb{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.gpb span{display:block;height:100%;border-radius:3px}
+.gpv{font-family:var(--f-mono);font-size:11px;text-align:right;color:var(--muted);white-space:nowrap}
+.glist{margin:9px 0 0;padding-left:16px;font-size:12.5px;line-height:1.45;list-style:disc}
+.glist li{margin-bottom:3px}
+.glist.pro li{color:var(--ok)}
+.glist.contro li{color:var(--crit)}
+@media(max-width:520px){.gpart{grid-template-columns:76px 1fr 40px}}
+
+/* ── stampa ──────────────────────────────────────────────────────────
+   La pagina a schermo non si stampa: si stampa #printview, costruito
+   apposta e denso, perché dodici rose in formato schermo fanno quindici
+   fogli. La vista è appesa a <body> con un portale.                    */
+#printview{display:none}
+@media print{
+  @page{margin:11mm;size:A4}
+  :root{
+    --bg:#fff!important;--surface:#fff!important;--surface-2:#f6f6f4!important;
+    --ink:#111!important;--muted:#555!important;--line:#ddd!important;--line-strong:#bbb!important;
+    --ok:#1a6b31!important;--crit:#a3221b!important;--accent:#1a5fb4!important;--shadow:none!important;
+  }
+  body{background:#fff!important;color:#111!important;font-size:9pt}
+  /* niente :not(#id) qui: porterebbe con sé la specificità di un id e
+     vincerebbe sulla regola che riaccende la vista di stampa */
+  body>*{display:none!important}
+  body>#printview{display:block!important}
+
+  .psthead{margin-bottom:7px;border-bottom:1.5px solid #111;padding-bottom:5px}
+  .psthead h1{font-family:var(--f-display);font-size:15pt;margin:0 0 2px;letter-spacing:-.02em;color:#111}
+  .psthead p{margin:0;font-size:7.5pt;color:#555}
+
+  table.ptab{width:100%;border-collapse:collapse;font-size:7.5pt;margin-bottom:9px}
+  table.ptab th{text-align:left;font-size:6.5pt;letter-spacing:.06em;text-transform:uppercase;
+    color:#555;font-weight:700;padding:2px 4px;border-bottom:1px solid #999}
+  table.ptab td{padding:2px 4px;border-bottom:1px solid #eee}
+  table.ptab .n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+  table.ptab tbody tr:nth-child(odd){background:#fafafa}
+
+  .pgrid{column-count:3;column-gap:7mm;orphans:2;widows:2}
+  .pblock{break-inside:avoid;page-break-inside:avoid;display:inline-block;width:100%;
+    border:1px solid #ccc;border-radius:3px;padding:4px 6px 5px;margin:0 0 4mm}
+  .pbh{display:flex;align-items:baseline;gap:4px;font-size:9pt;border-bottom:1px solid #ddd;padding-bottom:2px}
+  .pbh .pos{font-family:var(--f-mono);font-size:7pt;color:#777;min-width:9px}
+  .pbh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+  .pbh .pbv{font-family:var(--f-mono);font-weight:700;font-size:10pt}
+  .pbs{font-size:6.5pt;color:#666;margin:2px 0 3px;font-family:var(--f-mono)}
+  .pr{display:flex;flex-wrap:wrap;gap:0 5px;margin-bottom:2px;line-height:1.35}
+  .prh{font-size:6pt;font-weight:700;color:#fff;background:#333;border-radius:2px;
+    padding:0 3px;align-self:flex-start;margin-top:1px}
+  .pp{font-size:7pt;white-space:nowrap}
+  .pp b{font-family:var(--f-mono);font-weight:600;color:#555}
+  .pn{font-size:6.5pt;line-height:1.3;margin-top:2px}
+  .pn.ok{color:#1a6b31}
+  .pn.ko{color:#a3221b}
+}
+
 /* ══ Listone ═════════════════════════════════════════════════════════ */
 .fl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--muted);margin-bottom:4px}
 .toggles{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13.5px}

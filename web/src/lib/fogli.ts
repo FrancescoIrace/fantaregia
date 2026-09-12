@@ -18,6 +18,19 @@ export async function apriCartella(file: File): Promise<Cartella> {
   }
 }
 
+/** scrive un xlsx con un foglio per tabella e lo fa scaricare */
+export async function scaricaCartella(fogli: { nome: string; righe: (string | number)[][] }[], nomeFile: string) {
+  const X = await import('xlsx')
+  const wb = X.utils.book_new()
+  for (const f of fogli) X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(f.righe), f.nome)
+  const dati = X.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
+  const url = URL.createObjectURL(new Blob([dati], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+  const a = document.createElement('a')
+  a.href = url; a.download = nomeFile
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 3000)
+}
+
 const eCsv = (f: File) => /\.(csv|txt)$/i.test(f.name)
 
 /** le righe di un file tabellare: csv così com'è, xlsx dal foglio «Tutti» o dal primo */

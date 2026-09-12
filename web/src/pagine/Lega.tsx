@@ -15,6 +15,7 @@ import Calendario from './Calendario.tsx'
 import Infermeria from './Infermeria.tsx'
 import Mercato from './Mercato.tsx'
 import Listone from './Listone.tsx'
+import Rose from './Rose.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -50,6 +51,7 @@ export default function Lega({ utenteId }: { utenteId: string }) {
       <nav className="flex gap-1 overflow-x-auto border-b border-line">
         <NavLink to={`/lega/${id}`} end className={scheda}>Panoramica</NavLink>
         <NavLink to={`/lega/${id}/listone`} className={scheda}>Listone</NavLink>
+        <NavLink to={`/lega/${id}/rose`} className={scheda}>Rose</NavLink>
         <NavLink to={`/lega/${id}/formazioni`} className={scheda}>Formazioni</NavLink>
         <NavLink to={`/lega/${id}/scontri`} className={scheda}>Lega</NavLink>
         <NavLink to={`/lega/${id}/rendimento`} className={scheda}>Rendimento</NavLink>
@@ -61,6 +63,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
       <Routes>
         <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
         <Route path="listone" element={<Listone legaId={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+        <Route path="rose" element={<Rose legaId={id} motore={motore} ricarica={ricarica}
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
         <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} />} />
         <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica}
