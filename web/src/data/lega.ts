@@ -92,6 +92,18 @@ export async function annullaMovimento(legaId: string, id: number) {
   if (error) throw new Error(error.message)
 }
 
+/* ── rose ufficiali: il file della lega è la versione firmata ── */
+export interface RigaAllinea { stato: string; pid: number; squadra: number; prezzo: number; snap?: unknown }
+export async function allineaRose(legaId: string, righe: RigaAllinea[]) {
+  const { data, error } = await supabase.rpc('allinea_rose', { p_lega: legaId, p_righe: righe })
+  if (error) throw new Error(error.message)
+  return data as { messi: number; tolti: number; corretti: number }
+}
+export async function salvaRoseMeta(legaId: string, meta: { nome: string; when: number; squadre: number; diverse: number }) {
+  const { error } = await supabase.from('leghe').update({ rose_meta: meta }).eq('id', legaId)
+  if (error) throw new Error(error.message)
+}
+
 /* ── infermeria: S.out, S.squalSalta, S.squalOn ── */
 export async function segnaIndisponibile(legaId: string, giocatoreId: number, motivo: string, daGiornata: number) {
   const { error } = await supabase.from('indisponibili').upsert(

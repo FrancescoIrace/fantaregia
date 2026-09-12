@@ -7,6 +7,7 @@ import type { RigheLega } from '../data/componi.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
+import RoseUfficiali from './RoseUfficiali.tsx'
 import Formazioni from './Formazioni.tsx'
 import Scontri from './Scontri.tsx'
 import Rendimento from './Rendimento.tsx'
@@ -148,6 +149,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
       </Card>
 
       {io && io.ruolo !== 'lettore' && <CaricaDati legaId={id} righe={righe} motore={motore} />}
+      {io && io.ruolo !== 'lettore' && <RoseUfficiali legaId={id} motore={motore} ricarica={ricarica} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card titolo="Cosa c'è">

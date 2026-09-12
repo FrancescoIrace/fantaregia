@@ -26,6 +26,24 @@ A ogni nuova migrazione basta rilanciare `npx supabase db push`.
 
 Ogni tabella ha le policy RLS: i dati di una lega li leggono solo i suoi membri. Non è un dettaglio: listoni e voti non sono nostri e alcuni file vietano esplicitamente la ripubblicazione, quindi niente di questo database deve essere leggibile da fuori.
 
+## Messa online (Vercel)
+
+Il progetto sta in `web/`, quindi su Vercel va detto dove guardare:
+
+| Impostazione | Valore |
+|---|---|
+| Root Directory | `web` |
+| Framework | Vite |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+| Variabili | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
+
+`vercel.json` contiene la riscrittura che manda ogni indirizzo a `index.html`: senza, aprendo un link diretto a una lega si otterrebbe un 404.
+
+Le due variabili sono le stesse di `.env.local`. La chiave pubblica finisce nel codice che scarica il browser, ed è previsto: a proteggere i dati sono le policy RLS.
+
+Dopo il primo deploy, in Supabase → Authentication → URL Configuration aggiungi il dominio come **Site URL** e fra i **Redirect URLs**, altrimenti la mail di conferma rimanda a localhost.
+
 ## Test
 
 ```bash
