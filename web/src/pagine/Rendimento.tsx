@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { Motore, VoceSerie } from '../domain/motore.ts'
+import type { Motore } from '../domain/motore.ts'
 import type { Ruolo } from '../domain/tipi.ts'
 import { deltaCol, fmCol } from '../viste/colori.ts'
-import { RigBadge } from '../viste/segni.tsx'
+import { RigBadge, Spark } from '../viste/segni.tsx'
 import { Card, Ruolo as ChipRuolo } from '../ui.tsx'
 
 type Chiave = 'pres' | 'mv' | 'fm' | 'gf' | 'ass' | 'forma' | 'q'
@@ -100,21 +100,6 @@ export default function Rendimento({ motore: m }: { motore: Motore }) {
         ammonizione −0,5, espulsione −1, gol subito −1. I voti con asterisco valgono 6 e contano come presenza, ma restano fuori dalla media
         voto. La <b>forma</b> confronta la fantamedia delle ultime tre presenze con quella di tutta la stagione: sopra zero sta rendendo più
         del suo standard.</p>
-    </div>
-  )
-}
-
-/* le ultime dieci giornate in piccolo: alta verde sopra il 7, rossa sotto il 5 */
-function Spark({ serie }: { serie: (VoceSerie | null)[] }) {
-  const vals = serie.filter((x): x is VoceSerie => !!x).map(x => x.fv)
-  if (!vals.length) return null
-  const lo = Math.min(4, ...vals), hi = Math.max(10, ...vals)
-  return (
-    <div className="spark">
-      {serie.slice(-10).map((x, i) => x
-        ? <i key={i} className={x.fv >= 7 ? 'up' : x.fv <= 5 ? 'dn' : ''} style={{ height: Math.max(3, Math.round((x.fv - lo) / ((hi - lo) || 1) * 20)) }}
-          title={`Giornata ${x.g}: voto ${x.v.toFixed(1)}${x.sv ? ' (s.v.)' : ''}, fantavoto ${x.fv.toFixed(1)}`} />
-        : <i key={i} className="no" title="non ha giocato" />)}
     </div>
   )
 }

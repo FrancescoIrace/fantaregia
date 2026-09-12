@@ -136,6 +136,15 @@ export async function salvaAbbinamento(legaId: string, squadraId: number, idx: n
   if (error) throw new Error(error.message)
 }
 
+/** gli obiettivi con il prezzo massimo sono privati come le formazioni */
+export async function salvaObiettivi(legaId: string, utenteId: string, obiettivi: Record<string, { max?: number }>) {
+  const { error } = await supabase.from('preferenze').upsert(
+    { lega_id: legaId, utente_id: utenteId, obiettivi, aggiornate_il: new Date().toISOString() },
+    { onConflict: 'lega_id,utente_id' },
+  )
+  if (error) throw new Error(error.message)
+}
+
 /** le formazioni sono private: stanno nella riga di preferenze di chi le fa */
 export async function salvaFormazioni(legaId: string, utenteId: string, formazioni: Record<string, unknown>) {
   const { error } = await supabase.from('preferenze').upsert(
