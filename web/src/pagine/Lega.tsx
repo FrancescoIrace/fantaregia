@@ -13,6 +13,7 @@ import Rendimento from './Rendimento.tsx'
 import Titolari from './Titolari.tsx'
 import Calendario from './Calendario.tsx'
 import Infermeria from './Infermeria.tsx'
+import Mercato from './Mercato.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -53,6 +54,7 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         <NavLink to={`/lega/${id}/titolari`} className={scheda}>Titolari</NavLink>
         <NavLink to={`/lega/${id}/calendario`} className={scheda}>Calendario</NavLink>
         <NavLink to={`/lega/${id}/infermeria`} className={scheda}>Infermeria</NavLink>
+        <NavLink to={`/lega/${id}/mercato`} className={scheda}>Mercato</NavLink>
       </nav>
       <Routes>
         <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
@@ -63,6 +65,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         <Route path="titolari" element={<Titolari motore={motore} />} />
         <Route path="calendario" element={<Calendario motore={motore} />} />
         <Route path="infermeria" element={<Infermeria legaId={id} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+        <Route path="mercato" element={<Mercato legaId={id} motore={motore} ricarica={ricarica}
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
       </Routes>
     </div>

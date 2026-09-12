@@ -73,6 +73,25 @@ export async function assegna(legaId: string, giocatoreId: number, squadraId: nu
   return data
 }
 
+/* ── mercato: un movimento tocca registro, possesso e crediti insieme,
+      quindi passa da una funzione del database (vedi la migrazione) ── */
+export async function registraScambio(legaId: string, pidA: number, pidB: number, giornata: number) {
+  const { error } = await supabase.rpc('registra_scambio', { p_lega: legaId, p_a: pidA, p_b: pidB, p_giornata: giornata })
+  if (error) throw new Error(error.message)
+}
+export async function registraSvincolo(legaId: string, squadraId: number, fuori: number, dentro: number,
+  rimborso: number, costo: number, giornata: number, snap: { id: number; r: string; n: string; s: string; q: number }) {
+  const { error } = await supabase.rpc('registra_svincolo', {
+    p_lega: legaId, p_squadra: squadraId, p_fuori: fuori, p_dentro: dentro,
+    p_rimborso: rimborso, p_costo: costo, p_giornata: giornata, p_snap: snap,
+  })
+  if (error) throw new Error(error.message)
+}
+export async function annullaMovimento(legaId: string, id: number) {
+  const { error } = await supabase.rpc('annulla_movimento', { p_lega: legaId, p_id: id })
+  if (error) throw new Error(error.message)
+}
+
 /* ── infermeria: S.out, S.squalSalta, S.squalOn ── */
 export async function segnaIndisponibile(legaId: string, giocatoreId: number, motivo: string, daGiornata: number) {
   const { error } = await supabase.from('indisponibili').upsert(
