@@ -1,6 +1,6 @@
 /* I piccoli segni che l'app a file singolo mette accanto ai nomi:
    titolarità, rigorista, indisponibile, la striscia delle partite. */
-import { MENTNAME, type Motore } from '../domain/motore.ts'
+import { MENTNAME, type Motore, type VoceSerie } from '../domain/motore.ts'
 import type { Giocatore, Ruolo } from '../domain/tipi.ts'
 import { ABBR } from './colori.ts'
 
@@ -25,6 +25,21 @@ export function OutBadge({ m, p }: { m: Motore; p: Giocatore }) {
   if (!m.isOut(p.id)) return null
   const sq = m.squalificatoA(p.id, m.nextG())
   return <span className={`outb${sq ? ' squal' : ''}`} title={sq ? 'Squalificato per la prossima giornata' : 'Segnato indisponibile'}>{sq ? 'SQU' : 'OUT'}</span>
+}
+
+/** le ultime dieci giornate in piccolo: alta verde sopra il 7, rossa sotto il 5 */
+export function Spark({ serie }: { serie: (VoceSerie | null)[] }) {
+  const vals = serie.filter((x): x is VoceSerie => !!x).map(x => x.fv)
+  if (!vals.length) return null
+  const lo = Math.min(4, ...vals), hi = Math.max(10, ...vals)
+  return (
+    <div className="spark">
+      {serie.slice(-10).map((x, i) => x
+        ? <i key={i} className={x.fv >= 7 ? 'up' : x.fv <= 5 ? 'dn' : ''} style={{ height: Math.max(3, Math.round((x.fv - lo) / ((hi - lo) || 1) * 20)) }}
+          title={`Giornata ${x.g}: voto ${x.v.toFixed(1)}${x.sv ? ' (s.v.)' : ''}, fantavoto ${x.fv.toFixed(1)}`} />
+        : <i key={i} className="no" title="non ha giocato" />)}
+    </div>
+  )
 }
 
 /** mentalità: una parola al posto delle sigle Mantra, misurata dentro il ruolo */

@@ -7,12 +7,17 @@ import type { RigheLega } from '../data/componi.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
+import RoseUfficiali from './RoseUfficiali.tsx'
 import Formazioni from './Formazioni.tsx'
 import Scontri from './Scontri.tsx'
 import Rendimento from './Rendimento.tsx'
 import Titolari from './Titolari.tsx'
 import Calendario from './Calendario.tsx'
 import Infermeria from './Infermeria.tsx'
+import Mercato from './Mercato.tsx'
+import Listone from './Listone.tsx'
+import Rose from './Rose.tsx'
+import Asta from './Asta.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -47,15 +52,25 @@ export default function Lega({ utenteId }: { utenteId: string }) {
       {/* link assoluti: dentro una rotta con /* i relativi si risolvono in modo ambiguo */}
       <nav className="flex gap-1 overflow-x-auto border-b border-line">
         <NavLink to={`/lega/${id}`} end className={scheda}>Panoramica</NavLink>
+        <NavLink to={`/lega/${id}/asta`} className={scheda}>Asta live</NavLink>
+        <NavLink to={`/lega/${id}/listone`} className={scheda}>Listone</NavLink>
+        <NavLink to={`/lega/${id}/rose`} className={scheda}>Rose</NavLink>
         <NavLink to={`/lega/${id}/formazioni`} className={scheda}>Formazioni</NavLink>
         <NavLink to={`/lega/${id}/scontri`} className={scheda}>Lega</NavLink>
         <NavLink to={`/lega/${id}/rendimento`} className={scheda}>Rendimento</NavLink>
         <NavLink to={`/lega/${id}/titolari`} className={scheda}>Titolari</NavLink>
         <NavLink to={`/lega/${id}/calendario`} className={scheda}>Calendario</NavLink>
         <NavLink to={`/lega/${id}/infermeria`} className={scheda}>Infermeria</NavLink>
+        <NavLink to={`/lega/${id}/mercato`} className={scheda}>Mercato</NavLink>
       </nav>
       <Routes>
         <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
+        <Route path="listone" element={<Listone legaId={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+        <Route path="asta" element={<Asta legaId={id} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+        <Route path="rose" element={<Rose legaId={id} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
         <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} />} />
         <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica}
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
@@ -63,6 +78,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         <Route path="titolari" element={<Titolari motore={motore} />} />
         <Route path="calendario" element={<Calendario motore={motore} />} />
         <Route path="infermeria" element={<Infermeria legaId={id} motore={motore} ricarica={ricarica}
+          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+        <Route path="mercato" element={<Mercato legaId={id} motore={motore} ricarica={ricarica}
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
       </Routes>
     </div>
@@ -132,6 +149,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
       </Card>
 
       {io && io.ruolo !== 'lettore' && <CaricaDati legaId={id} righe={righe} motore={motore} />}
+      {io && io.ruolo !== 'lettore' && <RoseUfficiali legaId={id} motore={motore} ricarica={ricarica} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card titolo="Cosa c'è">

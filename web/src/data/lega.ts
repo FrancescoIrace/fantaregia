@@ -73,6 +73,37 @@ export async function assegna(legaId: string, giocatoreId: number, squadraId: nu
   return data
 }
 
+/* ── mercato: un movimento tocca registro, possesso e crediti insieme,
+      quindi passa da una funzione del database (vedi la migrazione) ── */
+export async function registraScambio(legaId: string, pidA: number, pidB: number, giornata: number) {
+  const { error } = await supabase.rpc('registra_scambio', { p_lega: legaId, p_a: pidA, p_b: pidB, p_giornata: giornata })
+  if (error) throw new Error(error.message)
+}
+export async function registraSvincolo(legaId: string, squadraId: number, fuori: number, dentro: number,
+  rimborso: number, costo: number, giornata: number, snap: { id: number; r: string; n: string; s: string; q: number }) {
+  const { error } = await supabase.rpc('registra_svincolo', {
+    p_lega: legaId, p_squadra: squadraId, p_fuori: fuori, p_dentro: dentro,
+    p_rimborso: rimborso, p_costo: costo, p_giornata: giornata, p_snap: snap,
+  })
+  if (error) throw new Error(error.message)
+}
+export async function annullaMovimento(legaId: string, id: number) {
+  const { error } = await supabase.rpc('annulla_movimento', { p_lega: legaId, p_id: id })
+  if (error) throw new Error(error.message)
+}
+
+/* ── rose ufficiali: il file della lega è la versione firmata ── */
+export interface RigaAllinea { stato: string; pid: number; squadra: number; prezzo: number; snap?: unknown }
+export async function allineaRose(legaId: string, righe: RigaAllinea[]) {
+  const { data, error } = await supabase.rpc('allinea_rose', { p_lega: legaId, p_righe: righe })
+  if (error) throw new Error(error.message)
+  return data as { messi: number; tolti: number; corretti: number }
+}
+export async function salvaRoseMeta(legaId: string, meta: { nome: string; when: number; squadre: number; diverse: number }) {
+  const { error } = await supabase.from('leghe').update({ rose_meta: meta }).eq('id', legaId)
+  if (error) throw new Error(error.message)
+}
+
 /* ── infermeria: S.out, S.squalSalta, S.squalOn ── */
 export async function segnaIndisponibile(legaId: string, giocatoreId: number, motivo: string, daGiornata: number) {
   const { error } = await supabase.from('indisponibili').upsert(
@@ -114,6 +145,15 @@ export async function salvaAbbinamento(legaId: string, squadraId: number, idx: n
     if (error) throw new Error(error.message)
   }
   const { error } = await supabase.from('squadre').update({ lega_idx: idx }).eq('id', squadraId)
+  if (error) throw new Error(error.message)
+}
+
+/** gli obiettivi con il prezzo massimo sono privati come le formazioni */
+export async function salvaObiettivi(legaId: string, utenteId: string, obiettivi: Record<string, { max?: number }>) {
+  const { error } = await supabase.from('preferenze').upsert(
+    { lega_id: legaId, utente_id: utenteId, obiettivi, aggiornate_il: new Date().toISOString() },
+    { onConflict: 'lega_id,utente_id' },
+  )
   if (error) throw new Error(error.message)
 }
 
