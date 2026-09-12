@@ -18,6 +18,24 @@ import Mercato from './Mercato.tsx'
 import Listone from './Listone.tsx'
 import Rose from './Rose.tsx'
 import Asta from './Asta.tsx'
+import { ORDINE, PRIME, modoAuto, modoSalvato, salvaModo, type Modo, type Scheda } from '../viste/modo.ts'
+
+/* le schede, ognuna con la chiave che gli ordini di modo.ts usano per
+   metterle in fila. La Panoramica sta fuori: è la casa della lega (la
+   rotta index, e dentro ci sono carica dati e rose ufficiali), quindi
+   resta prima e non va mai in secondo piano. */
+const SCHEDE: Record<Scheda, { path: string; testo: string }> = {
+  asta:       { path: 'asta',       testo: 'Asta live' },
+  listone:    { path: 'listone',    testo: 'Listone' },
+  rose:       { path: 'rose',       testo: 'Rose' },
+  formazioni: { path: 'formazioni', testo: 'Formazioni' },
+  scontri:    { path: 'scontri',    testo: 'Lega' },
+  rendimento: { path: 'rendimento', testo: 'Rendimento' },
+  titolari:   { path: 'titolari',   testo: 'Titolari' },
+  calendario: { path: 'calendario', testo: 'Calendario' },
+  infermeria: { path: 'infermeria', testo: 'Infermeria' },
+  mercato:    { path: 'mercato',    testo: 'Mercato' },
+}
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -28,6 +46,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
   const { id = '' } = useParams()
   const { righe, motore, errore, ricarica } = useLega(id, utenteId)
   const [membri, setMembri] = useState<Membro[]>([])
+  // null: nessuna scelta su questo dispositivo, decide modoAuto() sui dati
+  const [modoScelto, setModoScelto] = useState<Modo | null>(() => modoSalvato(id))
 
   useEffect(() => {
     supabase.from('membri').select('utente_id, nome, ruolo').eq('lega_id', id)
@@ -38,8 +58,11 @@ export default function Lega({ utenteId }: { utenteId: string }) {
   if (!righe || !motore) return <p className="text-muted">Carico la lega…</p>
 
   const io = membri.find(m => m.utente_id === utenteId)
-  const scheda = ({ isActive }: { isActive: boolean }) =>
-    `-mb-px border-b-2 px-3.5 py-2.5 text-sm font-semibold ${isActive ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'}`
+  /* sec: la voce non appartiene alla modalità attiva, resta in secondo piano */
+  const scheda = (sec: boolean) => ({ isActive }: { isActive: boolean }) =>
+    `-mb-px shrink-0 border-b-2 px-3.5 py-2.5 text-sm font-semibold ${isActive ? 'border-accent text-accent' : 'border-transparent text-muted hover:text-ink'}${sec && !isActive ? ' opacity-[.55] hover:opacity-90' : ''}`
+  const modo: Modo = modoScelto ?? modoAuto(motore)
+  const cambiaModo = (v: Modo) => { setModoScelto(v); salvaModo(id, v) }
 
   return (
     <div className="space-y-6">
@@ -48,20 +71,20 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         <h1 className="font-display text-2xl font-extrabold tracking-tight">{righe.lega.nome}</h1>
         <span className="font-mono text-[11px] text-muted">{righe.lega.stagione}</span>
         {io && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">{NOME_RUOLO[io.ruolo]}</span>}
+        <button type="button" role="switch" aria-checked={modo === 'asta'}
+          className={`modo${modo === 'asta' ? '' : ' off'}`}
+          title="Riordina il menu: con l'asta accesa vengono prima le pagine che servono a comprare, spenta quelle che servono a giocare le giornate"
+          onClick={() => cambiaModo(modo === 'asta' ? 'stagione' : 'asta')}>
+          <span className="mlab">Modalità asta</span><span className="msw"><i /></span>
+          <span className="mval">{modo === 'asta' ? 'ON' : 'OFF'}</span>
+        </button>
       </div>
       {/* link assoluti: dentro una rotta con /* i relativi si risolvono in modo ambiguo */}
       <nav className="flex gap-1 overflow-x-auto border-b border-line">
-        <NavLink to={`/lega/${id}`} end className={scheda}>Panoramica</NavLink>
-        <NavLink to={`/lega/${id}/asta`} className={scheda}>Asta live</NavLink>
-        <NavLink to={`/lega/${id}/listone`} className={scheda}>Listone</NavLink>
-        <NavLink to={`/lega/${id}/rose`} className={scheda}>Rose</NavLink>
-        <NavLink to={`/lega/${id}/formazioni`} className={scheda}>Formazioni</NavLink>
-        <NavLink to={`/lega/${id}/scontri`} className={scheda}>Lega</NavLink>
-        <NavLink to={`/lega/${id}/rendimento`} className={scheda}>Rendimento</NavLink>
-        <NavLink to={`/lega/${id}/titolari`} className={scheda}>Titolari</NavLink>
-        <NavLink to={`/lega/${id}/calendario`} className={scheda}>Calendario</NavLink>
-        <NavLink to={`/lega/${id}/infermeria`} className={scheda}>Infermeria</NavLink>
-        <NavLink to={`/lega/${id}/mercato`} className={scheda}>Mercato</NavLink>
+        <NavLink to={`/lega/${id}`} end className={scheda(false)}>Panoramica</NavLink>
+        {ORDINE[modo].map((k, i) => (
+          <NavLink key={k} to={`/lega/${id}/${SCHEDE[k].path}`} className={scheda(i >= PRIME)}>{SCHEDE[k].testo}</NavLink>
+        ))}
       </nav>
       <Routes>
         <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
