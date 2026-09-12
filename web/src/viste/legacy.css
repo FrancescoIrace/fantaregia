@@ -810,3 +810,20 @@ table.list.stats .colfm{display:table-cell}
   .infrow{grid-template-columns:auto 1fr auto;row-gap:2px}
   .inftag{grid-column:2/-1}
 }
+
+/* interruttore della modalità asta (part1 §Scoreboard) ─────────────── */
+.modo{display:inline-flex;align-items:center;gap:7px;background:var(--accent-soft);
+  border:1px solid var(--accent-line);border-radius:20px;padding:3px 9px 3px 10px;
+  font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;
+  color:var(--accent);cursor:pointer;line-height:1}
+.modo.off{background:var(--surface-2);border-color:var(--line);color:var(--muted)}
+.modo:hover{filter:brightness(1.08)}
+.modo .msw{width:24px;height:13px;border-radius:9px;background:var(--accent);position:relative;flex:none;
+  transition:background .15s ease}
+.modo.off .msw{background:var(--line-strong)}
+.modo .msw i{position:absolute;top:2px;left:13px;width:9px;height:9px;border-radius:50%;
+  background:var(--surface);transition:left .15s ease}
+.modo.off .msw i{left:2px}
+.modo .mval{font-family:var(--f-mono);font-size:10px;min-width:22px;text-align:left}
+@media(prefers-reduced-motion:reduce){.modo .msw,.modo .msw i{transition:none}}
+@media(max-width:620px){.modo .mlab{display:none}}
