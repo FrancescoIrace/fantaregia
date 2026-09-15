@@ -58,7 +58,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
 
   /* Il marchio è il colore della propria squadra. Uscendo dalla lega torna
      quello predefinito: l'elenco delle leghe non è di nessuna squadra. */
-  const miaTinta = righe?.squadre.find(s => s.id === righe.preferenze?.mia_squadra)?.colore ?? null
+  const miaSquadra = righe?.squadre.find(s => s.id === righe.preferenze?.mia_squadra) ?? null
+  const miaTinta = miaSquadra?.colore ?? null
   useEffect(() => {
     usaTinta(miaTinta)
     return () => { usaTinta(null) }
@@ -94,6 +95,13 @@ export default function Lega({ utenteId }: { utenteId: string }) {
         <h1 className="font-display text-2xl font-extrabold tracking-tight">{righe.lega.nome}</h1>
         <span className="font-mono text-[11px] text-muted">{righe.lega.stagione}</span>
         {io && <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">{NOME_RUOLO[io.ruolo]}</span>}
+        {/* la propria squadra, con il gagliardetto se ha un colore: il marchio della pagina viene da lì */}
+        {miaSquadra && (
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            {miaSquadra.colore && <span className="gagliardetto" style={{ ['--tinta' as string]: miaSquadra.colore }} />}
+            {miaSquadra.nome}
+          </span>
+        )}
         <button type="button" role="switch" aria-checked={modo === 'asta'}
           className={`modo${modo === 'asta' ? '' : ' off'}`}
           title="Riordina il menu: con l'asta accesa vengono prima le pagine che servono a comprare, spenta quelle che servono a giocare le giornate"
@@ -196,7 +204,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
           </table>
         </div>
         <div className="mt-3"><Suggerimento>Crediti, tetto e giudizio vengono dal motore dell'app a file singolo, sui dati di questa lega.</Suggerimento></div>
-        <div className="mt-4 border-t border-line pt-3"><ColoreSquadra legaId={id} squadre={righe.squadre} mia={mia} mancante={righe.coloreMancante} admin={io?.ruolo === 'admin'} /></div>
+        <div className="mt-4 border-t border-line pt-3"><ColoreSquadra legaId={id} squadre={righe.squadre} mia={mia} mancante={righe.coloreMancante} admin={io?.ruolo === 'admin'} puoScrivere={!!io && io.ruolo !== 'lettore'} /></div>
       </Card>
 
       {io && io.ruolo !== 'lettore' && <CaricaDati legaId={id} righe={righe} motore={motore} />}

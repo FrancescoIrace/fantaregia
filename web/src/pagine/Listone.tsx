@@ -5,7 +5,7 @@ import type { RigheLega } from '../data/componi.ts'
 import { salvaObiettivi } from '../data/lega.ts'
 import { appetCol, fmCol } from '../viste/colori.ts'
 import { FixStrip, MentChip, OutBadge, RigBadge, TitDot } from '../viste/segni.tsx'
-import { Card, Ruolo as ChipRuolo } from '../ui.tsx'
+import { Card } from '../ui.tsx'
 import Scheda from './Scheda.tsx'
 
 type Chiave = 'star' | 'r' | 'n' | 'q' | 'f' | 'att' | 'v' | 'app' | 'fm' | 'cal' | 'max'
@@ -139,8 +139,8 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
               {th('star', '★', 'w-[30px]')}{th('r', 'R', 'w-[38px]')}{th('n', 'Giocatore')}
               {th('q', 'Qt.A', 'num w-[70px]')}{th('f', 'FVM', 'num w-[70px]')}
               {th('att', 'Atteso', 'num w-[84px]', 'Quanto dovrebbe costare in questa lega')}
-              {th('v', 'Convenienza', 'num w-[136px]')}{th('app', 'Appetibilità', 'num w-[112px]')}
-              {th('fm', 'FM', 'num colfm w-[84px]')}{th('cal', 'Prossime partite', 'w-[216px]')}
+              {th('v', 'Convenienza', 'num w-[136px] col-secondaria')}{th('app', 'Appetibilità', 'num w-[112px]')}
+              {th('fm', 'FM', 'num colfm w-[84px]')}{th('cal', 'Prossime partite', 'w-[216px] col-secondaria')}
               {th('max', 'Max mio', 'num w-[72px]')}
               <th>Stato</th>
             </tr></thead>
@@ -153,11 +153,12 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
                 const conv = p.v ?? 1
                 return (
                   <tr key={p.id} className={`${a ? (a.team === me ? 'mine' : 'taken') : ''}${m.isOut(p.id) ? ' fuori' : ''}`}>
-                    <td>
+                    <td className="cella-filo">
+                      <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
                       <button type="button" className={`starbtn${t ? ' on' : ''}`} title="Segna come obiettivo"
                         onClick={() => segna(p.id, t ? null : { max: p.q })}>{t ? '★' : '☆'}</button>
                     </td>
-                    <td><ChipRuolo r={p.r} /></td>
+                    <td><span className="ruolo-lettera">{p.r}</span></td>
                     <td>
                       <div className="namewrap">
                         <button type="button" className="pname clic" onClick={() => setAperto(p.id)}>{p.n}</button>
@@ -165,51 +166,51 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
                       </div>
                       <div className="pteam">{p.s} <span className="rm">{p.rm || ''}</span> <MentChip m={m} p={p} /></div>
                     </td>
-                    <td className="num font-semibold">{p.q}</td>
-                    <td className="num text-muted">{p.f}</td>
+                    <td className="num fr-num">{p.q}</td>
+                    <td className="num fr-num text-muted">{p.f}</td>
                     <td className="num">
                       {a ? <span className="text-line-strong">—</span>
-                        : ora === null ? <span className="attv">{base}</span>
+                        : ora === null ? <span className="attv fr-num">{base}</span>
                           : <>
-                            <span className="attv" style={{ color: Math.abs(d) < 0.1 ? 'inherit' : d > 0 ? 'var(--warn)' : 'var(--ok)' }}>{ora}</span>
+                            <span className="attv fr-num" style={{ color: Math.abs(d) < 0.1 ? 'inherit' : d > 0 ? 'var(--warn)' : 'var(--ok)' }}>{ora}</span>
                             {Math.abs(d) >= 0.1 && <div className="subline text-right">listino {base}</div>}
                           </>}
                     </td>
-                    <td className="num">
+                    <td className="num col-secondaria">
                       <div className="meter">
                         <div className="bar"><span style={{
                           background: conv >= 1.15 ? 'var(--ok)' : conv <= 0.85 ? 'var(--crit)' : 'var(--muted)',
                           ...barra(conv),
                         }} /></div>
-                        <span className={`n ${conv >= 1.15 ? 'v-hi' : conv <= 0.85 ? 'v-lo' : 'v-mid'}`}>{conv.toFixed(2)}</span>
+                        <span className={`n fr-num ${conv >= 1.15 ? 'v-hi' : conv <= 0.85 ? 'v-lo' : 'v-mid'}`}>{conv.toFixed(2)}</span>
                       </div>
                     </td>
                     <td className="num">
                       <div className="app">
                         <div className="abar"><span style={{ width: `${m.appet(p, f, sp)}%`, background: appetCol(m.appet(p, f, sp)) }} /></div>
-                        <span className="an" style={{ color: appetCol(m.appet(p, f, sp)) }}>{m.appet(p, f, sp)}</span>
+                        <span className="an fr-num" style={{ color: appetCol(m.appet(p, f, sp)) }}>{m.appet(p, f, sp)}</span>
                       </div>
                     </td>
                     <td className="num colfm">
                       {st && st.pres
-                        ? <><span className="fmv" style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(2)}</span>
+                        ? <><span className="fmv fr-num" style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(2)}</span>
                           <div className="subline text-right">{st.pres}/{st.su} pres</div></>
                         : <span className="text-line-strong">—</span>}
                     </td>
-                    <td>
+                    <td className="col-secondaria">
                       {cs !== null && (
                         <div className="flex items-center gap-[7px]">
                           <FixStrip m={m} team={p.s} r={p.r} from={f} span={sp} />
-                          <span className="calscore" style={{ color: scoreCol(cs) }}>{cs.toFixed(1)}</span>
+                          <span className="calscore fr-num" style={{ color: scoreCol(cs) }}>{cs.toFixed(1)}</span>
                         </div>
                       )}
                     </td>
                     <td className="num">
-                      <input className="tmax" type="number" min={0} placeholder="—" value={t?.max ?? ''}
+                      <input className="tmax fr-num" type="number" min={0} placeholder="—" value={t?.max ?? ''}
                         onChange={e => segna(p.id, { max: parseInt(e.target.value) || 0 })} />
                     </td>
                     <td>
-                      {a ? <span className="takenby" style={{ color: a.team === me ? 'var(--accent)' : 'var(--muted)' }}>{m.teamName(a.team)} · {a.price}</span>
+                      {a ? <span className="takenby" style={{ color: a.team === me ? 'var(--accent)' : 'var(--muted)' }}>{m.teamName(a.team)} · <span className="fr-num">{a.price}</span></span>
                         : <span className="tag ok">libero</span>}
                     </td>
                   </tr>

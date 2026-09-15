@@ -8,8 +8,6 @@ export const fmCol = (f: number) => f >= 7 ? 'var(--ok)' : f <= 5.5 ? 'var(--cri
 /** forma: scarto dalla propria fantamedia */
 export const deltaCol = (d: number) => d >= 0.5 ? 'var(--ok)' : d <= -0.5 ? 'var(--crit)' : 'var(--muted)'
 export const segno = (d: number) => (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(1)
-/** la fascia della maglia in formazione: oro, argento, bronzo, grigio */
-export const fascia = (n: number) => n >= 80 ? 'f-oro' : n >= 65 ? 'f-arg' : n >= 50 ? 'f-bro' : 'f-gre'
 
 const SIGLE: Record<string, string> = {
   Atalanta: 'ATA', Bologna: 'BOL', Cagliari: 'CAG', Como: 'COM', Fiorentina: 'FIO', Frosinone: 'FRO',

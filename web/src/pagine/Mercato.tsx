@@ -3,7 +3,7 @@ import { ROLES, type Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
 import { annullaMovimento, registraScambio, registraSvincolo } from '../data/lega.ts'
 import { TitDot, RigBadge } from '../viste/segni.tsx'
-import { Avviso, Bottone, Card, Ruolo as ChipRuolo } from '../ui.tsx'
+import { Avviso, Bottone, Card } from '../ui.tsx'
 
 const RNOME: Record<string, [string, string]> = {
   P: ['i portieri', 'portiere'], D: ['i difensori', 'difensore'],
@@ -120,7 +120,7 @@ export default function Mercato({ legaId, motore: m, puoScrivere, ricarica }: {
                 <div className="mkesito">
                   {!pa || !pb ? <span className="hint">Scegli i due giocatori.</span>
                     : errScambio ? <span className="mkno">{errScambio}</span>
-                      : <span className="mkok">{m.giocatoreDi(pa)!.n} ({m.prezzoDi(pa)} cr) ⇄ {m.giocatoreDi(pb)!.n} ({m.prezzoDi(pb)} cr) · crediti invariati per entrambi</span>}
+                      : <span className="mkok">{m.giocatoreDi(pa)!.n} (<span className="fr-num">{m.prezzoDi(pa)}</span> cr) ⇄ {m.giocatoreDi(pb)!.n} (<span className="fr-num">{m.prezzoDi(pb)}</span> cr) · crediti invariati per entrambi</span>}
                 </div>
                 <Bottone variante="primario" disabled={invio || !pa || !pb || !!errScambio}
                   onClick={() => void agisci(() => registraScambio(legaId, pa, pb, scG), `Scambio registrato dalla giornata ${scG}`)}>Registra scambio</Bottone>
@@ -152,9 +152,10 @@ export default function Mercato({ legaId, motore: m, puoScrivere, ricarica }: {
                     <div className="infres">
                       {liberi.length ? liberi.map(p => (
                         <button key={p.id} type="button" onClick={() => { setSvSel(p); setSvQ('') }}>
-                          <ChipRuolo r={p.r} />
+                          <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
+                          <span className="ruolo-lettera">{p.r}</span>
                           <span className="pnome"><b>{p.n}</b> <TitDot m={m} p={p} /><RigBadge m={m} p={p} /> <span className="pteam">{p.s}</span></span>
-                          <span className="mono text-[12.5px] text-muted">q {p.q}</span>
+                          <span className="text-[12.5px] text-muted">q <span className="fr-num">{p.q}</span></span>
                         </button>
                       )) : <button type="button" disabled className="opacity-60">Nessun {rn[1]} svincolato con questo nome</button>}
                     </div>
@@ -162,8 +163,9 @@ export default function Mercato({ legaId, motore: m, puoScrivere, ricarica }: {
                   <div className="mkscelto">
                     {dentro ? (
                       <div className="mkpick">
-                        <ChipRuolo r={dentro.r} />
-                        <span className="mkpn"><b>{dentro.n}</b> <span className="pteam">{dentro.s}</span> · q {dentro.q}</span>
+                        <span className="fr-filo-ruolo" data-ruolo={dentro.r} aria-hidden="true" />
+                        <span className="ruolo-lettera">{dentro.r}</span>
+                        <span className="mkpn"><b>{dentro.n}</b> <span className="pteam">{dentro.s}</span> · q <span className="fr-num">{dentro.q}</span></span>
                         <Bottone piccolo onClick={() => setSvSel(null)}>Cambia</Bottone>
                       </div>
                     ) : <p className="hint mt-1.5">Nessuno scelto: digita almeno due lettere del cognome.</p>}
@@ -184,7 +186,7 @@ export default function Mercato({ legaId, motore: m, puoScrivere, ricarica }: {
                 <div className="mkesito">
                   {!out || !dentro ? <span className="hint">Scegli chi esce e chi entra.</span>
                     : errSvincolo ? <span className="mkno">{errSvincolo}</span>
-                      : <span className={dopo < 0 ? 'mkno' : 'mkok'}>crediti {residuo} → <b>{dopo}</b>{dopo < 0 ? ' — non bastano' : ''}</span>}
+                      : <span className={dopo < 0 ? 'mkno' : 'mkok'}>crediti <span className="fr-num">{residuo}</span> → <b className="fr-num">{dopo}</b>{dopo < 0 ? ' — non bastano' : ''}</span>}
                 </div>
                 <Bottone variante="primario" disabled={invio || !out || !dentro || !!errSvincolo || dopo < 0}
                   onClick={() => void agisci(
@@ -204,7 +206,7 @@ export default function Mercato({ legaId, motore: m, puoScrivere, ricarica }: {
           <div className="mklist">
             {movimenti.map(mv => (
               <div key={mv.id} className="mkrow">
-                <span className="mkg">g{mv.g}</span>
+                <span className="mkg fr-num">g{mv.g}</span>
                 <span className={`mktipo ${mv.tipo}`}>{mv.tipo}</span>
                 <span className="mkchi">
                   {mv.voci.map(v => {

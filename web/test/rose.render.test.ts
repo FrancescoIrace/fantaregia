@@ -32,6 +32,15 @@ describe('Rose', () => {
     expect(html).toContain('Scarica in Excel')
   })
 
+  it('i componenti nuovi: un filo e un prezzo condensato per giocatore in rosa, e nessun colore di ruolo sul testo', () => {
+    const html = disegna()
+    const inRosa = m.S.teams.reduce((n, t) => n + ROLES.reduce((k, r) => k + m.roster(t.id)[r].length, 0), 0)
+    expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(inRosa)
+    expect(conta(html, 'pz fr-num')).toBe(inRosa)
+    expect(html).not.toMatch(/color:var\(--r[PDCA]\)/)
+    expect(html).not.toContain('rounded-[5px]')
+  })
+
   it('in sola lettura niente pulsanti per liberare', () => {
     expect(disegna(m, false)).not.toContain('title="Libera"')
     expect(disegna(m, true)).toContain('title="Libera"')

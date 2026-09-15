@@ -58,7 +58,6 @@
    verso, che vince per specificità. */
 .dsv .fr-delta{font-size:var(--fr-t-piccolo);font-weight:var(--fr-peso-num);margin-left:6px}
 .cand .cs .fr-delta{font-size:var(--fr-t-piccolo);margin-left:4px;vertical-align:middle}
-.gs-stat .fr-delta{font-size:var(--fr-t-mini)}
 
 /* ── titolari fissi ── */
 /* Un interruttore di forma, non di colore: il documento vuole la casella
@@ -69,8 +68,74 @@
 }
 .fisso:hover{border-color:var(--fr-ink);color:var(--fr-ink)}
 .fisso.on{border-color:var(--fr-ink);color:var(--fr-ink);font-weight:var(--fr-peso-forte)}
-.gslot.bloccata{border-color:var(--fr-ink)}
-.gs-fisso{margin-left:6px;font-size:var(--fr-t-mini);font-weight:var(--fr-peso-forte);color:var(--fr-fioco)}
+/* ── la casella di formazione ── */
+/* Sostituisce la maglia oro/argento/bronzo. Lo stato sta sul bordo superiore,
+   il corpo è pannello e inchiostro: il punteggio si legge come ogni altro
+   numero. Il tratteggio è riservato alle proposte del pilota. */
+.casella{
+  display:flex;flex-direction:column;gap:3px;min-width:0;text-align:left;cursor:pointer;font:inherit;color:var(--fr-ink);
+  background:var(--fr-pan);border:1px solid var(--fr-filo);border-top:3px solid var(--fr-filo);
+  border-radius:var(--fr-r);padding:6px 10px 8px;
+}
+/* il passaggio del mouse è un anello fuori dal bordo: lo stato in cima non cambia */
+.casella:hover{box-shadow:0 0 0 1px var(--fr-marchio)}
+.casella .cas-testa{display:flex;align-items:baseline;gap:8px;min-width:0}
+.casella .cas-nome{flex:1;min-width:0;font-weight:var(--fr-peso-forte);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.casella .cas-punti{font-size:24px;line-height:1}
+.casella .cas-sq{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;white-space:nowrap;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.casella .cas-stat{display:flex;align-items:center;gap:6px;margin-top:2px;font-size:var(--fr-t-mini)}
+.casella .cas-stat .fr-delta{font-size:var(--fr-t-mini)}
+.casella .gsv i{font-style:normal;color:var(--fr-fioco);margin-right:2px}
+.casella .cas-why{font-size:var(--fr-t-et);color:var(--fr-fioco);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.casella .cas-meglio{font-size:var(--fr-t-et);font-weight:var(--fr-peso-forte);color:var(--fr-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.casella .cas-fisso{margin-left:6px;font-size:var(--fr-t-mini);font-weight:var(--fr-peso-forte);color:var(--fr-fioco)}
+.casella.alta{border-top-color:var(--fr-su)}
+.casella.rivedere{border-top-color:var(--fr-ink)}
+.casella.ko{border-top-color:var(--fr-giu)}
+.casella.bloccata{border-left-color:var(--fr-ink);border-right-color:var(--fr-ink);border-bottom-color:var(--fr-ink)}
+.casella.proposta{border-style:dashed;background:var(--fr-marchio-velo)}
+/* sul telefono si stringe come faceva la maglia: via frase, «di meglio» e statistiche */
+@media (max-width:640px){
+  .casella{padding:5px 7px 6px;gap:2px}
+  .casella .cas-punti{font-size:17px}
+  /* il punteggio sopra e il nome sotto a tutta larghezza: affiancati, a quattro per riga il nome si tagliava */
+  .casella .cas-testa{flex-direction:column-reverse;align-items:flex-start;gap:0}
+  .casella .cas-nome{font-size:12.5px}
+  .casella .cas-sq{font-size:10px}
+  .casella .cas-why, .casella .cas-meglio, .casella .gsv{display:none}
+}
+
+/* ── Panchina sul telefono ── */
+/* Sotto i 620px le colonne secondarie spariscono invece di stringersi: a
+   390px la riga tagliava il nome del giocatore («Rusr…») per far stare la
+   squadra di serie A. Il nome ha la precedenza; la squadra si legge nella
+   striscia della partita e nella scheda. */
+@media (max-width:620px){
+  .benchrow .bn .pteam{display:none}
+  .benchrow{gap:6px;padding-left:10px;padding-right:10px}
+}
+
+/* ── Listone ── */
+/* Il filo di ruolo sta nella prima cella, appoggiato al bordo sinistro della
+   riga: le celle di una tabella non spostano le colonne se il filo è assoluto. */
+table.list td.cella-filo{position:relative}
+table.list td.cella-filo > .fr-filo-ruolo{position:absolute;left:0;top:5px;bottom:5px;height:auto}
+/* La stella non selezionata era --line-strong: 1,3:1 sul pannello, e sul velo
+   della propria riga spariva del tutto. È un comando, quindi almeno 3:1:
+   --fr-fioco (4,99:1 nel giorno, 6,09 nel notte). Accesa resta marchio. */
+.starbtn{color:var(--fr-fioco)}
+/* Già preso da un'altra squadra: grigio leggibile e nome più leggero, non
+   opacità. Con opacity:.5 il testo secondario scendeva a 2,57:1 nel notte e
+   2,00:1 nel giorno, e nel giorno anche il nome a 3,34:1. Di chi è lo dice
+   la colonna «Stato». */
+table.list tr.taken{opacity:1}
+table.list tr.taken td{color:var(--fr-fioco)}
+table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
+/* Sotto i 620px le colonne secondarie spariscono invece di stringersi: il
+   documento nomina convenienza e prossime partite. */
+@media (max-width:620px){
+  table.list .col-secondaria{display:none}
+}
 
 /* ── previsione contro realtà e testa a testa ── */
 /* Righe separate da filetti, non card: il documento le vuole così per i dati. */
@@ -83,3 +148,122 @@
   border-top:1px solid var(--fr-filo-t);font-size:var(--fr-t-piccolo)}
 .tat-xi li > .fr-filo-ruolo{position:absolute;left:0;top:5px;bottom:5px;height:auto}
 .tat-totale{font-size:var(--fr-t-grande);line-height:1}
+
+/* ── Titolari ── */
+/* La riga sta dentro una sezione con 14px di margine: il filo si appoggia al
+   bordo della scheda, come nella panchina, e non sposta nome e quotazione. */
+.tp{position:relative}
+.tp > .fr-filo-ruolo{position:absolute;left:-14px;top:3px;bottom:3px;height:auto}
+
+/* ── Rose ── */
+/* Come in Titolari: la riga sta dentro una sezione con 14px di margine e il
+   filo si appoggia al bordo della scheda. La riga trovata dalla ricerca ha
+   un margine suo di -4px, quindi lì il filo rientra di altrettanto. */
+.rp{position:relative}
+.rp > .fr-filo-ruolo{position:absolute;left:-14px;top:3px;bottom:3px;height:auto}
+.rp.trovato > .fr-filo-ruolo{left:-10px}
+
+/* ── Asta ── */
+/* Il filo sul bordo delle righe del registro e dei risultati di ricerca. */
+.logrow, .results button{position:relative}
+.logrow > .fr-filo-ruolo, .results button > .fr-filo-ruolo{position:absolute;left:0;top:5px;bottom:5px;height:auto}
+/* I colori di ruolo non vanno sul testo (regola 3 dei token): i contatori del
+   tabellone e i «3/8» dei crediti in sala tornano inchiostro. Il ruolo lo
+   dicono la lettera e il fondino, che restano. */
+.gauge.gP, .gauge.gD, .gauge.gC, .gauge.gA{color:inherit}
+.sq.P, .sq.D, .sq.C, .sq.A{color:var(--fr-ink)}
+/* Già assegnato: grigio leggibile, non opacità — come le righe prese nel Listone. */
+.results .gone{opacity:1;color:var(--fr-fioco)}
+
+/* ── Lega: il mio undici e i pericolosi ── */
+/* Righe in griglia con la lettera nella prima colonna: il filo è assoluto,
+   non occupa una cella, e un margine lo stacca dalla lettera. */
+.undrow, .perrow{position:relative;padding-left:8px}
+.undrow > .fr-filo-ruolo, .perrow > .fr-filo-ruolo{position:absolute;left:0;top:5px;bottom:5px;height:auto}
+
+/* ── Infermeria e Mercato ── */
+/* Righe di giocatori in griglia o in fila: il filo è assoluto, quindi non
+   occupa una cella della griglia di .infrow e non sposta le colonne. */
+.infrow, .infres button, .mkpick{position:relative}
+.infrow{padding-left:10px}
+.infrow > .fr-filo-ruolo, .infres button > .fr-filo-ruolo, .mkpick > .fr-filo-ruolo{
+  position:absolute;left:0;top:6px;bottom:6px;height:auto;
+}
+
+/* ── Calendario: le forze ── */
+/* Attacco e difesa si distinguono con l'etichetta, non con il colore del
+   ruolo, che non va mai sul testo. La colonna si allarga per l'etichetta. */
+.forcerow .fv{width:auto;min-width:62px}
+.forza-et{font-style:normal;font-size:var(--fr-t-mini);color:var(--fr-fioco);margin-right:4px}
+
+/* ── colore squadra: la propria riga e la testata ── */
+/* Nel registro d'asta la propria riga si riconosce come nelle rose: il velo
+   del marchio, e un filo del marchio sul bordo che non sposta le colonne. */
+.logrow.mine{background:var(--fr-marchio-velo);box-shadow:inset 3px 0 0 var(--fr-marchio)}
+
+/* ── il cassetto ── */
+/* Scheda giocatore e «Chi schierare» non sono pagine: salgono dal basso sopra
+   quello che stavi guardando e lo lasciano dov'era. Raggi grandi solo in
+   cima, un filo di marchio sul bordo, e lo scorrimento dentro il cassetto —
+   non sulla pagina sotto. legacy.css resta com'è: qui lo si ridisegna. */
+.modal{align-items:flex-end;padding:0;overflow:hidden}
+.pcard{
+  max-width:760px;max-height:min(88vh, 920px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  border:1px solid var(--fr-filo);border-bottom:0;border-top:3px solid var(--fr-marchio);
+  border-radius:var(--fr-r-grande) var(--fr-r-grande) 0 0;
+  box-shadow:0 -12px 40px -18px rgba(0,0,0,.55);
+  animation:cassetto var(--fr-mov-lento);
+}
+@keyframes cassetto{from{transform:translateY(28px)}to{transform:none}}
+/* Un elemento flex non si stringe sotto la larghezza del suo contenuto: senza
+   min-width:0 la griglia a quattro caselle della scheda allargava il cassetto
+   oltre lo schermo del telefono, e il bordo destro spariva tagliato. */
+.pcard{min-width:0}
+/* sotto i 620px le griglie scendono a due colonne; la scheda scrive la sua
+   griglia in linea, quindi qui serve !important */
+@media (max-width:620px){
+  .pstats{grid-template-columns:repeat(2,1fr) !important}
+}
+
+/* ── i colori di ruolo quando dicono altro ── */
+/* Il rosso dell'attaccante e il blu del difensore o del centrocampista
+   significano «ruolo» e basta (fantaregia-design.md, regola 3): dove
+   servivano a dire mentalità, rigorista, porta inviolata o pericolo,
+   diventavano un falso indizio di ruolo. Qui tornano inchiostro, forma o
+   verde/rosso secondo quello che vogliono dire davvero. legacy.css resta
+   com'è: questo file, caricato dopo, lo sovrascrive.
+   Scelta di Francesco, 16/09/2026. */
+
+/* La mentalità non è un ruolo: è una direzione. Inchiostro e una freccia,
+   e nella barra dell'equilibrio in Asta la forma al posto del colore —
+   pieno chi spinge, grigio l'equilibrata, tratteggio chi copre. */
+.ment.off, .ment.equ, .ment.cop{color:var(--fr-ink)}
+.ment::before{margin-right:3px;color:var(--fr-fioco);font-weight:400}
+.ment.off::before{content:"↗"}
+.ment.equ::before{content:"→"}
+.ment.cop::before{content:"↘"}
+.balbar i.off{background:var(--fr-ink);color:var(--fr-pan)}
+.balbar i.equ{background:var(--fr-filo);color:var(--fr-ink)}
+.balbar i.cop{background:repeating-linear-gradient(135deg,var(--fr-filo) 0 2px,var(--fr-pan) 2px 6px);color:var(--fr-ink)}
+
+/* Il rigorista non è un attaccante: lo sono anche difensori e centrocampisti.
+   Badge d'inchiostro, pieno il primo e vuoto il secondo; «una sola fonte» è
+   il tratteggio e non l'opacità, che a .62 scendeva sotto il leggibile. */
+.rig{background:transparent;color:var(--fr-ink);border-color:var(--fr-ink)}
+.rig.first{background:var(--fr-ink);color:var(--fr-pan);border-color:var(--fr-ink)}
+.rig.soft{opacity:1;border-style:dashed}
+.rig.first.soft{background:transparent;color:var(--fr-ink)}
+
+/* Le caselle dei bonus seguono la regola della spia: verde quello che porta
+   punti, rosso quello che ne toglie. La porta inviolata era nel blu del
+   difensore pur essendo un bonus del portiere, gli assist nel colore del
+   marchio; lo zero era sbiadito e ora è grigio leggibile. */
+.btile.ass, .btile.cs, .btile.par{background:var(--fr-su-velo);color:var(--fr-su);border-color:var(--fr-su)}
+.btile.amm{background:var(--fr-giu-velo);color:var(--fr-giu);border-color:var(--fr-giu)}
+.btile.off{opacity:1;background:var(--fr-incasso);color:var(--fr-fioco);border-color:var(--fr-filo)}
+
+/* Il tetto del più pericoloso non è uno scostamento da un riferimento: è
+   quanto fa in una giornata buona. Inchiostro in grassetto e barre grigie,
+   così il rosso resta ai malus veri. */
+.perrow.primo .pertet{color:var(--fr-ink);font-weight:var(--fr-peso-num)}
+.perbar i{background:var(--fr-fioco);opacity:1}

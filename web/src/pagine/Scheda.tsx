@@ -97,10 +97,10 @@ export default function Scheda({ m, id, legaId, puoScrivere, obiettivo, onObiett
                 <Tile n={st.ass!} k="Assist" cls="ass" />
                 {p.r === 'P' ? <>
                   <Tile n={st.cs!} k="Porta inviolata" cls="cs" />
-                  <Tile n={st.rp!} k="Rigori parati" cls="neu" />
+                  <Tile n={st.rp!} k="Rigori parati" cls="par" />
                   <Tile n={st.sub!} k="Gol subiti" cls="mal" />
                 </> : <>
-                  <Tile n={st.amm!} k="Ammonizioni" cls="neu" />
+                  <Tile n={st.amm!} k="Ammonizioni" cls="amm" />
                   <Tile n={st.esp! + st.au! + st.rs!} k="Esp. autogol rig." cls="mal" />
                 </>}
               </div>

@@ -138,6 +138,13 @@
   --fr-diff-3:#29343D; --fr-diff-3-ink:#A3B6C3;   /* l'avversario medio: neutro */
   --fr-diff-4:#4B2B1B; --fr-diff-4-ink:#F0B18C;
   --fr-diff-5:#4C201C; --fr-diff-5-ink:#F3A49B;   /* molto sfavorevole */
+
+  /* fondini dei chip di ruolo, dove il filo non c'è */
+  --fr-ruolo-p-velo:#2E2312; --fr-ruolo-d-velo:#122C1F; --fr-ruolo-c-velo:#151F31; --fr-ruolo-a-velo:#2E1715;
+  /* il campo della formazione, e le maglie per fascia di punteggio */
+  --fr-erba:#183A2E; --fr-erba-2:#143327; --fr-erba-linea:rgba(198,244,218,.34);
+  --fr-maglia-oro:#7A5A12; --fr-maglia-oro-2:#C9A238; --fr-maglia-arg:#4C575D; --fr-maglia-arg-2:#8A979E;
+  --fr-maglia-bro:#5F3A1E; --fr-maglia-bro-2:#A66E44; --fr-maglia-gre:#414D53; --fr-maglia-gre-2:#77848B;
 }
 
 /* ============================================================
@@ -171,6 +178,13 @@
   --fr-diff-4:#F7D6BE; --fr-diff-4-ink:#833710;
   --fr-diff-5:#F5C6C0; --fr-diff-5-ink:#8F1A12;
 
+  /* fondini dei chip di ruolo, dove il filo non c'è */
+  --fr-ruolo-p-velo:#FAEEDA; --fr-ruolo-d-velo:#E0F0E7; --fr-ruolo-c-velo:#E3EBF7; --fr-ruolo-a-velo:#F9E5E3;
+  /* il campo della formazione, e le maglie per fascia di punteggio */
+  --fr-erba:#C8E2CE; --fr-erba-2:#BEDBC6; --fr-erba-linea:rgba(255,255,255,.9);
+  --fr-maglia-oro:#8A6410; --fr-maglia-oro-2:#D6A82C; --fr-maglia-arg:#586167; --fr-maglia-arg-2:#98A6AE;
+  --fr-maglia-bro:#6E4222; --fr-maglia-bro-2:#B4794C; --fr-maglia-gre:#5A666C; --fr-maglia-gre-2:#8B989F;
+
   /* i ruoli scuriscono un po' per reggere sul bianco */
   --fr-ruolo-p:#B2842A;
   --fr-ruolo-d:#2E8E58;
@@ -196,9 +210,26 @@
     --fr-diff-3:#E3E7EA; --fr-diff-3-ink:#4B5C65;
     --fr-diff-4:#F7D6BE; --fr-diff-4-ink:#833710;
     --fr-diff-5:#F5C6C0; --fr-diff-5-ink:#8F1A12;
+    /* fondini dei chip di ruolo, dove il filo non c'è */
+    --fr-ruolo-p-velo:#FAEEDA; --fr-ruolo-d-velo:#E0F0E7; --fr-ruolo-c-velo:#E3EBF7; --fr-ruolo-a-velo:#F9E5E3;
+    /* il campo della formazione, e le maglie per fascia di punteggio */
+    --fr-erba:#C8E2CE; --fr-erba-2:#BEDBC6; --fr-erba-linea:rgba(255,255,255,.9);
+    --fr-maglia-oro:#8A6410; --fr-maglia-oro-2:#D6A82C; --fr-maglia-arg:#586167; --fr-maglia-arg-2:#98A6AE;
+    --fr-maglia-bro:#6E4222; --fr-maglia-bro-2:#B4794C; --fr-maglia-gre:#5A666C; --fr-maglia-gre-2:#8B989F;
     --fr-ruolo-p:#B2842A; --fr-ruolo-d:#2E8E58;
     --fr-ruolo-c:#2F73C4; --fr-ruolo-a:#CF5440; --fr-ruolo-ink:#FFFFFF;
   }
+}
+
+/* I controlli del browser — menu a tendina aperti, selettore colore, barre
+   di scorrimento — non leggono i token: seguono color-scheme. Senza, restano
+   chiari anche nel tema notte. Stessa logica dei token qui sopra: notte di
+   partenza, giorno esplicito, e chiaro quando data-tema manca e il sistema
+   è chiaro. */
+:root, :root[data-tema="notte"]{color-scheme:dark}
+:root[data-tema="giorno"]{color-scheme:light}
+@media (prefers-color-scheme: light){
+  :root:not([data-tema]){color-scheme:light}
 }
 
 /* ============================================================

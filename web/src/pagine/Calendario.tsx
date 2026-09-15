@@ -60,10 +60,10 @@ export default function Calendario({ motore: m }: { motore: Motore }) {
             <tbody>
               {righe.map((r, i) => (
                 <tr key={r.t}>
-                  <td className="mono w-8 text-muted">{i + 1}</td>
+                  <td className="w-8 text-muted fr-num">{i + 1}</td>
                   <td className="tname">{r.t}</td>
                   <td><FixStrip m={m} team={r.t} r={role} from={f} span={sp} /></td>
-                  <td className="num">{r.s === null ? '—' : <span className="calscore" style={{ color: scoreCol(r.s) }}>{r.s.toFixed(2)}</span>}</td>
+                  <td className="num">{r.s === null ? '—' : <span className="calscore fr-num" style={{ color: scoreCol(r.s) }}>{r.s.toFixed(2)}</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -88,12 +88,14 @@ export default function Calendario({ motore: m }: { motore: Motore }) {
             : <>Finché non carichi i voti sono solo valori di partenza: reggono in agosto e vanno riletti quando il campo dice altro.</>}
           {' '}Il fattore campo vale mezzo gradino di difficoltà.
         </p>
+        {/* Attacco e difesa si distinguono con l'etichetta, non con il colore del ruolo: i colori di ruolo
+            stanno solo su fili e chip, mai sul testo (regola 3 dei token). */}
         <div className="forcegrid">
           {forze.map(x => (
             <div key={x.t} className="forcerow">
               <span className="fn">{x.t}</span>
-              <span className="fv" title="Forza d'attacco" style={{ color: 'var(--rA)' }}>{segno2(x.a)}</span>
-              <span className="fv" title="Solidità difensiva" style={{ color: 'var(--rD)' }}>{segno2(x.d)}</span>
+              <span className="fv" title="Forza d'attacco"><i className="forza-et">att</i><span className="fr-num">{segno2(x.a)}</span></span>
+              <span className="fv" title="Solidità difensiva"><i className="forza-et">dif</i><span className="fr-num">{segno2(x.d)}</span></span>
             </div>
           ))}
         </div>
@@ -120,7 +122,7 @@ function Risultati({ m, gg, g, onG }: { m: Motore; gg: number[]; g: number; onG:
             <div key={r.casa} className={`rispart${r.torna === false ? ' dubbia' : ''}`}
               title={r.torna === false ? 'i gol dei giocatori e quelli subiti dal portiere non tornano: forse il file di quella giornata è parziale' : undefined}>
               <span className={`rt${r.gc > r.go ? ' win' : ''}`}>{r.casa}</span>
-              <span className={`rs${r.gc === r.go ? ' pari' : ''}`}>{r.gc}<i>–</i>{r.go}</span>
+              <span className={`rs fr-num${r.gc === r.go ? ' pari' : ''}`}>{r.gc}<i>–</i>{r.go}</span>
               <span className={`rt${r.go > r.gc ? ' win' : ''}`}>{r.osp}</span>
             </div>
           ))}
@@ -136,11 +138,11 @@ function Risultati({ m, gg, g, onG }: { m: Motore; gg: number[]; g: number; onG:
               const dr = x.gf - x.gs
               return (
                 <tr key={x.t}>
-                  <td className="mono cpos">{k + 1}</td><td className="tname">{x.t}</td>
-                  <td className="num csm">{x.g}</td><td className="num csm">{x.v}</td><td className="num csm">{x.n}</td><td className="num csm">{x.p}</td>
-                  <td className="num csm">{x.gf}:{x.gs}</td>
-                  <td className="num csm" style={{ color: dr > 0 ? 'var(--ok)' : dr < 0 ? 'var(--crit)' : 'var(--muted)' }}>{dr > 0 ? '+' : ''}{dr}</td>
-                  <td className="num cpt">{x.pt}</td>
+                  <td className="cpos fr-num">{k + 1}</td><td className="tname">{x.t}</td>
+                  <td className="num csm fr-num">{x.g}</td><td className="num csm fr-num">{x.v}</td><td className="num csm fr-num">{x.n}</td><td className="num csm fr-num">{x.p}</td>
+                  <td className="num csm fr-num">{x.gf}:{x.gs}</td>
+                  <td className="num csm fr-num" style={{ color: dr > 0 ? 'var(--ok)' : dr < 0 ? 'var(--crit)' : 'var(--muted)' }}>{dr > 0 ? '+' : ''}{dr}</td>
+                  <td className="num cpt fr-num">{x.pt}</td>
                 </tr>
               )
             })}

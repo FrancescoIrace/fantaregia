@@ -13,6 +13,11 @@ coverage/
 supabase/.temp/
 supabase/.branches/
 
+# Briefing personale di Francesco sulle feature nuove: appunti privati, e il
+# repo è pubblico. Era solo «non tracciato», cioè a un `git add -A` di distanza
+# dall'essere pubblicato.
+fantaregia-prompt-nuove-feature.md
+
 # Dati reali della lega: stesso vincolo di licenza della root.
 # Nessun export dal database (listone, voti, backup d'asta) va versionato.
 *.xlsx

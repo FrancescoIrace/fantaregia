@@ -5,7 +5,7 @@ import { righeRiepilogo, righeRose } from '../domain/riepilogo.ts'
 import { libera } from '../data/lega.ts'
 import { scaricaCartella } from '../lib/fogli.ts'
 import { OutBadge, RigBadge } from '../viste/segni.tsx'
-import { Avviso, Bottone, Card, Ruolo as ChipRuolo } from '../ui.tsx'
+import { Avviso, Bottone, Card } from '../ui.tsx'
 import Scheda from './Scheda.tsx'
 
 const votoCol = (v: number) => v >= 70 ? 'var(--ok)' : v >= 55 ? 'var(--warn)' : 'var(--crit)'
@@ -79,19 +79,20 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
                     const st = m.stats(x.t.id), g = x.g, d = 1 / g.resa - 1
                     return (
                       <tr key={x.t.id} className={m.isMine(x.t.id) ? 'mine' : undefined}>
-                        <td className="mono text-muted">{i + 1}</td>
+                        <td className="text-muted fr-num">{i + 1}</td>
                         <td><b>{x.t.name}</b>{m.isMine(x.t.id) && <span className="tag neu"> io</span>}
                           <div className="pteam">{g.mod} · {g.n} giocatori</div></td>
-                        <td className="num">{st.spent}</td>
-                        <td className="num text-muted">{st.left}</td>
-                        <td className="num text-[12px]">{ROLES.map((r, k) => (
-                          <span key={r}>{k > 0 && ' · '}<span style={{ color: `var(--r${r})` }}>{g.dev[r].reale}</span></span>
+                        <td className="num fr-num">{st.spent}</td>
+                        <td className="num text-muted fr-num">{st.left}</td>
+                        {/* l'ordine dei ruoli lo dice l'intestazione: i colori di ruolo non vanno sul testo (regola 3 dei token) */}
+                        <td className="num text-[12px] fr-num">{ROLES.map((r, k) => (
+                          <span key={r}>{k > 0 && ' · '}{g.dev[r].reale}</span>
                         ))}</td>
-                        <td className="num" style={{ color: d <= -0.05 ? 'var(--ok)' : d >= 0.05 ? 'var(--crit)' : 'var(--muted)' }}>
+                        <td className="num fr-num" style={{ color: d <= -0.05 ? 'var(--ok)' : d >= 0.05 ? 'var(--crit)' : 'var(--muted)' }}>
                           {d >= 0 ? '+' : '−'}{Math.abs(Math.round(d * 100))}%</td>
-                        <td className="num">{g.media.toFixed(0)}</td>
-                        <td className="num">{g.titolari}</td>
-                        <td className="num"><b className="text-base" style={{ color: votoCol(g.voto) }}>{g.voto}</b></td>
+                        <td className="num fr-num">{g.media.toFixed(0)}</td>
+                        <td className="num fr-num">{g.titolari}</td>
+                        <td className="num"><b className="text-base fr-num" style={{ color: votoCol(g.voto) }}>{g.voto}</b></td>
                       </tr>
                     )
                   })}
@@ -131,14 +132,15 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
             if (cerca && !lista.length) return null
             return (
               <div key={r} className="rosesec">
-                <div className="sh"><span>{ROLENAME[r]}</span><span className="mono">{st.perRole[r].spent} cr</span></div>
+                <div className="sh"><span>{ROLENAME[r]}</span><span className="fr-num">{st.perRole[r].spent} cr</span></div>
                 {lista.map(x => (
                   <div key={x.p.id} className={`rp${cerca && trova(x.p.n, x.p.s) ? ' trovato' : ''}`}>
-                    <ChipRuolo r={r} />
+                    <span className="fr-filo-ruolo" data-ruolo={r} aria-hidden="true" />
+                    <span className="ruolo-lettera">{r}</span>
                     <button type="button" className="nm pname clic" onClick={() => setAperto(x.p.id)}>{x.p.n}</button>
                     <RigBadge m={m} p={x.p} /><OutBadge m={m} p={x.p} />
                     <span className="pteam text-[11px]">{x.p.s}</span>
-                    <span className="pz">{x.price}</span>
+                    <span className="pz fr-num">{x.price}</span>
                     {puoScrivere && <button type="button" className="x" title="Libera"
                       onClick={() => void libera(legaId, x.p.id).then(ricarica, (e: Error) => setEsito(e.message))}>✕</button>}
                   </div>
@@ -158,21 +160,21 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
                 <h3>{t.name}</h3>
                 {m.isMine(t.id) && <span className="tag neu">io</span>}
                 {!!cerca && <span className="tag ok">{match} {match === 1 ? 'trovato' : 'trovati'}</span>}
-                {g && <span className="voto" style={{ color: votoCol(g.voto) }} title="Il voto della rosa">{g.voto}</span>}
-                <span className="mono font-semibold">{st.left}</span>
+                {g && <span className="voto fr-num" style={{ color: votoCol(g.voto) }} title="Il voto della rosa">{g.voto}</span>}
+                <span className="font-semibold fr-num">{st.left}</span>
               </summary>
               <div className="roseb">
                 {sezioni}
                 {!cerca && g && (
                   <div className="giud">
-                    <div className="gh">Giudizio <b style={{ color: votoCol(g.voto) }}>{g.voto}</b>
+                    <div className="gh">Giudizio <b className="fr-num" style={{ color: votoCol(g.voto) }}>{g.voto}</b>
                       <span className="hint ml-auto">{g.mod} · undici da {g.media.toFixed(0)}</span></div>
                     <div className="gparts">
                       {g.parti.map(x => (
                         <div key={x.k} className="gpart" title={x.nota}>
                           <div className="gpl">{x.k}</div>
                           <div className="gpb"><span style={{ width: `${Math.round(x.v / x.max * 100)}%`, background: x.v / x.max >= 0.7 ? 'var(--ok)' : x.v / x.max <= 0.3 ? 'var(--crit)' : 'var(--accent)' }} /></div>
-                          <div className="gpv">{Math.round(x.v)}<span style={{ opacity: .5 }}>/{x.max}</span></div>
+                          <div className="gpv fr-num">{Math.round(x.v)}<span style={{ opacity: .5 }}>/{x.max}</span></div>
                         </div>
                       ))}
                     </div>

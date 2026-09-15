@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { Motore } from '../domain/motore.ts'
 import type { Ruolo } from '../domain/tipi.ts'
-import { deltaCol, fmCol } from '../viste/colori.ts'
-import { RigBadge, Spark } from '../viste/segni.tsx'
-import { Card, Ruolo as ChipRuolo } from '../ui.tsx'
+import { fmCol } from '../viste/colori.ts'
+import { Delta, RigBadge, Spark } from '../viste/segni.tsx'
+import { Card } from '../ui.tsx'
 
 type Chiave = 'pres' | 'mv' | 'fm' | 'gf' | 'ass' | 'forma' | 'q'
 
@@ -75,20 +75,24 @@ export default function Rendimento({ motore: m }: { motore: Motore }) {
                 const f = m.formaOf(p.id)
                 return (
                   <tr key={p.id}>
-                    <td><ChipRuolo r={p.r} /></td>
+                    <td className="cella-filo">
+                      <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
+                      <span className="ruolo-lettera">{p.r}</span>
+                    </td>
                     <td>
                       <div className="namewrap"><span className="pname">{p.n}</span><RigBadge m={m} p={p} /></div>
                       <div className="pteam">{p.s}{st.sv ? <span className="subline"> {st.sv} s.v.</span> : null}
                         {st.amm || st.esp ? <span className="subline"> {st.amm ? `${st.amm}×⚠` : ''}{st.esp ? ` ${st.esp}×⛔` : ''}</span> : null}</div>
                     </td>
-                    <td className="num">{st.pres}<span className="text-muted">/{st.su}</span></td>
-                    <td className="num">{st.mv === null || st.mv === undefined ? '—' : st.mv.toFixed(2)}</td>
-                    <td className="num"><span className="fmv" style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(2)}</span></td>
-                    <td className="num">{st.gf || '—'}</td>
-                    <td className="num">{st.ass || '—'}</td>
+                    <td className="num fr-num">{st.pres}<span className="text-muted">/{st.su}</span></td>
+                    <td className="num fr-num">{st.mv === null || st.mv === undefined ? '—' : st.mv.toFixed(2)}</td>
+                    <td className="num"><span className="fmv fr-num" style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(2)}</span></td>
+                    <td className="num fr-num">{st.gf || '—'}</td>
+                    <td className="num fr-num">{st.ass || '—'}</td>
                     <td><Spark serie={st.serie} /></td>
-                    <td className="num">{f ? <span className="delta" style={{ color: deltaCol(f.delta) }}>{f.delta >= 0 ? '+' : ''}{f.delta.toFixed(1)}</span> : '—'}</td>
-                    <td className="num text-muted">{p.q}</td>
+                    {/* la forma è già uno scostamento dalla sua fantamedia: la stessa soglia di ±0,5 di prima, detta con il delta */}
+                    <td className="num">{f ? <Delta ora={f.delta} prima={0} soglia={0.5} decimali={1} titolo="rispetto alla sua fantamedia di stagione" /> : '—'}</td>
+                    <td className="num fr-num text-muted">{p.q}</td>
                   </tr>
                 )
               })}

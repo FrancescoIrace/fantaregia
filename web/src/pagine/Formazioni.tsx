@@ -9,7 +9,7 @@ import { moduloPreferito, salvaModuloPreferito, salvaTitolariFissi, titolariFiss
 import type { Giocatore, Ruolo } from '../domain/tipi.ts'
 import type { RigheLega } from '../data/componi.ts'
 import { salvaFormazioni } from '../data/lega.ts'
-import { ABBR, appetCol, dataBreve, deltaCol, fascia, fmCol, segno } from '../viste/colori.ts'
+import { ABBR, appetCol, dataBreve, deltaCol, fmCol, segno } from '../viste/colori.ts'
 import { Delta, FixStrip, OutBadge, RigBadge, TitDot } from '../viste/segni.tsx'
 import { Avviso, Bottone, Card } from '../ui.tsx'
 import PrevisioneRealta from './PrevisioneRealta.tsx'
@@ -173,7 +173,7 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
                 <div className="rowlab"><span>{lab}</span></div>
                 <div className="prow" data-n={L.start[r].length}>
                   {L.start[r].map((id, i) => (
-                    <Maglia key={i} m={m} g={g} p={id ? giocatore(id) : null} sc={sc} scPrima={scPrima} fisso={!!id && fissi.includes(id)}
+                    <CasellaCampo key={i} m={m} g={g} p={id ? giocatore(id) : null} sc={sc} scPrima={scPrima} fisso={!!id && fissi.includes(id)}
                       alternative={R[r].map(x => x.p).filter(x => !dentro.has(x.id) && !m.isOut(x.id))}
                       onApri={() => setCasella({ r, i })} />
                   ))}
@@ -246,10 +246,18 @@ function Dato({ v, k, col, delta }: { v: ReactNode; k: string; col?: string; del
   )
 }
 
-/* La maglia di una casella: la fascia viene dal punteggio di giornata, ed è
-   la stessa scala di colori usata ovunque. Se in panchina c'è chi fa più
-   di cinque punti meglio, il bordo lo dice. */
-function Maglia({ m, g, p, sc, scPrima, fisso, alternative, onApri }: {
+/* La casella di una formazione (fantaregia-design.md, «Casella di formazione»).
+   Il bordo superiore dice lo stato, il corpo porta il punteggio e la frase che
+   lo spiega. Gli stati, in quest'ordine: indisponibile (costa punti, rosso);
+   da rivedere (in panchina c'è chi fa più di quattro punti meglio: bordo
+   d'inchiostro, una forma e non un colore); alta (dai 75 in su, la stessa
+   soglia che colora i punteggi); neutra. Il titolare fisso ha il bordo scuro
+   sugli altri tre lati, così lo stato in cima resta.
+   Prima era una maglia oro, argento o bronzo: il numero bianco sulla sfumatura
+   stava intorno ai 2:1 nel tema giorno. Scelta di Francesco, 16/09/2026. */
+const SOGLIA_ALTA = 75
+
+function CasellaCampo({ m, g, p, sc, scPrima, fisso, alternative, onApri }: {
   m: Motore; g: number; p: Giocatore | null; sc: (p: Giocatore) => number; scPrima: (p: Giocatore) => number | null; fisso: boolean; alternative: Giocatore[]; onApri: () => void
 }) {
   if (!p) return (
@@ -261,25 +269,25 @@ function Maglia({ m, g, p, sc, scPrima, fisso, alternative, onApri }: {
   const meglio = alternative.length ? alternative.reduce((a, x) => sc(x) > sc(a) ? x : a, alternative[0]) : null
   const su = !!meglio && sc(meglio) > s + 4
   const st = m.statFor(p.id), fo = m.formaOf(p.id, 3)
+  const stato = ko ? 'ko' : su ? 'rivedere' : s >= SOGLIA_ALTA ? 'alta' : 'neutra'
   return (
-    <button type="button" className={`gslot ${fascia(s)}${ko ? ' ko' : ''}${su ? ' meglio' : ''}${fisso ? ' bloccata' : ''}`} onClick={onApri}>
-      <span className="gs-rate">
-        <b className="fr-num">{s}</b>
-        <i>{p.r}</i>
-        {m.rigOf(p) && <span className="gs-rig"><RigBadge m={m} p={p} /></span>}
+    <button type="button" className={`casella ${stato}${fisso ? ' bloccata' : ''}`} onClick={onApri}>
+      <span className="cas-testa">
+        <span className="cas-nome">{p.n}{fisso && <span className="cas-fisso">fisso</span>}</span>
+        <b className="fr-num cas-punti" style={{ color: appetCol(s) }}>{s}</b>
       </span>
-      <span className="gs-main">
-        <span className="gs-nome">{p.n}{fisso && <span className="gs-fisso">fisso</span>}</span>
-        <span className="gs-sq"><TitDot m={m} p={p} /> {p.s}{ko && <> <OutBadge m={m} p={p} /></>}</span>
-        <span className="gs-stat">
-          <FixStrip m={m} team={p.s} r={p.r} from={g} span={1} />
-          <Delta ora={s} prima={scPrima(p)} />
-          {st && st.pres ? <span className="gsv"><i>fm</i><b style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(1)}</b></span> : null}
-          {fo && <span className="gsv"><i>for</i><b style={{ color: deltaCol(fo.delta) }}>{segno(fo.delta)}</b></span>}
-        </span>
-        <span className="gs-why">{m.dayWhy(p, g)}</span>
-        {su && meglio && <span className="gs-meglio">↑ {meglio.n} {sc(meglio)}</span>}
+      <span className="cas-sq">
+        <span className="ruolo-lettera">{p.r}</span><TitDot m={m} p={p} /> {p.s}
+        {m.rigOf(p) && <RigBadge m={m} p={p} />}{ko && <OutBadge m={m} p={p} />}
       </span>
+      <span className="cas-stat">
+        <FixStrip m={m} team={p.s} r={p.r} from={g} span={1} />
+        <Delta ora={s} prima={scPrima(p)} />
+        {st && st.pres ? <span className="gsv"><i>fm</i><b className="fr-num" style={{ color: fmCol(st.fm!) }}>{st.fm!.toFixed(1)}</b></span> : null}
+        {fo && <span className="gsv"><i>for</i><b className="fr-num" style={{ color: deltaCol(fo.delta) }}>{segno(fo.delta)}</b></span>}
+      </span>
+      <span className="cas-why">{m.dayWhy(p, g)}</span>
+      {su && meglio && <span className="cas-meglio">↑ {meglio.n} <span className="fr-num">{sc(meglio)}</span> in panchina</span>}
     </button>
   )
 }

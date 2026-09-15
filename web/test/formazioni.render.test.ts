@@ -32,10 +32,11 @@ describe('vista Formazioni', () => {
     expect((html.match(/class="benchrow/g) ?? []).length).toBe(Object.values(shared.assign!).filter(a => a.team === 3).length)
   })
 
-  it('con la formazione proposta: undici maglie colorate per fascia, distinta, niente caselle vuote', () => {
+  it('con la formazione proposta: undici caselle con lo stato sul bordo, distinta, niente caselle vuote', () => {
     const g = motore.giornataOggi()
     const html = disegna({ [g]: motore.formazioneAutomatica(g, '3-4-3') })
-    expect((html.match(/class="gslot f-(oro|arg|bro|gre)/g) ?? []).length).toBe(11)
+    expect((html.match(/class="casella (alta|neutra|rivedere|ko)/g) ?? []).length).toBe(11)
+    expect(html).not.toMatch(/gslot f-(oro|arg|bro|gre)/)                        // le maglie di prima
     expect(html).not.toContain('gslot vuoto')
     expect(html).toContain('formazione completa')
     expect(html).toContain('fixstrip')
@@ -50,9 +51,9 @@ describe('vista Formazioni', () => {
     expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(righePanchina)
     expect((html.match(/class="dsc fr-num"/g) ?? []).length).toBe(righePanchina)
     // il ruolo lo dice il filo: la lettera senza sfondo, niente quadratino pieno accanto ai delta
-    expect((html.match(/class="ruolo-lettera"/g) ?? []).length).toBe(righePanchina)
+    expect((html.match(/class="ruolo-lettera"/g) ?? []).length).toBe(righePanchina + 11)   // più una lettera per casella in campo
     expect(html).not.toContain('fr-chip')
-    expect((html.match(/class="gslot[^"]*"[^>]*>(?:(?!<\/button>).)*class="fr-num"/g) ?? []).length).toBe(11)
+    expect((html.match(/class="casella[^"]*"[^>]*>(?:(?!<\/button>).)*class="fr-num[ "]/g) ?? []).length).toBe(11)
     // un delta per riga di panchina, per maglia, e uno per il punteggio medio
     expect((html.match(/class="fr-delta" data-verso="(su|giu|fermo)"/g) ?? []).length).toBe(righePanchina + 11 + 1)
   })
