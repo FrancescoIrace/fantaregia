@@ -33,7 +33,7 @@ async function leggiRighe(lega: string): Promise<RigheLega> {
   const [l] = await q<RigheLega['lega']>('select id, nome, stagione, budget, slots, plan, squal_on, voti_meta, rose_meta, versione, aggiornata_il from public.leghe where id = $1')
   return {
     lega: l,
-    squadre: await q('select id::int as id, nome, posizione, lega_idx from public.squadre where lega_id = $1 order by posizione'),
+    squadre: await q('select id::int as id, nome, posizione, lega_idx, colore from public.squadre where lega_id = $1 order by posizione'),
     assegnazioni: await q('select giocatore_id, squadra_id::int as squadra_id, prezzo, snap from public.assegnazioni where lega_id = $1'),
     log: await q('select giocatore_id, squadra_id::int as squadra_id, prezzo, registrata_il from public.log_asta where lega_id = $1'),
     movimenti: await q('select id::int as id, giornata, tipo, voci, agg, rimborso, costo, registrato_il from public.movimenti where lega_id = $1'),

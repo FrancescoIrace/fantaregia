@@ -1,37 +1,71 @@
 @import "tailwindcss";
+@import "./viste/fantaregia-tokens.css";
 
-/* I token sono quelli di src/part1.html, copiati tali e quali: la webapp
-   deve avere la faccia di Fantaregia, non quella di un template. Tailwind
-   li espone come classi (bg-surface, text-muted, border-line, …).        */
+/* ══ Strato di alias ═════════════════════════════════════════════════
+   La sorgente dei valori è viste/fantaregia-tokens.css. Qui i nomi
+   vecchi (--accent, --ok, --line, …) restano in piedi come alias sui
+   token nuovi, così le 829 righe di viste/legacy.css e le classi
+   Tailwind già scritte nelle viste continuano a funzionare mentre le
+   viste passano al sistema nuovo una alla volta.
+
+   Non si aggiungono valori qui dentro: se manca un colore, il posto
+   dove definirlo è il file dei token. Le uniche eccezioni dichiarate
+   sono i fondini dei chip di ruolo, che nel sistema nuovo non hanno
+   ancora un token perché il ruolo vive su fili e chip pieni.
+
+   Le corrispondenze non ovvie, e perché:
+   - --line è il separatore fra righe (--fr-filo-t), --line-strong è
+     il bordo dei blocchi e dei controlli (--fr-filo). I controlli
+     perdono un po' di stacco: è voluto, «silenzio di base».
+   - --accent diventa --fr-marchio, cioè il colore della squadra di
+     chi guarda. Da qui in poi l'accento non è più una scelta
+     dell'app: è identità dell'utente, e va corretto a runtime da
+     viste/colore-squadra.ts.
+   - --warn diventa --fr-fioco. Verde e rosso dicono lo scostamento da
+     un riferimento; «manca un file» non si scosta da niente, quindi è
+     neutro. Non --fr-fermo: come testo sta a 2,67:1 sul bianco. Le
+     spie si distinguono con la forma (tratteggio, peso, cerchio vuoto),
+     e il grigio serve solo a farle leggere.
+   ═══════════════════════════════════════════════════════════════════ */
 :root {
-  --bg: #F1F3F4; --surface: #FFFFFF; --surface-2: #F7F9FA; --ink: #10191D; --muted: #5C6B72;
-  --line: #DCE3E5; --line-strong: #C3CFD3;
-  --accent: #0A6B87; --accent-ink: #FFFFFF; --accent-soft: #E2F0F5; --accent-line: #9CC9D9;
-  --ok: #1F7A4C; --ok-soft: #E1F1E8; --warn: #B5661A; --warn-soft: #FAEDDF; --crit: #B3261E; --crit-soft: #FAE6E4;
-  --rP: #B8760F; --rD: #237349; --rC: #33619F; --rA: #B03A32;
+  --bg: var(--fr-fondo);
+  --surface: var(--fr-pan);
+  --surface-2: var(--fr-incasso);
+  --ink: var(--fr-ink);
+  --muted: var(--fr-fioco);
+  --line: var(--fr-filo-t);
+  --line-strong: var(--fr-filo);
+
+  --accent: var(--fr-marchio);
+  --accent-ink: var(--fr-marchio-ink);
+  --accent-soft: var(--fr-marchio-velo);
+  --accent-line: var(--fr-marchio);
+
+  --ok: var(--fr-su);
+  --ok-soft: var(--fr-su-velo);
+  --crit: var(--fr-giu);
+  --crit-soft: var(--fr-giu-velo);
+  --warn: var(--fr-fioco);
+  --warn-soft: var(--fr-incasso);
+
+  --rP: var(--fr-ruolo-p);
+  --rD: var(--fr-ruolo-d);
+  --rC: var(--fr-ruolo-c);
+  --rA: var(--fr-ruolo-a);
+
+  --shadow: var(--fr-ombra);
+  --radius: var(--fr-r-grande);
+
+  /* fondini dei chip: senza token nel sistema nuovo, restano questi */
   --rP-soft: #FAEEDA; --rD-soft: #E0F0E7; --rC-soft: #E3EBF7; --rA-soft: #F9E5E3;
-  --shadow: 0 1px 2px rgba(16,25,29,.06), 0 8px 24px -12px rgba(16,25,29,.18);
-  --radius: 10px;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0D1417; --surface: #141F24; --surface-2: #18262C; --ink: #E6EDEF; --muted: #93A3AA;
-    --line: #233238; --line-strong: #33474F;
-    --accent: #4FC3E8; --accent-ink: #06222C; --accent-soft: #123039; --accent-line: #245A6D;
-    --ok: #5BC98E; --ok-soft: #122E22; --warn: #E0A055; --warn-soft: #32240F; --crit: #EC7A70; --crit-soft: #331714;
-    --rP: #DDA344; --rD: #5FBE98; --rC: #7FA8E8; --rA: #E58079;
+  :root:not([data-tema="giorno"]) {
     --rP-soft: #2E2312; --rD-soft: #122C1F; --rC-soft: #151F31; --rA-soft: #2E1715;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
   }
 }
-:root[data-theme="dark"] {
-  --bg: #0D1417; --surface: #141F24; --surface-2: #18262C; --ink: #E6EDEF; --muted: #93A3AA;
-  --line: #233238; --line-strong: #33474F;
-  --accent: #4FC3E8; --accent-ink: #06222C; --accent-soft: #123039; --accent-line: #245A6D;
-  --ok: #5BC98E; --ok-soft: #122E22; --warn: #E0A055; --warn-soft: #32240F; --crit: #EC7A70; --crit-soft: #331714;
-  --rP: #DDA344; --rD: #5FBE98; --rC: #7FA8E8; --rA: #E58079;
+:root[data-tema="notte"] {
   --rP-soft: #2E2312; --rD-soft: #122C1F; --rC-soft: #151F31; --rA-soft: #2E1715;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px -14px rgba(0,0,0,.7);
 }
 
 @theme inline {
@@ -62,19 +96,13 @@
   --color-r-a-soft: var(--rA-soft);
   --shadow-card: var(--shadow);
   --radius-card: var(--radius);
-  --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  --font-display: var(--fr-font-testo);
+  --font-body: var(--fr-font-testo);
+  --font-mono: var(--fr-font-num);
 }
 
 @layer base {
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--font-body);
-    font-size: 15px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  /* body e :focus-visible li definisce ormai il file dei token; qui
+     resta solo quello che i token non dicono. */
+  body { -webkit-font-smoothing: antialiased; }
 }

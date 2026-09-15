@@ -48,7 +48,7 @@ export function Avviso({ tipo = 'info', children }: { tipo?: 'info' | 'ok' | 'er
     info: 'border-accent-line bg-accent-soft text-accent',
     ok: 'border-ok bg-ok-soft text-ok',
     errore: 'border-crit bg-crit-soft text-crit',
-    attenzione: 'border-warn bg-warn-soft text-warn',
+    attenzione: 'border-dashed border-warn bg-transparent text-ink',
   }[tipo]
   return <div className={`rounded-lg border px-3 py-2 text-sm ${stile}`}>{children}</div>
 }

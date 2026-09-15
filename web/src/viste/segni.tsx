@@ -3,6 +3,7 @@
 import { MENTNAME, type Motore, type VoceSerie } from '../domain/motore.ts'
 import type { Giocatore, Ruolo } from '../domain/tipi.ts'
 import { ABBR } from './colori.ts'
+import { scriviDelta, verso } from './delta.ts'
 
 export function TitDot({ m, p }: { m: Motore; p: Giocatore }) {
   const t = m.titStato(p)
@@ -61,4 +62,14 @@ export function FixStrip({ m, team, r, from, span }: { m: Motore; team: string; 
       ))}
     </span>
   )
+}
+
+/** La variazione accanto al valore, sempre con il verso. Senza un confronto
+    non scrive niente ma tiene lo spazio, così le colonne non ballano. */
+export function Delta({ ora, prima, soglia = 3, decimali = 0, titolo = 'rispetto alla giornata prima' }: {
+  ora: number; prima: number | null | undefined; soglia?: number; decimali?: number; titolo?: string
+}) {
+  if (prima === null || prima === undefined) return <span className="fr-delta" aria-hidden="true" />
+  const d = ora - prima, testo = scriviDelta(d, decimali)
+  return <span className="fr-delta" data-verso={verso(d, soglia)} title={`${testo} ${titolo}`}>{testo}</span>
 }

@@ -13,16 +13,32 @@ import type {
   RigaSqualificaAnnullata, RigaSquadra, RigaVoti, RigheLega,
 } from './componi.ts'
 
-type Risposta<T> = { data: T | null; error: { message: string } | null }
+type Risposta<T> = { data: T | null; error: { message: string; code?: string } | null }
 function dati<T>(r: Risposta<T>, cosa: string): T {
   if (r.error) throw new Error(`${cosa}: ${r.error.message}`)
   return r.data as T
 }
 
+/* Le squadre, con il colore se il database ce l'ha. La colonna arriva con
+   la migrazione colore_squadra: finché su un database non è applicata,
+   chiederla fa fallire il caricamento dell'intera lega («column
+   squadre.colore does not exist»). Allora si richiede senza: ogni squadra
+   resta senza colore, il marchio usa l'ambra predefinita, e la Panoramica
+   dice cosa manca invece di nasconderlo. Ogni altro errore resta un errore. */
+const COLONNE_SQUADRE = 'id, nome, posizione, lega_idx'
+export async function leggiSquadre(chiedi: (colonne: string) => PromiseLike<Risposta<RigaSquadra[]>>) {
+  const r = await chiedi(`${COLONNE_SQUADRE}, colore`)
+  const manca = !!r.error && (r.error.code === '42703' || /colore.*does not exist/i.test(r.error.message))
+  if (!manca) return { squadre: dati(r, 'squadre'), coloreMancante: false }
+  const senza = await chiedi(COLONNE_SQUADRE)
+  return { squadre: dati(senza, 'squadre').map(s => ({ ...s, colore: null })), coloreMancante: true }
+}
+
 export async function caricaRighe(legaId: string, utenteId: string): Promise<RigheLega> {
-  const [lega, squadre, assegnazioni, log, movimenti, indisponibili, annullate, voti, dataset, preferenze] = await Promise.all([
+  const [lega, sq, assegnazioni, log, movimenti, indisponibili, annullate, voti, dataset, preferenze] = await Promise.all([
     supabase.from('leghe').select('*').eq('id', legaId).maybeSingle(),
-    supabase.from('squadre').select('id, nome, posizione, lega_idx').eq('lega_id', legaId).order('posizione'),
+    // con le colonne in una variabile Supabase non conosce la forma delle righe: la si dichiara qui, al confine, come fa dati()
+    leggiSquadre(colonne => supabase.from('squadre').select(colonne).eq('lega_id', legaId).order('posizione') as unknown as PromiseLike<Risposta<RigaSquadra[]>>),
     supabase.from('assegnazioni').select('giocatore_id, squadra_id, prezzo, snap').eq('lega_id', legaId),
     supabase.from('log_asta').select('giocatore_id, squadra_id, prezzo, registrata_il').eq('lega_id', legaId)
       .order('registrata_il', { ascending: false }).limit(500),
@@ -37,7 +53,8 @@ export async function caricaRighe(legaId: string, utenteId: string): Promise<Rig
   if (!l) throw new Error('lega non trovata, o non ne fai parte')
   return {
     lega: l,
-    squadre: dati<RigaSquadra[]>(squadre, 'squadre'),
+    squadre: sq.squadre,
+    coloreMancante: sq.coloreMancante,
     assegnazioni: dati<RigaAssegnazione[]>(assegnazioni, 'assegnazioni'),
     log: dati<RigaLog[]>(log, 'registro d\'asta'),
     movimenti: dati<RigaMovimento[]>(movimenti, 'movimenti'),
@@ -145,6 +162,15 @@ export async function salvaAbbinamento(legaId: string, squadraId: number, idx: n
     if (error) throw new Error(error.message)
   }
   const { error } = await supabase.from('squadre').update({ lega_idx: idx }).eq('id', squadraId)
+  if (error) throw new Error(error.message)
+}
+
+/** il colore di una squadra è un dato di lega: admin e banditori cambiano
+    quello di tutte, ognuno quello della squadra che ha scelto come sua
+    (vedi la migrazione colore_squadra). Si salva la tinta scelta, non
+    quella corretta sul tema. */
+export async function salvaColoreSquadra(legaId: string, squadraId: number, colore: string | null) {
+  const { error } = await supabase.rpc('imposta_colore', { p_lega: legaId, p_squadra: squadraId, p_colore: colore })
   if (error) throw new Error(error.message)
 }
 

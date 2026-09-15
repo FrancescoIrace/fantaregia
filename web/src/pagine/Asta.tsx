@@ -245,7 +245,7 @@ function Chiamata({ m, p, squadra, setSquadra, prezzo, setPrezzo, invio, conferm
       </div>
 
       {a ? (
-        <div className="suggest mt-3" style={{ borderColor: 'var(--warn)', background: 'var(--warn-soft)' }}>
+        <div className="suggest mt-3" style={{ border: '1px dashed var(--ink)', background: 'transparent' }}>
           Già assegnato a <b>{m.teamName(a.team)}</b> per <b>{a.price}</b> crediti.
           <Bottone piccolo className="ml-auto" onClick={() => liberaG(p.id)}>Libera</Bottone>
         </div>
@@ -340,7 +340,7 @@ function Equilibrio({ m }: { m: Motore }) {
           </div>
           <span className="balnote" style={{ color: poco ? 'var(--warn)' : 'var(--muted)' }}>{n ? `${Math.round(g.off / n * 100)}% off` : '—'}</span>
         </div>
-        {poco && <p className="hint ml-[37px]" style={{ color: 'var(--warn)' }}>
+        {poco && <p className="hint ml-[37px]" style={{ color: 'var(--ink)', fontWeight: 600 }}>
           Solo {g.off} su {n} {r === 'D' ? 'difensori spingono' : 'centrocampisti spingono'}: rischi una rosa che prende pochi bonus.</p>}
       </div>
     )

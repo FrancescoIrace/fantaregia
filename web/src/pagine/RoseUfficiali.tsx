@@ -120,7 +120,7 @@ export default function RoseUfficiali({ legaId, motore: m, ricarica }: {
 
           {!!conta.ignoto && <p className="hint mt-2">I nomi che non riconosco sono quasi sempre giocatori arrivati dopo l'ultimo listone
             caricato: aggiorna le quotazioni e ricarica il file.</p>}
-          {cmp.senza.length > 0 && <p className="hint mt-2"><span className="text-warn">Non ho capito a chi corrispondono</span>{' '}
+          {cmp.senza.length > 0 && <p className="hint mt-2"><span className="font-semibold text-ink">Non ho capito a chi corrispondono</span>{' '}
             <b>{cmp.senza.join(', ')}</b>: se hai caricato il calendario di lega, sistema gli abbinamenti nella scheda Lega e ricarica il file.</p>}
 
           {prop && prop.quanti > 0 && (
@@ -168,7 +168,7 @@ export default function RoseUfficiali({ legaId, motore: m, ricarica }: {
           ) : cmp.totali.length ? (
             <p className="hint mt-2">Tutto combacia: l'asta segnata è identica alle rose ufficiali.</p>
           ) : (
-            <p className="hint mt-2"><span className="text-warn">Non ho abbinato nessuna squadra</span>: né i nomi né le rose del file somigliano
+            <p className="hint mt-2"><span className="font-semibold text-ink">Non ho abbinato nessuna squadra</span>: né i nomi né le rose del file somigliano
               a quelle di quest'asta. Controlla di aver preso il file della lega giusta.</p>
           )}
 
@@ -181,10 +181,10 @@ export default function RoseUfficiali({ legaId, motore: m, ricarica }: {
             <div className="mt-3 rounded-lg border border-crit bg-crit-soft p-3">
               <Bottone variante={prop && prop.quanti ? 'normale' : 'primario'} disabled={invio} onClick={() => void allinea()}>Allinea l'asta al file</Bottone>
               <p className="hint mt-2">Riscrive {cmp.diverse} {cmp.diverse === 1 ? 'voce' : 'voci'} prendendo il file per buono. I nomi non
-                riconosciuti restano come stanno.{prop && prop.quanti > 0 && <> <span className="text-warn">Comprese le {prop.quanti} qui sopra</span>:
+                riconosciuti restano come stanno.{prop && prop.quanti > 0 && <> <span className="font-semibold text-ink">Comprese le {prop.quanti} qui sopra</span>:
                   riscritte così diventano correzioni d'asta, e i punti fatti prima seguono il giocatore invece di restare a chi ce l'aveva.
                   Meglio registrare prima i movimenti.</>}</p>
-              {m.moves().length > 0 && <p className="hint mt-2"><span className="text-warn">Hai {m.moves().length}{' '}
+              {m.moves().length > 0 && <p className="hint mt-2"><span className="font-semibold text-ink">Hai {m.moves().length}{' '}
                 {m.moves().length === 1 ? 'movimento registrato' : 'movimenti registrati'}</span>: il file fotografa le rose di oggi, quindi dopo
                 l'allineamento controlla i crediti nella scheda Rose.</p>}
             </div>

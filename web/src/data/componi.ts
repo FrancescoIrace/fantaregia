@@ -24,7 +24,7 @@ export interface RigaLega {
   versione: number
   aggiornata_il: string
 }
-export interface RigaSquadra { id: number; nome: string; posizione: number; lega_idx: number | null }
+export interface RigaSquadra { id: number; nome: string; posizione: number; lega_idx: number | null; colore: string | null }
 export interface RigaAssegnazione { giocatore_id: number; squadra_id: number; prezzo: number; snap: Snap | null }
 export interface RigaLog { giocatore_id: number; squadra_id: number; prezzo: number; registrata_il: string }
 export interface RigaMovimento {
@@ -59,6 +59,8 @@ export interface RigheLega {
   voti: RigaVoti[]
   dataset: RigaDataset[]
   preferenze: RigaPreferenze | null
+  /** il database non ha ancora squadre.colore (migrazione colore_squadra non applicata) */
+  coloreMancante?: boolean
 }
 
 /** lo stato condiviso della lega, nella forma di S */
@@ -135,4 +137,13 @@ export function ingressoMotore(r: RigheLega, opz: Pick<IngressoMotore, 'finestra
     me: r.preferenze ? { myTeam: r.preferenze.mia_squadra, targets: r.preferenze.obiettivi } : undefined,
     ...opz,
   }
+}
+
+/** il motore com'era prima della giornata g: gli stessi dati, senza i voti da
+    quella giornata in poi. Serve a chiedere al modello cosa avrebbe consigliato
+    senza fargli vedere il risultato («Previsione contro realtà»). */
+export function ingressoFinoA(r: RigheLega, g: number, opz: Pick<IngressoMotore, 'finestra' | 'oggi'> = {}): IngressoMotore {
+  const i = ingressoMotore(r, opz)
+  const stats = Object.fromEntries(Object.entries(i.stato?.stats ?? {}).filter(([k]) => Number(k) < g))
+  return { ...i, stato: { ...i.stato, stats } }
 }
