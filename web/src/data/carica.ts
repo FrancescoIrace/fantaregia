@@ -7,9 +7,10 @@
    chi li ha scaricati con il proprio account. L'unica fonte automatica è il
    calendario di openfootball, che è un dataset aperto di fatti.       */
 import { supabase } from '../lib/supabase.ts'
-import { creaMotore, type IngressoMotore } from '../domain/motore.ts'
+import { creaMotore, ROLES, type IngressoMotore, type Motore } from '../domain/motore.ts'
 import { calendarioDaOpenfootball, type PartitaAperta } from '../domain/importa.ts'
-import type { VotoRiga } from '../domain/tipi.ts'
+import type { SquadraAsta } from '../domain/calendario-lega.ts'
+import type { CalendarioLega, VotoRiga } from '../domain/tipi.ts'
 import type { TipoDataset } from './componi.ts'
 
 export async function salvaDataset(legaId: string, tipo: TipoDataset, dati: unknown, meta: Record<string, unknown> = {}) {
@@ -30,6 +31,45 @@ export async function scaricaCalendario(stagione: string, squadreListone: string
   if (!r.ok) throw new Error(`openfootball non ha ancora la stagione ${stagione} (${r.status})`)
   const j = await r.json() as { matches?: PartitaAperta[] }
   return calendarioDaOpenfootball(j.matches ?? [], squadreListone)
+}
+
+/* ── calendario di lega ─────────────────────────────────────────────
+   Un file solo porta gli incroci, i fantapunti e i risultati di ogni
+   scontro: è la fonte di classificaLega() e verifica(), che non calcolano
+   niente da sé. Si ricarica quando si vuole — a stagione avviata è così
+   che entrano i risultati nuovi.                                      */
+
+/** le squadre dell'asta nella forma che serve all'abbinamento automatico */
+export function squadreAsta(motore: Motore): SquadraAsta[] {
+  return motore.S.teams.map(t => {
+    const R = motore.roster(t.id)
+    return { tid: t.id, nome: t.name, colpi: ROLES.flatMap(r => R[r]).map(x => ({ nome: x.p.n, prezzo: x.price })) }
+  })
+}
+
+/* Gli abbinamenti stanno su squadre.lega_idx, uno per riga: si azzerano
+   tutti e si riscrivono, così «un nome, una squadra» resta vero anche
+   quando la mappa nuova sposta gli indici. */
+export async function salvaAbbinamenti(legaId: string, map: Record<string, number>) {
+  const { error } = await supabase.from('squadre').update({ lega_idx: null }).eq('lega_id', legaId)
+  if (error) throw new Error(error.message)
+  for (const [tid, idx] of Object.entries(map)) {
+    const { error: e } = await supabase.from('squadre').update({ lega_idx: idx }).eq('lega_id', legaId).eq('id', Number(tid))
+    if (e) throw new Error(e.message)
+  }
+}
+
+export async function salvaCalendarioLega(legaId: string, cal: CalendarioLega, map: Record<string, number>, meta: Record<string, unknown> = {}) {
+  await salvaDataset(legaId, 'calendario_lega', cal, meta)
+  try {
+    await salvaAbbinamenti(legaId, map)
+  } catch (e) {
+    // il calendario è dentro: quello che manca sono i nomi, e si rifanno a mano
+    throw new Error(
+      `calendario caricato, ma non sono riuscito a salvare gli abbinamenti (${(e as Error).message}): rifalli in «Abbinamenti», nella scheda Lega`,
+      { cause: e },
+    )
+  }
 }
 
 /* ── voti di giornata e i loro effetti sull'infermeria ──────────────

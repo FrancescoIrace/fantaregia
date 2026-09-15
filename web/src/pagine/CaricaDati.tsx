@@ -4,9 +4,12 @@ import {
   calendarioDaRighe, giornataDaTitolo, leggiVoti, parseCSV, righeInGiocatori, storicoDaRighe, unisciRimasti,
 } from '../domain/importa.ts'
 import type { Rigoristi, VotoRiga } from '../domain/tipi.ts'
+import { parseCalLega, riallinea } from '../domain/calendario-lega.ts'
 import { ingressoMotore, type RigheLega } from '../data/componi.ts'
 import { leggiPagina } from '../data/importa-app.ts'
-import { effettoVoti, salvaDataset, salvaVoti, scaricaCalendario, togliGiornata } from '../data/carica.ts'
+import {
+  effettoVoti, salvaCalendarioLega, salvaDataset, salvaVoti, scaricaCalendario, squadreAsta, togliGiornata,
+} from '../data/carica.ts'
 import { apriCartella, righeDaFile } from '../lib/fogli.ts'
 import { Avviso, Bottone, Card, Suggerimento } from '../ui.tsx'
 
@@ -21,6 +24,13 @@ export default function CaricaDati({ legaId, righe, motore }: { legaId: string; 
   const gv = motore.giornateGiocate(), ultima = gv.length ? Math.max(...gv) : 0
   const attesa = Math.max(0, motore.giornataOggi() - 1)
   const squadreListone = [...new Set(motore.PL.map(p => p.s))].sort()
+
+  /* Il calendario di lega porta con sé i risultati: se resta indietro, a
+     restare indietro sono la classifica di lega e la verifica. */
+  const CL = motore.S.lega, glv = motore.legaGiocate()
+  const ultimaRis = glv.length ? Math.max(...glv) : 0
+  const attesaRis = CL ? Math.max(0, motore.legaOggi() - 1) : 0
+  const daAbbinare = CL ? CL.teams.length - Object.keys(motore.S.legaMap ?? {}).length : 0
 
   return (
     <Card titolo="Carica dati">
@@ -37,6 +47,16 @@ export default function CaricaDati({ legaId, righe, motore }: { legaId: string; 
         <Riga nome="Calendario di serie A" stato={motore.CAL.teams.length ? `${motore.CAL.teams.length} squadre${meta('calendario').fonte ? ` · da ${String(meta('calendario').fonte)}` : ''}` : 'non caricato'}
           manca={!motore.CAL.teams.length}
           azione={esito => <FileCalendario legaId={legaId} stagione={righe.lega.stagione} squadre={squadreListone} esito={esito} />} />
+        <Riga nome="Calendario di lega e risultati"
+          stato={!CL ? 'non caricato · senza questo non ci sono classifica di lega né verifica'
+            : `${CL.teams.length} squadre · ${CL.gior.length} giornate`
+              + (!ultimaRis ? ' · nessun risultato'
+                : ultimaRis >= attesaRis ? ` · risultati fino alla ${ultimaRis}ª · in pari`
+                : attesaRis - ultimaRis === 1 ? ` · risultati fino alla ${ultimaRis}ª · manca la ${attesaRis}ª`
+                : ` · risultati fino alla ${ultimaRis}ª · mancano dalla ${ultimaRis + 1}ª alla ${attesaRis}ª`)
+              + (daAbbinare > 0 ? ` · ${daAbbinare} da abbinare` : '')}
+          manca={!CL || ultimaRis < attesaRis}
+          azione={esito => <FileCalLega legaId={legaId} motore={motore} esito={esito} />} />
         <Riga nome="Statistiche della stagione scorsa" stato={Object.keys(righe.dataset.find(d => d.tipo === 'storico')?.dati ?? {}).length ? 'caricate' : 'non caricate'}
           azione={esito => <FileSemplice etichetta="xlsx" accetta=".xlsx,.xls,.csv" esito={esito}
             carica={async f => { const h = storicoDaRighe(await righeDaFile(f, false)); await salvaDataset(legaId, 'storico', h, { name: f.name, when: Date.now() }); return `${Object.keys(h).length} giocatori con statistiche` }} />} />
@@ -142,6 +162,49 @@ function FileCalendario({ legaId, stagione, squadre, esito }: { legaId: string; 
       }} />
     </>
   )
+}
+
+/* Il file di leghe.fantacalcio.it: incroci, fantapunti e risultato in gol
+   di ogni scontro. Si ricarica a ogni giornata — è così che entrano i
+   risultati nuovi, che l'app non sa e non può calcolare da sé. Gli
+   abbinamenti con le squadre dell'asta si riallineano da soli, perché
+   ricaricando il file i nomi possono essere cambiati. */
+function FileCalLega({ legaId, motore, esito }: { legaId: string; motore: Motore; esito: (e: Esito) => void }) {
+  const [invio, setInvio] = useState(false)
+  return <SceltaFile etichetta={invio ? 'Carico…' : 'xlsx o csv'} accetta=".xlsx,.xls,.csv,.txt" disabled={invio}
+    onFile={async ([f]) => {
+      setInvio(true); esito(null)
+      try {
+        const { cal, giocate, offMisto, avvisi } = parseCalLega(await righeDaFile(f, false))
+        const r = riallinea(motore.S.lega, motore.S.legaMap ?? {}, cal, squadreAsta(motore))
+        await salvaCalendarioLega(legaId, { ...cal, nome: f.name }, r.map, { name: f.name, when: Date.now(), giocate })
+
+        const n = Object.keys(r.map).length, manca = cal.teams.length - n
+        const coda = manca > 0 ? ` ${manca === 1 ? 'Ne resta una' : `Ne restano ${manca}`} da abbinare, in «Abbinamenti».` : ''
+        const note: ReactNode[] = []
+        if (r.rinominate.length) note.push(<div key="rin"><b>Qualcuno ha cambiato nome</b> — {r.rinominate.join('; ')} — ma gli incroci sono identici, quindi gli abbinamenti restano validi.</div>)
+        if (r.rifatto) note.push(<div key="rif"><b>Gli incroci sono diversi da quelli di prima</b>: ho tenuto <b>{r.tenuti}</b> abbinamenti riconoscendo i nomi{r.persi.length ? <>, ma <b>{r.persi.join(', ')}</b> {r.persi.length === 1 ? 'non c\'è più' : 'non ci sono più'}</> : null}. Ricontrollali in «Abbinamenti».</div>)
+        if (offMisto) note.push(<div key="off"><b>L'aggancio alla serie A non è costante in tutto il file</b>: ho preso il valore più frequente.</div>)
+        if (avvisi.length) note.push(<div key="avv">{avvisi.join('; ')}.</div>)
+
+        esito({ tipo: note.length ? 'attenzione' : 'ok', testo: (
+          <div className="space-y-1">
+            <div>
+              Calendario caricato: <b>{cal.teams.length} squadre</b>, <b>{cal.gior.length} giornate</b>.
+              {' '}La 1ª di lega è la {Math.max(1, Math.min(38, 1 + cal.off))}ª di serie A.
+              {' '}{giocate ? <>Con i risultati di <b>{giocate === 1 ? 'una giornata' : `${giocate} giornate`}</b>.</> : 'Nessuna giornata ancora giocata.'}
+            </div>
+            <div>
+              {!n ? 'Ora abbina i nomi in «Abbinamenti», nella scheda Lega: lo fa uno solo e vale per tutti.'
+                : r.aveva ? <>I <b>{n}</b> abbinamenti che avevi restano al loro posto.{coda}</>
+                : <>Ne ho abbinate <b>{n}</b> da solo, per somiglianza del nome o per il giocatore simbolo in rosa: <b>controllale</b>, perché indovinare i soprannomi non è una scienza.{coda}</>}
+            </div>
+            {note}
+          </div>
+        ) })
+      } catch (e) { esito({ tipo: 'errore', testo: `Non sono riuscito a leggere il file: ${(e as Error).message}.` }) }
+      setInvio(false)
+    }} />
 }
 
 /* Un file solo: giornata letta dal titolo (o da indicare) e foglio a scelta.

@@ -23,6 +23,7 @@ const ESPORTA = [
   'pesoRisultati', 'giornataOggi', 'legaOggi', 'esitoDi', 'classificaLega', 'verifica',
   'sintesiVerifica', 'dayParts', 'dayScore', 'dayWhy', 'indiceNomi', 'meId', 'infoOut',
   'autoFill', 'lineup', 'movimentiProposti', 'parseVoti', 'giornataDa', 'rowsToPlayers',
+  'parseCalLega', 'proponiAbbinamenti',
 ]
 
 const jsonSafe = (o: unknown) => JSON.stringify(o).replace(/</g, '\\u003c')
