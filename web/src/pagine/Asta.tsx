@@ -76,9 +76,10 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
                         const a = m.S.assign[g.id]
                         return (
                           <button key={g.id} type="button" className={a ? 'gone' : ''} onClick={() => scegli(g)}>
-                            <ChipRuolo r={g.r} />
+                            <span className="fr-filo-ruolo" data-ruolo={g.r} aria-hidden="true" />
+                            <span className="ruolo-lettera">{g.r}</span>
                             <span className="min-w-0 flex-1"><b>{g.n}</b> <TitDot m={m} p={g} /><RigBadge m={m} p={g} /><OutBadge m={m} p={g} /> <span className="pteam">{g.s}</span></span>
-                            <span className="mono text-[12.5px] text-muted">{g.q}</span>
+                            <span className="text-[12.5px] text-muted fr-num">{g.q}</span>
                             {a && <span className="tag neu">{m.teamName(a.team)} {a.price}</span>}
                           </button>
                         )
@@ -94,7 +95,7 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
           </Card>
 
           <Card titolo="Assegnazioni" denso azioni={<>
-            <span className="hint mono">{Object.keys(m.S.assign).length} assegnati</span>
+            <span className="hint"><span className="fr-num">{Object.keys(m.S.assign).length}</span> assegnati</span>
             {puoScrivere && m.S.log.length > 0 && <Bottone piccolo onClick={() => liberaGiocatore(m.S.log[0].pid)}>Annulla ultima</Bottone>}
           </>}>
             {m.S.log.length ? (
@@ -104,12 +105,13 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
                   if (!g) return null
                   const e = m.esitoPrezzo(l.pid, l.price)
                   return (
-                    <div key={`${l.pid}-${l.t}`} className="logrow">
-                      <ChipRuolo r={g.r} />
+                    <div key={`${l.pid}-${l.t}`} className={`logrow${m.isMine(l.team) ? ' mine' : ''}`}>
+                      <span className="fr-filo-ruolo" data-ruolo={g.r} aria-hidden="true" />
+                      <span className="ruolo-lettera">{g.r}</span>
                       <span className="font-semibold">{g.n}</span><RigBadge m={m} p={g} />
                       <span className="who">→ {m.teamName(l.team)}{m.isMine(l.team) ? ' (io)' : ''}</span>
                       {e && <span className={`deal ${e.tipo === 'affare' ? 'ok' : 'bad'}`} title={`pagato ${l.price} contro un listino di ${e.atteso}`}>{e.tipo}</span>}
-                      <span className="pr" style={{ color: l.price > g.q * 1.5 ? 'var(--warn)' : 'inherit' }}>{l.price}</span>
+                      <span className="pr fr-num" style={{ color: l.price > g.q * 1.5 ? 'var(--warn)' : 'inherit' }}>{l.price}</span>
                       {puoScrivere && <button type="button" className="x" title="Libera" onClick={() => liberaGiocatore(l.pid)}>✕</button>}
                     </div>
                   )
@@ -131,10 +133,10 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
                   <div key={t.id} className={`teamrow${m.isMine(t.id) ? ' me' : ''}`}>
                     <span className="tn">{t.name}{m.isMine(t.id) && <span className="tag neu"> io</span>}</span>
                     <span className="slots">{ROLES.map(r => (
-                      <span key={r} className={`sq ${r}${st.perRole[r].count >= m.S.slots[r] ? ' full' : ''}`}>{st.perRole[r].count}/{m.S.slots[r]}</span>
+                      <span key={r} className={`sq ${r}${st.perRole[r].count >= m.S.slots[r] ? ' full' : ''} fr-num`}>{st.perRole[r].count}/{m.S.slots[r]}</span>
                     ))}</span>
-                    <span className="credits">{st.left}</span>
-                    <span className="mono w-[34px] text-right text-[12px]" style={{ color: st.slotsLeft > 0 && st.max <= 2 ? 'var(--crit)' : 'inherit' }}>
+                    <span className="credits fr-num">{st.left}</span>
+                    <span className="w-[34px] text-right text-[12px] fr-num" style={{ color: st.slotsLeft > 0 && st.max <= 2 ? 'var(--crit)' : 'inherit' }}>
                       {st.slotsLeft > 0 ? `·${st.max}` : '—'}</span>
                   </div>
                 )
@@ -152,11 +154,12 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
                   <div key={r} className="planrow">
                     <ChipRuolo r={r} />
                     <div className="track" title={`${ROLENAME[r]}: ${spesa} spesi su ${target} pianificati`}>
-                      <div className="fill" style={{ width: `${Math.min(100, spesa / scala * 100)}%`, background: oltre ? 'var(--crit)' : `var(--r${r})`, opacity: .32 }} />
+                      {/* una barra di avanzamento neutra è colore squadra, non colore di ruolo: i ruoli non riempiono superfici (regola 3 dei token) */}
+                      <div className="fill" style={{ width: `${Math.min(100, spesa / scala * 100)}%`, background: oltre ? 'var(--crit)' : 'var(--fr-marchio)', opacity: .32 }} />
                       <div className="mark" style={{ left: `${Math.min(100, target / scala * 100)}%` }} />
-                      <div className="lb">{spesa} / {target}</div>
+                      <div className="lb fr-num">{spesa} / {target}</div>
                     </div>
-                    <span className="mono text-right text-[12.5px]" style={{ color: oltre ? 'var(--crit)' : 'var(--muted)' }}>
+                    <span className="text-right text-[12.5px] fr-num" style={{ color: oltre ? 'var(--crit)' : 'var(--muted)' }}>
                       {oltre ? `+${spesa - target}` : `${target - spesa} liberi`}</span>
                   </div>
                 )
@@ -176,9 +179,9 @@ function Tabellone({ m, st, mercato }: { m: Motore; st: ReturnType<Motore['stats
   const stretto = st.slotsLeft > 0 && st.max <= Math.max(2, Math.round(m.S.budget * 0.02))
   return (
     <div className="gauges">
-      <div className="gauge hi"><div className="lab">Crediti</div><div className="val">{st.left}</div><div className="sub">di {m.S.budget}</div></div>
+      <div className="gauge hi"><div className="lab">Crediti</div><div className="val fr-num">{st.left}</div><div className="sub">di {m.S.budget}</div></div>
       <div className={`gauge${stretto ? ' alarm' : ''}`}>
-        <div className="lab">Max offerta</div><div className="val">{st.slotsLeft > 0 ? st.max : '—'}</div>
+        <div className="lab">Max offerta</div><div className="val fr-num">{st.slotsLeft > 0 ? st.max : '—'}</div>
         <div className="sub">{st.slotsLeft} slot liberi</div>
       </div>
       {ROLES.map(r => {
@@ -187,7 +190,7 @@ function Tabellone({ m, st, mercato }: { m: Motore; st: ReturnType<Motore['stats
         return (
           <div key={r} className={`gauge g${r}`}>
             <div className="lab">{r} · {st.perRole[r].spent}{oltre ? ' ⚠' : ''}</div>
-            <div className="val">{c}<span className="text-[12px] opacity-50">/{tot}</span></div>
+            <div className="val fr-num">{c}<span className="text-[12px] opacity-50">/{tot}</span></div>
             <div className="slotbar">{Array.from({ length: tot }, (_, i) => <i key={i} className={i < c ? 'on' : ''} />)}</div>
           </div>
         )
@@ -196,7 +199,7 @@ function Tabellone({ m, st, mercato }: { m: Motore; st: ReturnType<Motore['stats
         <div className={`gauge${Math.abs(mercato.infl) >= 0.12 ? (mercato.infl > 0 ? ' alarm' : ' good') : ''}`}
           title={`Finora la lega ha speso ${mercato.pagato} crediti per giocatori che di listino ne valevano ${mercato.atteso}`}>
           <div className="lab">Mercato</div>
-          <div className="val" style={{ color: inflCol(mercato.infl) }}>
+          <div className="val fr-num" style={{ color: inflCol(mercato.infl) }}>
             {mercato.infl >= 0 ? '+' : '−'}{Math.abs(Math.round(mercato.infl * 100))}%</div>
           <div className="sub">{mercato.infl >= 0.12 ? 'si paga caro' : mercato.infl <= -0.12 ? 'si compra bene' : 'in linea'}</div>
         </div>
@@ -232,21 +235,21 @@ function Chiamata({ m, p, squadra, setSquadra, prezzo, setPrezzo, invio, conferm
           </div>
         </div>
         <div className="selstats">
-          <div className="st"><div className="lab">Quotazione</div><div className="qv">{p.q}</div></div>
-          <div className="st"><div className="lab">Prezzo atteso</div><div className="qv" style={{ color: 'var(--accent)' }}>{consigliato}</div></div>
-          <div className="st"><div className="lab">Convenienza</div><div className="qv">{(p.v ?? 1).toFixed(2)}</div></div>
-          <div className="st"><div className="lab">Appetibilità</div><div className="qv" style={{ color: appetCol(m.appet(p, from, span)) }}>{m.appet(p, from, span)}</div></div>
+          <div className="st"><div className="lab">Quotazione</div><div className="qv fr-num">{p.q}</div></div>
+          <div className="st"><div className="lab">Prezzo atteso</div><div className="qv fr-num" style={{ color: 'var(--accent)' }}>{consigliato}</div></div>
+          <div className="st"><div className="lab">Convenienza</div><div className="qv fr-num">{(p.v ?? 1).toFixed(2)}</div></div>
+          <div className="st"><div className="lab">Appetibilità</div><div className="qv fr-num" style={{ color: appetCol(m.appet(p, from, span)) }}>{m.appet(p, from, span)}</div></div>
           {cs !== null && (
             <div className="st fix"><div className="lab">Prossime {span}</div>
               <div className="row"><FixStrip m={m} team={p.s} r={p.r} from={from} span={span} />
-                <span className="calscore">{cs.toFixed(1)}</span></div></div>
+                <span className="calscore fr-num">{cs.toFixed(1)}</span></div></div>
           )}
         </div>
       </div>
 
       {a ? (
         <div className="suggest mt-3" style={{ border: '1px dashed var(--ink)', background: 'transparent' }}>
-          Già assegnato a <b>{m.teamName(a.team)}</b> per <b>{a.price}</b> crediti.
+          Già assegnato a <b>{m.teamName(a.team)}</b> per <b className="fr-num">{a.price}</b> crediti.
           <Bottone piccolo className="ml-auto" onClick={() => liberaG(p.id)}>Libera</Bottone>
         </div>
       ) : (
@@ -265,7 +268,7 @@ function Chiamata({ m, p, squadra, setSquadra, prezzo, setPrezzo, invio, conferm
           <div className="offerta">
             <div className="offbar">
               <span className="offlab">Consigliato ora</span>
-              <b className="mono">{consigliato}</b>
+              <b className="fr-num">{consigliato}</b>
               {d !== null && (
                 <span className="offdelta" style={{ color: d >= 0.35 ? 'var(--crit)' : d >= 0.12 ? 'var(--warn)' : d <= -0.2 ? 'var(--ok)' : 'var(--muted)' }}>
                   {d >= 0 ? '+' : '−'}{Math.abs(Math.round(d * 100))}% · {d >= 0.35 ? 'stai strapagando' : d >= 0.12 ? 'sopra il suo prezzo' : d <= -0.2 ? 'lo stai prendendo bene' : 'in linea'}
@@ -275,13 +278,13 @@ function Chiamata({ m, p, squadra, setSquadra, prezzo, setPrezzo, invio, conferm
             </div>
           </div>
           <div className={`altrow${alt.length <= 2 ? ' pochi' : ''}`}>
-            <span>Come lui restano <b>{alt.length}</b></span>
+            <span>Come lui restano <b className="fr-num">{alt.length}</b></span>
             {alt.length > 0 && <span className="altnomi">{alt.slice(0, 3).map(x => x.n).join(', ')}{alt.length > 3 ? ` e altri ${alt.length - 3}` : ''}</span>}
-            <span className="ml-auto">{p.r} titolari liberi <b>{sc.tit}</b> · cercati <b>{sc.domanda}</b></span>
+            <span className="ml-auto">{p.r} titolari liberi <b className="fr-num">{sc.tit}</b> · cercati <b className="fr-num">{sc.domanda}</b></span>
           </div>
           <div className="suggest">
-            <span>Il tuo tetto: <b>{tetto}</b></span>
-            <span>{p.r} presi: <b>{st.perRole[p.r].count}/{m.S.slots[p.r]}</b>{repartoPieno && <span className="tag crit"> reparto pieno</span>}</span>
+            <span>Il tuo tetto: <b className="fr-num">{tetto}</b></span>
+            <span>{p.r} presi: <b className="fr-num">{st.perRole[p.r].count}/{m.S.slots[p.r]}</b>{repartoPieno && <span className="tag crit"> reparto pieno</span>}</span>
           </div>
         </form>
       )}
@@ -303,12 +306,12 @@ function Scarsita({ m }: { m: Motore }) {
             <div key={r} className="scrow">
               <ChipRuolo r={r} />
               <div className="scmain">
-                <div className="scnum"><b>{s.tit}</b> liber{s.tit === 1 ? 'o' : 'i'} <span className="sep">contro</span> <b>{s.domanda}</b> cercat{s.domanda === 1 ? 'o' : 'i'}
+                <div className="scnum"><b className="fr-num">{s.tit}</b> liber{s.tit === 1 ? 'o' : 'i'} <span className="sep">contro</span> <b className="fr-num">{s.domanda}</b> cercat{s.domanda === 1 ? 'o' : 'i'}
                   {!!s.mieiTit && <span className="mio" title="Titolari di questo ruolo che devi ancora prendere tu"> tu {s.mieiTit}</span>}</div>
                 <div className="scbar"><span style={{ width: `${larg}%`, background: pressCol(s.press) }} /></div>
                 <div className="scfa">{fasce || 'nessun titolare di valore rimasto'}</div>
               </div>
-              <span className="scpress" style={{ color: pressCol(s.press) }}
+              <span className="scpress fr-num" style={{ color: pressCol(s.press) }}
                 title="Quanti titolari servono ancora alle squadre per ogni titolare rimasto libero">
                 {s.press === Infinity ? '—' : s.press.toFixed(1)}<small>{m.pressLab(s.press)}</small>
               </span>
@@ -338,7 +341,7 @@ function Equilibrio({ m }: { m: Motore }) {
               ? <i key={k} className={k} style={{ flex: g[k] }} title={`${g[k]} ${k === 'off' ? 'offensivi' : k === 'equ' ? 'equilibrati' : 'di copertura'}`}>{g[k]}</i>
               : null) : <i className="none" />}
           </div>
-          <span className="balnote" style={{ color: poco ? 'var(--warn)' : 'var(--muted)' }}>{n ? `${Math.round(g.off / n * 100)}% off` : '—'}</span>
+          <span className="balnote fr-num" style={{ color: poco ? 'var(--warn)' : 'var(--muted)' }}>{n ? `${Math.round(g.off / n * 100)}% off` : '—'}</span>
         </div>
         {poco && <p className="hint ml-[37px]" style={{ color: 'var(--ink)', fontWeight: 600 }}>
           Solo {g.off} su {n} {r === 'D' ? 'difensori spingono' : 'centrocampisti spingono'}: rischi una rosa che prende pochi bonus.</p>}

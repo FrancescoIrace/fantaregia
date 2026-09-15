@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
 import { MentChip, OutBadge, RigBadge } from '../viste/segni.tsx'
-import { Card, Ruolo as ChipRuolo } from '../ui.tsx'
+import { Card } from '../ui.tsx'
 
 const TITLAB: Record<number, string> = { 1: 'titolare', 2: 'ballottaggio', 3: 'panchina' }
 const ordina = (a: Giocatore, b: Giocatore) => ('PDCA'.indexOf(a.r) - 'PDCA'.indexOf(b.r)) || b.q - a.q
@@ -26,9 +26,10 @@ export default function Titolari({ motore: m }: { motore: Motore }) {
     const dentro = rosa.filter(p => !m.isOut(p.id))
     const riga = (p: Giocatore) => (
       <div key={p.id} className="tp">
-        <ChipRuolo r={p.r} />
+        <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
+        <span className="ruolo-lettera">{p.r}</span>
         <span className="nm">{p.n}</span><RigBadge m={m} p={p} /><OutBadge m={m} p={p} /><MentChip m={m} p={p} />
-        <span className="qz">{p.q}</span>
+        <span className="qz fr-num">{p.q}</span>
       </div>
     )
     return (

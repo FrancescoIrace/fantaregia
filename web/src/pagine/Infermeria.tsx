@@ -3,7 +3,7 @@ import type { Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
 import { annullaSqualifica, impostaSqualifiche, segnaIndisponibile, togliIndisponibile } from '../data/lega.ts'
 import { TitDot } from '../viste/segni.tsx'
-import { Avviso, Bottone, Card, Ruolo as ChipRuolo } from '../ui.tsx'
+import { Avviso, Bottone, Card } from '../ui.tsx'
 
 type Ordine = 'ruolo' | 'da' | 'nome'
 const CHIAVE_ORDINE = 'fantaregia:infermeria-ordine'
@@ -84,7 +84,8 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
                   return (
                     <button key={p.id} type="button" disabled={invio}
                       onClick={() => { setQ(''); void agisci(() => segnaIndisponibile(legaId, p.id, 'infortunio', g), `${p.n} segnato indisponibile`) }}>
-                      <ChipRuolo r={p.r} />
+                      <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
+                      <span className="ruolo-lettera">{p.r}</span>
                       <span className="pnome"><b>{p.n}</b> <TitDot m={m} p={p} /> <span className="pteam">{p.s}</span></span>
                       <span className="mono whitespace-nowrap text-[12px]" style={{ color: a?.team === mio ? 'var(--accent)' : 'var(--muted)' }}>{a ? m.teamName(a.team) : 'svincolato'}</span>
                     </button>
@@ -96,7 +97,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
         ) : <p className="hint">Gli infortunati li segnano admin e banditori.</p>}
       </Card>
 
-      <Card titolo="Chi non puoi schierare" azioni={<span className="hint">{totPrima ? <><b>{totPrima}</b> fuori</> : 'nessuno fuori'} · prossima giornata la <b>{g}ª</b></span>}>
+      <Card titolo="Chi non puoi schierare" azioni={<span className="hint">{totPrima ? <><b className="fr-num">{totPrima}</b> fuori</> : 'nessuno fuori'} · prossima giornata la <b className="fr-num">{g}ª</b></span>}>
         {totPrima >= 2 && (
           <div className="infbar">
             <input type="text" value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="Filtra la lista…" autoComplete="off"
@@ -113,7 +114,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
             <RigaInf key={`s${x.pid}-${x.g}`} p={x.p} pid={x.pid} tag="squal"
               azione={puoScrivere && <Bottone piccolo disabled={invio} title="La tua lega non applica questa squalifica"
                 onClick={() => void agisci(() => annullaSqualifica(legaId, x.pid, x.g!), 'Squalifica annullata')}>Annulla</Bottone>}>
-              squalificato · salta la <b>{x.g}ª</b> <i>({x.n}ª ammonizione)</i>
+              squalificato · salta la <b className="fr-num">{x.g}ª</b> <i>({x.n}ª ammonizione)</i>
             </RigaInf>
           )
           const quante = x.da ? Math.max(0, g - x.da) : 0
@@ -122,7 +123,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
               azione={puoScrivere && <Bottone piccolo disabled={invio}
                 onClick={() => void agisci(() => togliIndisponibile(legaId, x.pid), 'Rientrato fra i disponibili')}>È tornato</Bottone>}>
               {x.motivo === 'espulsione' ? 'espulso' : 'infortunato'}
-              {x.da ? <> · fuori dalla <b>{x.da}ª</b>{quante ? <i> ({quante} giornat{quante === 1 ? 'a' : 'e'})</i> : <i> (da questa)</i>}</> : null}
+              {x.da ? <> · fuori dalla <b className="fr-num">{x.da}ª</b>{quante ? <i> ({quante} giornat{quante === 1 ? 'a' : 'e'})</i> : <i> (da questa)</i>}</> : null}
             </RigaInf>
           )
         }) : totPrima ? <p className="hint">Nessuno corrisponde a «{filtro}».</p>
@@ -132,7 +133,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
       <div className="grid gap-[18px] lg:grid-cols-2">
         <Card titolo="Diffidati" azioni={<span className="hint">a un giallo dallo stop</span>}>
           {diffidati.length ? diffidati.map(x => (
-            <RigaInf key={x.pid} p={nomeDi(x.pid)} pid={x.pid} tag="diff"><b>{x.amm}</b> ammonizioni — al prossimo giallo salta</RigaInf>
+            <RigaInf key={x.pid} p={nomeDi(x.pid)} pid={x.pid} tag="diff"><b className="fr-num">{x.amm}</b> ammonizioni — al prossimo giallo salta</RigaInf>
           )) : <p className="hint">Nessuno in diffida. Si diventa diffidati alla 4ª ammonizione, poi all'8ª, 12ª, 15ª, 17ª.</p>}
         </Card>
         <Card titolo="Da controllare" azioni={<span className="hint">espulsi: le giornate le dà il giudice</span>}>
@@ -142,7 +143,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
                 <RigaInf key={x.pid} p={nomeDi(x.pid)} pid={x.pid} tag="rosso"
                   azione={puoScrivere && !m.isOut(x.pid) && <Bottone piccolo disabled={invio}
                     onClick={() => void agisci(() => segnaIndisponibile(legaId, x.pid, 'espulsione', g), 'Messo fuori')}>Mettilo fuori</Bottone>}>
-                  espulso alla <b>{x.g}ª</b>
+                  espulso alla <b className="fr-num">{x.g}ª</b>
                 </RigaInf>
               ))}
               <p className="hint mt-[9px]">Quante giornate lo decide il giudice sportivo il martedì: nessun file lo dice, quindi decidi tu. Se lo metti fuori
@@ -185,7 +186,8 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
 function RigaInf({ p, pid, tag, azione, children }: { p: Giocatore | null; pid: number; tag: string; azione?: ReactNode; children: ReactNode }) {
   return (
     <div className="infrow">
-      {p ? <ChipRuolo r={p.r} /> : <span className="rm">?</span>}
+      {p && <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />}
+      <span className="ruolo-lettera">{p ? p.r : '?'}</span>
       <span className="infn"><b>{p ? p.n : `#${pid}`}</b> <span className="pteam">{p?.s || ''}</span></span>
       <span className={`inftag ${tag}`}>{children}</span>
       {azione || <span />}

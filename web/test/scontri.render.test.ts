@@ -28,7 +28,10 @@ describe('vista Lega', () => {
     expect(html).toContain('scmatch')
     expect(conta(html, 'lcell')).toBe(m.legaIncroci(3).length)
     expect(m.legaIncroci(3).length).toBeGreaterThan(10)
-    expect(conta(html, 'mono cpos')).toBe(m.classificaLega().length)
+    expect(conta(html, 'cpos fr-num')).toBe(m.classificaLega().length)
+    // l'undici e i pericolosi: una lettera di ruolo con il suo filo per riga
+    const righeGiocatori = conta(html, 'undrow') + conta(html, 'perrow')
+    expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(righeGiocatori)
     expect(conta(html, 'vrow')).toBe(m.verifica(3).length)
     expect(html).toContain('Abbinamenti')                 // la squadra 10 non è abbinata
   })

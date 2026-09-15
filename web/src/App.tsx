@@ -15,7 +15,8 @@ export default function App() {
   const { sessione, pronto } = useSessione()
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-line bg-surface">
+      {/* il filo in cima è il marchio: dentro una lega il colore della propria squadra, fuori l'ambra */}
+      <header className="sticky top-0 z-40 border-t-[3px] border-b border-t-accent border-b-line bg-surface">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-5 py-3">
           <Link to="/" className="font-display text-xl font-extrabold tracking-tight">Fantaregia</Link>
           <span className="font-mono text-[11px] tracking-wider text-muted">asta e stagione</span>

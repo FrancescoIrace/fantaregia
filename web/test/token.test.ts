@@ -139,3 +139,89 @@ describe('le spie senza riferimento', () => {
     }
   })
 })
+
+describe('nessun colore scritto a mano fuori dal file dei token', () => {
+  const leggi = (f: string) => readFileSync(fileURLToPath(new URL(`../src/${f}`, import.meta.url)), 'utf8')
+
+  it('fondini dei ruoli, erba e maglie: index.css e legacy.css li prendono dai token', () => {
+    const index = leggi('index.css'), legacy = leggi('viste/legacy.css')
+    for (const v of ['--rP-soft', '--rD-soft', '--rC-soft', '--rA-soft']) {
+      expect(index, v).toMatch(new RegExp(`${v}\\s*:\\s*var\\(--fr-`))
+      expect(index, v).not.toMatch(new RegExp(`${v}\\s*:\\s*#`))
+    }
+    for (const v of ['--erba', '--erba-2', '--erba-linea', '--oro', '--oro-2', '--arg', '--arg-2', '--bro', '--bro-2', '--gre', '--gre-2']) {
+      expect(legacy, v).toMatch(new RegExp(`${v}\\s*:\\s*var\\(--fr-`))
+      expect(legacy, v).not.toMatch(new RegExp(`${v}\\s*:\\s*(#|rgba)`))
+    }
+  })
+
+  it('e il file dei token li definisce in tutti e tre i contesti a schermo', () => {
+    const inizi = SEZIONI.map(s => CSS.indexOf(s.da))
+    for (const s of schermo) {
+      const i = CSS.indexOf(s.da)
+      const fine = inizi.filter(x => x > i).sort((a, b) => a - b)[0] ?? CSS.length
+      const pezzo = CSS.slice(i, fine)
+      for (const t of ['--fr-ruolo-p-velo', '--fr-ruolo-a-velo', '--fr-erba', '--fr-erba-linea', '--fr-maglia-oro', '--fr-maglia-gre-2']) {
+        expect(pezzo, `${t} in «${s.nome}»`).toMatch(new RegExp(`${t}\\s*:`))
+      }
+    }
+  })
+})
+
+describe('il cassetto', () => {
+  it('scheda e «Chi schierare» salgono dal basso, con il filo di marchio in cima', () => {
+    const componenti = readFileSync(fileURLToPath(new URL('../src/viste/componenti.css', import.meta.url)), 'utf8').replace(/\s+/g, '')
+    expect(componenti).toContain('.modal{align-items:flex-end;')
+    expect(componenti).toMatch(/\.pcard\{[^}]*border-top:3pxsolidvar\(--fr-marchio\)/)
+    expect(componenti).toMatch(/\.pcard\{[^}]*border-radius:var\(--fr-r-grande\)var\(--fr-r-grande\)00/)
+    // si scorre dentro il cassetto, non la pagina sotto
+    expect(componenti).toMatch(/\.pcard\{[^}]*overscroll-behavior:contain/)
+  })
+})
+
+describe('i colori di ruolo non vanno sul testo', () => {
+  it('contatori del tabellone e posti per ruolo tornano inchiostro, sopra le regole di legacy.css', () => {
+    /* legacy.css colora il testo con --rP…--rA in più punti; componenti.css,
+       caricato dopo, li riporta all'inchiostro senza toccare l'originale. */
+    const componenti = readFileSync(fileURLToPath(new URL('../src/viste/componenti.css', import.meta.url)), 'utf8').replace(/\s+/g, '')
+    expect(componenti).toContain('.gauge.gP,.gauge.gD,.gauge.gC,.gauge.gA{color:inherit}')
+    expect(componenti).toContain('.sq.P,.sq.D,.sq.C,.sq.A{color:var(--fr-ink)}')
+    expect(componenti).toContain('.results.gone{opacity:1;')
+  })
+
+  it('mentalità, rigorista, porta inviolata e pericolo non usano più i colori di ruolo', () => {
+    /* Erano quattro usi con un significato diverso dal ruolo: la mentalità nel
+       rosso dell'attaccante e nel blu del centrocampista, il badge del
+       rigorista in rosso, la porta inviolata nel blu del difensore, il tetto
+       del più pericoloso in rosso. */
+    const componenti = readFileSync(fileURLToPath(new URL('../src/viste/componenti.css', import.meta.url)), 'utf8').replace(/\s+/g, '')
+    expect(componenti).toContain('.ment.off,.ment.equ,.ment.cop{color:var(--fr-ink)}')
+    expect(componenti).toContain('.balbari.off{background:var(--fr-ink);color:var(--fr-pan)}')
+    expect(componenti).toContain('.rig{background:transparent;color:var(--fr-ink);border-color:var(--fr-ink)}')
+    expect(componenti).toContain('.btile.ass,.btile.cs,.btile.par{background:var(--fr-su-velo);')
+    expect(componenti).toContain('.perrow.primo.pertet{color:var(--fr-ink);')
+    // la mentalità si distingue anche senza colore, con una freccia
+    expect(componenti).toContain('.ment.off::before{content:"↗"}')
+  })
+})
+
+describe('niente opacità per dire «meno importante»', () => {
+  it('le righe del listone già prese restano leggibili', () => {
+    /* opacity:.5 sbiadiva il testo secondario a 2,00:1 nel giorno. La regola
+       di legacy.css resta com'è, e componenti.css la annulla. */
+    const componenti = readFileSync(fileURLToPath(new URL('../src/viste/componenti.css', import.meta.url)), 'utf8').replace(/\s+/g, '')
+    expect(componenti).toContain('table.listtr.taken{opacity:1}')
+    expect(componenti).toContain('table.listtr.takentd{color:var(--fr-fioco)}')
+  })
+})
+
+describe('i controlli del browser seguono il tema', () => {
+  it('color-scheme per i tre stati: notte di partenza, giorno esplicito, sistema chiaro senza scelta', () => {
+    /* Menu a tendina aperti, selettore colore e barre di scorrimento non
+       leggono i token: senza color-scheme restavano chiari nel tema notte. */
+    const piatto = CSS.replace(/\s+/g, '')
+    expect(piatto).toContain(':root,:root[data-tema="notte"]{color-scheme:dark}')
+    expect(piatto).toContain(':root[data-tema="giorno"]{color-scheme:light}')
+    expect(piatto).toMatch(/@media\(prefers-color-scheme:light\)\{:root:not\(\[data-tema\]\)\{color-scheme:light\}\}/)
+  })
+})

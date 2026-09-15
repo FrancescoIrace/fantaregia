@@ -56,6 +56,21 @@ Perché possono usarle: `fixDiff()` è centrato su 3, cioè sull'avversario medi
 
 In stampa la tonalità sparisce e il verso lo porta il grigio, dal chiaro allo scuro.
 
+### La regola dei ruoli, applicata alle viste portate
+
+Portando le viste sono venuti fuori diversi punti in cui l'app originale usava i colori di ruolo come testo o come riempimento. Dove il ruolo si capiva già da altro, sono stati tolti:
+- le forze di attacco e difesa nel Calendario si distinguono con le etichette «att» e «dif»;
+- la colonna P · D · C · A del riepilogo di Rose segue l'ordine dell'intestazione;
+- la barra della spesa per reparto in Asta è una barra di avanzamento neutra, quindi colore squadra;
+- i contatori per ruolo del tabellone d'Asta e i posti per ruolo nei crediti in sala tornano inchiostro, con fondino e lettera che restano.
+
+Restavano quattro usi in cui il colore di ruolo portava un significato che non è il ruolo, e lì serviva un segno nuovo. Scelti da Francesco il 16/09/2026, sul confronto a schermo nei due temi, con le regole in `componenti.css` sopra quelle di `legacy.css`:
+
+- **la mentalità** era offensiva in rosso attaccante e copertura in blu centrocampista, anche nella barra dell'equilibrio in Asta. Ora è inchiostro con una freccia (`↗ → ↘`), e nella barra è la forma a distinguere: pieno chi spinge, grigio l'equilibrata, tratteggio chi copre. Non è un ruolo, è una direzione — e un difensore offensivo in rosso sembrava un attaccante;
+- **il badge del rigorista** era rosso attaccante, ma rigoristi sono anche difensori e centrocampisti. Ora è inchiostro: pieno il primo rigorista, vuoto il secondo. «Una sola fonte» è il tratteggio del bordo e non più `opacity:.62`, che portava il badge sotto il leggibile;
+- **la casella della porta inviolata** era verde difensore pur essendo un bonus del portiere. Ora le caselle dei bonus seguono la regola della spia: verde quello che porta punti (gol, assist, porta inviolata, rigori parati), rosso quello che ne toglie (ammonizioni, gol subiti). Sono cadute due incoerenze vicine: gli assist stavano nel colore del marchio, che non è un valore, e la casella a zero era sbiadita con l'opacità — ora è grigio leggibile su fondo incassato;
+- **il tetto del giocatore più pericoloso** era rosso, senza un riferimento da cui scostarsi: il tetto è quanto fa in una giornata buona. Ora è inchiostro in grassetto, e le barre accanto sono grigie. Il rosso resta ai malus veri.
+
 ## Il colore squadra
 
 Ognuno dei dodici sceglie una tinta e la vede ovunque nella propria copia dell'app.
@@ -94,7 +109,7 @@ Due tagli della stessa famiglia: `--fr-font-testo` (Barlow) per il testo, `--fr-
 - Riga di dati: `--fr-riga-y` in verticale, `--fr-riga-x` in orizzontale. Una riga con filo di ruolo è alta 44px circa: tocca bene col pollice e ne stanno sette in una schermata di telefono.
 - Pannelli: `--fr-pad`, distanziati di `--fr-blocco-y`.
 - Colonna di lettura: `--fr-lim`, 820px. Oltre, le tabelle diventano illeggibili in larghezza.
-- Sotto i 620px: le griglie a tre colonne diventano due, le caselle della formazione due per riga, le colonne secondarie delle tabelle spariscono (`conv`, `prossime 5`) invece di stringersi.
+- Sotto i 620px: le griglie a tre colonne diventano due, le caselle della formazione due per riga, le colonne secondarie delle tabelle spariscono (`conv`, `prossime 5`) invece di stringersi. Nel Listone le due colonne hanno la classe `col-secondaria`; nella panchina di Formazioni sparisce la squadra di serie A, perché a 390px tagliava il nome del giocatore. Le prove a larghezza telefono si fanno in un iframe da 390px: Chromium headless non impagina sotto i 484px, e ritaglia.
 
 ## I componenti ricorrenti
 
@@ -116,6 +131,14 @@ Sulle maglie il delta sta nella riga delle statistiche e non sotto il punteggio:
 
 **Casella di formazione.** Il bordo superiore dice lo stato (alta, neutra, da rivedere), il corpo porta il punteggio e la frase che lo spiega. Tratteggiata e velata di marchio se è una proposta del pilota; bordo scuro pieno se è bloccata.
 
+**Ha preso il posto delle maglie** oro, argento e bronzo (scelta del 16/09/2026). Il grado a medaglia si leggeva a colpo d'occhio, ma il punteggio era bianco su una sfumatura che nel tema giorno stava intorno ai 2:1, e oro e bronzo erano colori decorativi fuori dai token. Gli stati, in quest'ordine:
+- **indisponibile:** bordo rosso, perché costa punti;
+- **da rivedere:** in panchina c'è chi fa più di quattro punti meglio. Bordo d'inchiostro, cioè una forma e non un colore, e sotto la riga «↑ nome in panchina»;
+- **alta:** bordo verde, dai 75 in su, la stessa soglia che colora i punteggi ovunque;
+- **neutra:** il filo di sempre.
+
+Il titolare fisso ha il bordo scuro sugli altri tre lati, così lo stato in cima resta. Al passaggio del mouse compare un anello del colore squadra fuori dal bordo, per la stessa ragione. Sul telefono la casella si stringe come faceva la maglia: spariscono frase, «di meglio» e statistiche.
+
 **Titolari fissi e modulo preferito** sono le prime «caselle bloccate». Un titolare fisso ha la casella con il bordo scuro pieno e la parola «fisso» accanto al nome. L'interruttore sta sulla riga di panchina e nella finestra «Chi schierare», ed è una forma, non un colore: acceso è scritto pieno. Le regole che valgono anche per il pilota:
 - **Non si scarta niente in silenzio.** Troppi fissi per il reparto: entrano i primi fissati e gli altri sono nominati in una nota. Un fisso indisponibile non si schiera — la regola che non si disattiva — ma la nota lo dice.
 - **Un modulo che la rosa non copre non si cambia da solo.** Le caselle scoperte restano vuote e la nota propone il modulo più vicino che i disponibili coprono. Il pulsante lo applica a quella giornata sola, senza toccare la preferenza.
@@ -123,7 +146,9 @@ Sulle maglie il delta sta nella riga delle statistiche e non sotto il punteggio:
 
 Tutte e due sono di chi guarda e restano sul dispositivo, una chiave per lega.
 
-**Cassetto.** Scheda giocatore e confronto salgono dal basso con `--fr-r-grande` e un filo di marchio in cima. Non sono pagine: si aprono sopra quello che stavi guardando e lo lasciano dov'era.
+**Cassetto.** Scheda giocatore e confronto salgono dal basso con `--fr-r-grande` e un filo di marchio in cima. Non sono pagine: si aprono sopra quello che stavi guardando e lo lasciano dov'era. È fatto solo con il CSS, in `viste/componenti.css` sopra le classi di sempre (`.modal`, `.pcard`), quindi vale per la scheda giocatore e per «Chi schierare» senza toccare i componenti. Si scorre dentro il cassetto, non la pagina sotto (`overscroll-behavior:contain`). Due regole nate dalla prova sul telefono: la scheda ha `min-width:0`, perché un elemento flex non si stringe sotto il suo contenuto; e sotto i 620px le quattro caselle in alto diventano due per riga.
+
+**Colore squadra nella testata e nel registro.** L'intestazione dell'app ha il filo del marchio in cima. Accanto al titolo della lega ci sono il nome della propria squadra e il suo gagliardetto. Nel registro d'asta la propria riga ha il velo e un filo del marchio, come nelle rose. Admin e banditori scelgono dal menu «Il colore di» quale squadra colorare, come il database già permette; chi è in sola lettura colora solo la sua.
 
 ## Il pilota automatico
 

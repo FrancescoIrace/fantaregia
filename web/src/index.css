@@ -9,9 +9,8 @@
    viste passano al sistema nuovo una alla volta.
 
    Non si aggiungono valori qui dentro: se manca un colore, il posto
-   dove definirlo è il file dei token. Le uniche eccezioni dichiarate
-   sono i fondini dei chip di ruolo, che nel sistema nuovo non hanno
-   ancora un token perché il ruolo vive su fili e chip pieni.
+   dove definirlo è il file dei token. Anche i fondini dei chip di
+   ruolo ormai vengono da lì.
 
    Le corrispondenze non ovvie, e perché:
    - --line è il separatore fra righe (--fr-filo-t), --line-strong è
@@ -56,16 +55,8 @@
   --shadow: var(--fr-ombra);
   --radius: var(--fr-r-grande);
 
-  /* fondini dei chip: senza token nel sistema nuovo, restano questi */
-  --rP-soft: #FAEEDA; --rD-soft: #E0F0E7; --rC-soft: #E3EBF7; --rA-soft: #F9E5E3;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-tema="giorno"]) {
-    --rP-soft: #2E2312; --rD-soft: #122C1F; --rC-soft: #151F31; --rA-soft: #2E1715;
-  }
-}
-:root[data-tema="notte"] {
-  --rP-soft: #2E2312; --rD-soft: #122C1F; --rC-soft: #151F31; --rA-soft: #2E1715;
+  --rP-soft: var(--fr-ruolo-p-velo); --rD-soft: var(--fr-ruolo-d-velo);
+  --rC-soft: var(--fr-ruolo-c-velo); --rA-soft: var(--fr-ruolo-a-velo);
 }
 
 @theme inline {

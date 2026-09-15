@@ -28,6 +28,13 @@ describe('Calendario', () => {
     expect(conta(html, 'rispart')).toBe(m.risultatiDi(m.giornateGiocate().at(-1)!).length)
   })
 
+  it('le forze dicono attacco e difesa con l\'etichetta, non con il colore del ruolo sul testo', () => {
+    const html = renderToString(createElement(Calendario, { motore: m }))
+    expect(conta(html, 'forza-et')).toBe(2 * cal.teams.length)
+    expect(html).not.toMatch(/color:var\(--r[PDCA]\)/)
+    expect(conta(html, 'calscore fr-num')).toBe(cal.teams.length)
+  })
+
   it('senza calendario dice dove prenderlo', () => {
     const vuoto = creaMotore({ players, stato: shared })
     expect(renderToString(createElement(Calendario, { motore: vuoto }))).toContain('openfootball')
@@ -44,6 +51,10 @@ describe('Infermeria', () => {
     const sola = infermeria(false)
     expect(sola).not.toContain('È tornato')
     expect(sola).toContain('Gli infortunati li segnano admin e banditori')
+    // ogni riga ha la lettera del ruolo; il filo c'è quando il giocatore è noto
+    expect(conta(html, 'ruolo-lettera')).toBe(conta(html, 'infrow'))
+    expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBeGreaterThan(0)
+    expect(html).not.toContain('rounded-[5px]')
   })
 
   it('con le squalifiche spente restano solo gli infortuni', () => {

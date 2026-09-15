@@ -15,25 +15,14 @@
   --f3: var(--fr-diff-3); --f3t: var(--fr-diff-3-ink);
   --f4: var(--fr-diff-4); --f4t: var(--fr-diff-4-ink);
   --f5: var(--fr-diff-5); --f5t: var(--fr-diff-5-ink);
-  --erba: #C8E2CE; --erba-2: #BEDBC6; --erba-linea: rgba(255,255,255,.9);
-  --oro: #8A6410; --oro-2: #D6A82C; --arg: #586167; --arg-2: #98A6AE;
-  --bro: #6E4222; --bro-2: #B4794C; --gre: #5A666C; --gre-2: #8B989F;
+  /* campo e maglie: i valori, con i due temi, stanno nel file dei token */
+  --erba: var(--fr-erba); --erba-2: var(--fr-erba-2); --erba-linea: var(--fr-erba-linea);
+  --oro: var(--fr-maglia-oro); --oro-2: var(--fr-maglia-oro-2); --arg: var(--fr-maglia-arg); --arg-2: var(--fr-maglia-arg-2);
+  --bro: var(--fr-maglia-bro); --bro-2: var(--fr-maglia-bro-2); --gre: var(--fr-maglia-gre); --gre-2: var(--fr-maglia-gre-2);
   /* alias sul sistema nuovo: due tagli soli, e ogni numero condensato */
   --f-display: var(--fr-font-testo);
   --f-body: var(--fr-font-testo);
   --f-mono: var(--fr-font-num);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-tema="giorno"]) {
-    --erba: #183A2E; --erba-2: #143327; --erba-linea: rgba(198,244,218,.34);
-    --oro: #7A5A12; --oro-2: #C9A238; --arg: #4C575D; --arg-2: #8A979E;
-    --bro: #5F3A1E; --bro-2: #A66E44; --gre: #414D53; --gre-2: #77848B;
-  }
-}
-:root[data-tema="notte"] {
-  --erba: #183A2E; --erba-2: #143327; --erba-linea: rgba(198,244,218,.34);
-  --oro: #7A5A12; --oro-2: #C9A238; --arg: #4C575D; --arg-2: #8A979E;
-  --bro: #5F3A1E; --bro-2: #A66E44; --gre: #414D53; --gre-2: #77848B;
 }
 
 /* ── generici ─────────────────────────────── */

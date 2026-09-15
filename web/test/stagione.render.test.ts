@@ -35,7 +35,20 @@ describe('viste di stagione', () => {
     expect((html.match(/<tr>/g) ?? []).length - 1).toBe(Math.min(400, giocato))   // meno l'intestazione
     expect(html).toContain('class="spark"')
     expect(html).toContain('1, 2, 3, 4, 5, 6, 7, 8, 9, 10')    // React separa i pezzi di testo con <!-- -->
+  })
 
+  it('i componenti nuovi: filo di ruolo e lettera per riga, numeri condensati, la forma detta con il delta', () => {
+    const tit = renderToString(createElement(Titolari, { motore: m }))
+    const righeTit = conta(tit, 'tp')
+    expect((tit.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(righeTit)
+    expect(conta(tit, 'qz fr-num')).toBe(righeTit)
+    expect(tit).not.toContain('rounded-[5px]')                                  // il chip pastello di prima
+
+    const ren = renderToString(createElement(Rendimento, { motore: m }))
+    const righeRen = Math.min(400, m.PL.filter(p => m.statFor(p.id)?.pres).length)
+    expect((ren.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(righeRen)
+    expect(conta(ren, 'fmv fr-num')).toBe(righeRen)
+    expect(ren).toMatch(/class="fr-delta" data-verso="(su|giu|fermo)"/)
   })
 
   it('senza voti né listone lo dicono', () => {

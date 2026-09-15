@@ -92,7 +92,7 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
           </p>
         ) : !s.sua ? (
           <div className="scmain">
-            <div className="lsnum" style={{ color: 'var(--accent)' }}>{s.mia.media.toFixed(1)}</div>
+            <div className="lsnum fr-num" style={{ color: 'var(--accent)' }}>{s.mia.media.toFixed(1)}</div>
             <div><b>{s.avv.nome}</b> non è abbinato a nessuna squadra dell'asta, quindi la sua rosa non la conosco.
               <div className="hint">Il tuo atteso per questa giornata è {s.mia.media.toFixed(1)} con il {s.mia.mod}.</div></div>
           </div>
@@ -179,8 +179,8 @@ function Giocata({ m, tid, gl }: { m: Motore; tid: number; gl: number }) {
   return (
     <div className={`scfatta ${es}`}>
       <span className="sfl">giocata</span>
-      {e.gf !== null && <span className="sfg">{e.gf}<i>–</i>{e.gc}</span>}
-      <span className="sfp">{(e.pf || 0).toFixed(1)} <i>a</i> {(e.pc || 0).toFixed(1)}</span>
+      {e.gf !== null && <span className="sfg fr-num">{e.gf}<i>–</i>{e.gc}</span>}
+      <span className="sfp fr-num">{(e.pf || 0).toFixed(1)} <i>a</i> {(e.pc || 0).toFixed(1)}</span>
     </div>
   )
 }
@@ -191,14 +191,14 @@ function Pronostico({ s }: { s: Scontro }) {
   return (
     <>
       <div className="legasc">
-        <div className="lsq"><div className="lslab">tu</div><div className="lsnum">{s.mia.media.toFixed(1)}</div><div className="lssd">± {s.mia.sd.toFixed(1)} · {s.mia.mod}</div></div>
+        <div className="lsq"><div className="lslab">tu</div><div className="lsnum fr-num">{s.mia.media.toFixed(1)}</div><div className="lssd">± {s.mia.sd.toFixed(1)} · {s.mia.mod}</div></div>
         <div className="lsmid">
-          <div className="lsprob" style={{ color: col }}>{pv}%</div>
+          <div className="lsprob fr-num" style={{ color: col }}>{pv}%</div>
           <div className="lsplab">probabilità di vincere</div>
           <div className="lsbar"><i style={{ width: `${pv}%`, background: col }} /></div>
           <div className="lsdiff">{p1(s.diff!)} punti attesi</div>
         </div>
-        <div className="lsq"><div className="lslab">{s.avv.nome}</div><div className="lsnum">{s.sua!.media.toFixed(1)}</div><div className="lssd">± {s.sua!.sd.toFixed(1)} · {s.sua!.mod}</div></div>
+        <div className="lsq"><div className="lslab">{s.avv.nome}</div><div className="lsnum fr-num">{s.sua!.media.toFixed(1)}</div><div className="lssd">± {s.sua!.sd.toFixed(1)} · {s.sua!.mod}</div></div>
       </div>
       <div className={`lscons ${s.strategia}`}><b>{titolo}</b><p>{testo}</p></div>
     </>
@@ -219,10 +219,10 @@ function Reparti({ s }: { s: Scontro }) {
           <div key={r} className="cmprow">
             <div className="cmplab">{NOMI[r]}</div>
             <div className="cmpbars">
-              <div className="cmpb mine"><span className="tr"><i style={{ width: `${(a / tot * 100).toFixed(1)}%` }} /></span><span className="v">{a.toFixed(1)} <em>×{na}</em></span></div>
-              <div className="cmpb his"><span className="tr"><i style={{ width: `${(b / tot * 100).toFixed(1)}%` }} /></span><span className="v">{b.toFixed(1)} <em>×{nb}</em></span></div>
+              <div className="cmpb mine"><span className="tr"><i style={{ width: `${(a / tot * 100).toFixed(1)}%` }} /></span><span className="v fr-num">{a.toFixed(1)} <em>×{na}</em></span></div>
+              <div className="cmpb his"><span className="tr"><i style={{ width: `${(b / tot * 100).toFixed(1)}%` }} /></span><span className="v fr-num">{b.toFixed(1)} <em>×{nb}</em></span></div>
             </div>
-            <div className="cmpd" style={{ color: d >= 1.5 ? 'var(--ok)' : d <= -1.5 ? 'var(--crit)' : 'var(--muted)' }}>{p1(d)}</div>
+            <div className="cmpd fr-num" style={{ color: d >= 1.5 ? 'var(--ok)' : d <= -1.5 ? 'var(--crit)' : 'var(--muted)' }}>{p1(d)}</div>
           </div>
         )
       })}
@@ -240,11 +240,11 @@ function Undici({ m, s }: { m: Motore; s: Scontro }) {
           const fx = x.a.fx, dur = fx ? m.fixDiff(fx.opp, m.isOff(x.p.r), fx.home) : 3
           return (
             <div key={x.p.id} className="undrow">
-              <span className={`rm ${x.p.r}`}>{x.p.r}</span>
+              <span className="fr-filo-ruolo" data-ruolo={x.p.r} aria-hidden="true" /><span className="ruolo-lettera">{x.p.r}</span>
               <span className="undn">{x.p.n}<em>{x.p.s || ''}{fx ? ' · ' + (fx.home ? '' : 'a ') + ABBR(fx.opp) : ''}</em></span>
-              <span className="undsd" title="quanto oscilla">±{x.a.sd.toFixed(1)}</span>
+              <span className="undsd fr-num" title="quanto oscilla">±{x.a.sd.toFixed(1)}</span>
               <span className="undd" style={{ background: dur <= 2.2 ? 'var(--ok)' : dur >= 3.6 ? 'var(--crit)' : 'var(--warn)' }} />
-              <b className="undv">{x.atteso.toFixed(1)}</b>
+              <b className="undv fr-num">{x.atteso.toFixed(1)}</b>
             </div>
           )
         })}
@@ -267,12 +267,12 @@ function Pericolosi({ m, s }: { m: Motore; s: Scontro }) {
           const fx = x.a.fx
           return (
             <div key={x.p.id} className={`perrow${i === 0 ? ' primo' : ''}`}>
-              <span className={`rm ${x.p.r}`}>{x.p.r}</span>
+              <span className="fr-filo-ruolo" data-ruolo={x.p.r} aria-hidden="true" /><span className="ruolo-lettera">{x.p.r}</span>
               <span className="pern">{x.p.n}{x.rig && <b className="perig" title="primo rigorista">R</b>}
                 <em>{x.p.s || ''}{fx ? ' · ' + (fx.home ? '' : 'a ') + ABBR(fx.opp) : ''} · {x.perche}</em></span>
               <span className="perbar"><i style={{ width: `${(x.tetto / max * 100).toFixed(0)}%` }} /></span>
-              <span className="permed">{x.atteso.toFixed(1)}</span>
-              <b className="pertet">{x.tetto.toFixed(1)}</b>
+              <span className="permed fr-num">{x.atteso.toFixed(1)}</span>
+              <b className="pertet fr-num">{x.tetto.toFixed(1)}</b>
             </div>
           )
         })}
@@ -294,13 +294,13 @@ function Classifica({ m, tid }: { m: Motore; tid: number }) {
             <td className="num">P</td><td className="num">Gol</td><td className="num">Fantapunti</td><td className="num">Pt</td></tr>
           {m.classificaLega().map((x, i) => (
             <tr key={x.i} className={x.i === mio ? 'claio' : undefined}>
-              <td className="mono cpos">{i + 1}</td>
+              <td className="cpos fr-num">{i + 1}</td>
               <td className="tname">{x.nome}</td>
-              <td className="num csm">{x.g}</td><td className="num csm">{x.v}</td>
-              <td className="num csm">{x.n}</td><td className="num csm">{x.p}</td>
-              <td className="num csm">{x.gf}:{x.gs}</td>
-              <td className="num csm">{x.pf.toFixed(1)}</td>
-              <td className="num cpt">{x.pt}</td>
+              <td className="num csm fr-num">{x.g}</td><td className="num csm fr-num">{x.v}</td>
+              <td className="num csm fr-num">{x.n}</td><td className="num csm fr-num">{x.p}</td>
+              <td className="num csm fr-num">{x.gf}:{x.gs}</td>
+              <td className="num csm fr-num">{x.pf.toFixed(1)}</td>
+              <td className="num cpt fr-num">{x.pt}</td>
             </tr>
           ))}
         </tbody>
@@ -318,10 +318,10 @@ function Verifica({ m, tid }: { m: Motore; tid: number }) {
     <>
       {s && (
         <div className="vsint">
-          <div className="vs1"><div className="vsv" style={{ color: Math.abs(s.scarto) < 4 ? 'var(--ok)' : Math.abs(s.scarto) < 8 ? 'var(--warn)' : 'var(--crit)' }}>{seg(s.scarto)}{s.scarto.toFixed(1)}</div>
+          <div className="vs1"><div className="vsv fr-num" style={{ color: Math.abs(s.scarto) < 4 ? 'var(--ok)' : Math.abs(s.scarto) < 8 ? 'var(--warn)' : 'var(--crit)' }}>{seg(s.scarto)}{s.scarto.toFixed(1)}</div>
             <div className="vsk">il mio scarto medio</div></div>
-          {s.scartoAvv !== null && <div className="vs1"><div className="vsv">{seg(s.scartoAvv)}{s.scartoAvv.toFixed(1)}</div><div className="vsk">quello degli avversari</div></div>}
-          <div className="vs1"><div className="vsv">{s.centrate}<span className="text-base text-muted">/{s.n}</span></div><div className="vsk">pronostici azzeccati</div></div>
+          {s.scartoAvv !== null && <div className="vs1"><div className="vsv fr-num">{seg(s.scartoAvv)}{s.scartoAvv.toFixed(1)}</div><div className="vsk">quello degli avversari</div></div>}
+          <div className="vs1"><div className="vsv fr-num">{s.centrate}<span className="text-base text-muted">/{s.n}</span></div><div className="vsk">pronostici azzeccati</div></div>
         </div>
       )}
       <div className="vlist">
@@ -330,12 +330,12 @@ function Verifica({ m, tid }: { m: Motore; tid: number }) {
           const es = x.vinta > 0 ? 'vinta' : x.vinta < 0 ? 'persa' : 'pari'
           return (
             <div key={x.gl} className="vrow">
-              <span className="vg">{x.gl}ª</span>
+              <span className="vg fr-num">{x.gl}ª</span>
               <span className="vavv">{m.S.lega!.teams[x.avv] || '?'}<i>{x.casa ? 'in casa' : 'fuori'}</i></span>
               <span className={`vpt ${es}`}>{x.gf !== null ? `${x.gf}–${x.gc}` : es}</span>
-              <span className="vnum">{x.pf !== null ? x.pf.toFixed(1) : '—'}<i>fatti</i></span>
-              <span className="vnum">{x.atteso !== null ? x.atteso.toFixed(1) : '—'}<i>attesi</i></span>
-              <span className="vsc" style={{ color: sc === null ? 'var(--muted)' : sc > 0 ? 'var(--ok)' : sc < 0 ? 'var(--crit)' : 'var(--muted)' }}>{sc === null ? '' : seg(sc) + sc.toFixed(1)}</span>
+              <span className="vnum fr-num">{x.pf !== null ? x.pf.toFixed(1) : '—'}<i>fatti</i></span>
+              <span className="vnum fr-num">{x.atteso !== null ? x.atteso.toFixed(1) : '—'}<i>attesi</i></span>
+              <span className="vsc fr-num" style={{ color: sc === null ? 'var(--muted)' : sc > 0 ? 'var(--ok)' : sc < 0 ? 'var(--crit)' : 'var(--muted)' }}>{sc === null ? '' : seg(sc) + sc.toFixed(1)}</span>
             </div>
           )
         })}
@@ -362,9 +362,9 @@ function Striscia({ m, tid, gl, onScegli }: { m: Motore; tid: number; gl: number
           return (
             <button key={r.gl} type="button" className={`lcell${r.gl === gl ? ' on' : ''}`} onClick={() => onScegli(r.gl)}
               title={`giornata ${r.gl} di lega · ${r.ga}ª di serie A`}>
-              <span className="lg">g{r.gl}</span>
+              <span className="lg fr-num">g{r.gl}</span>
               <span className="lavv">{r.avv.nome}</span>
-              <span className="lprob" style={{ color: probCol(p) }}>{p}%</span>
+              <span className="lprob fr-num" style={{ color: probCol(p) }}>{p}%</span>
               <span className="lner"><i style={{ width: `${r.nera}%`, background: nerCol(r.nera) }} /></span>
             </button>
           )

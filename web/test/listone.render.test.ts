@@ -38,12 +38,40 @@ describe('Listone', () => {
     expect(html).toContain('★')                              // l'obiettivo salvato nelle preferenze
   })
 
+  it('i componenti nuovi: un filo di ruolo per riga, la lettera senza sfondo, ogni numero condensato', () => {
+    const html = listone(), righe = Math.min(400, players.length)
+    expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(righe)
+    expect(conta(html, 'ruolo-lettera')).toBe(righe)
+    expect((html.match(/class="num fr-num"/g) ?? []).length).toBe(righe)        // la quotazione
+    expect((html.match(/class="an fr-num"/g) ?? []).length).toBe(righe)         // l'appetibilità
+    expect(html).not.toContain('rounded-[5px]')                                  // il chip pastello di prima
+  })
+
+  it('sul telefono le colonne secondarie si possono togliere: convenienza e prossime partite sono marcate', () => {
+    const html = listone(), righe = Math.min(400, players.length)
+    // intestazione più una cella per riga, per ciascuna delle due colonne
+    expect((html.match(/col-secondaria/g) ?? []).length).toBe(2 * (righe + 1))
+  })
+
   it('senza listone dice dove caricarlo', () => {
     expect(listone(creaMotore({ players: [], stato: shared }))).toContain('Il listone non è caricato')
   })
 })
 
 describe('scheda giocatore', () => {
+  it('le caselle dei bonus dicono verde se porta punti e rosso se ne toglie, non il ruolo', () => {
+    /* La porta inviolata stava nel blu del difensore pur essendo un bonus del
+       portiere, e rigori parati e ammonizioni erano la stessa casella neutra.
+       `par` invece di `rp` perché `.rp` è già la riga di Rose. */
+    const portiere = m.PL.find(x => x.r === 'P' && m.statFor(x.id)?.pres)!
+    const altro = m.PL.find(x => x.r !== 'P' && m.statFor(x.id)?.pres)!
+    expect(scheda(portiere.id)).toMatch(/btile cs/)
+    expect(scheda(portiere.id)).toMatch(/btile par/)
+    expect(scheda(altro.id)).toMatch(/btile amm/)
+    expect(scheda(portiere.id)).not.toMatch(/btile neu/)
+    expect(scheda(altro.id)).not.toMatch(/btile neu/)
+  })
+
   it('un giocatore con voti: appetibilità a voci, stagione scorsa, rendimento e giornata per giornata', () => {
     const p = m.PL.find(x => m.statFor(x.id)?.pres && m.annoScorso(x.id))!
     const html = scheda(p.id)

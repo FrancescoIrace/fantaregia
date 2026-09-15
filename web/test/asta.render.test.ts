@@ -38,6 +38,19 @@ describe('Asta live', () => {
     const html = disegna()
     expect(conta(html, 'logrow')).toBe(Math.min(80, stato.log.length))
     expect(stato.log.length).toBeGreaterThan(0)
+    // la propria riga si riconosce come nelle rose: il velo e il filo del marchio
+    const mie = stato.log.slice(0, 80).filter(l => m.isMine(l.team) && (m.byId.get(l.pid) ?? stato.assign[l.pid]?.snap)).length
+    expect(mie).toBeGreaterThan(0)
+    expect((html.match(/class="logrow mine"/g) ?? []).length).toBe(mie)
+    // ogni riga del registro ha il suo filo di ruolo e il prezzo condensato
+    expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(conta(html, 'logrow'))
+    expect(conta(html, 'pr fr-num')).toBe(conta(html, 'logrow'))
+  })
+
+  it('i colori di ruolo non riempiono le barre: la spesa per reparto è colore squadra', () => {
+    const html = disegna()
+    expect(html).not.toMatch(/background:var\(--r[PDCA]\)/)
+    expect(html).toContain('background:var(--fr-marchio)')
     expect(html).toContain('Annulla ultima')
   })
 
