@@ -1,0 +1,308 @@
+/* ============================================================
+   FANTAREGIA — token di design
+   ------------------------------------------------------------
+   Unica sorgente di verità per colori, tipografia e densità.
+   Nessun valore letterale (#hex, px di spaziatura, font-size)
+   va scritto nei componenti: si usano solo queste variabili.
+
+   Tre regole che tengono in piedi tutto il resto:
+
+   1. VERDE E ROSSO DICONO LO SCOSTAMENTO DA UN RIFERIMENTO.
+      Il riferimento può essere il valore di ieri (i delta) o una
+      soglia dichiarata (75 di appetibilità, 7 di fantamedia, il
+      prezzo di adesso in asta). Non si usano per stato, marchio,
+      ruolo o decorazione. Se serve "attenzione" senza un
+      riferimento da cui scostarsi, si usa il filo neutro
+      --fr-fermo.
+   2. IL COLORE SQUADRA (--fr-marchio) è identità, mai semantica.
+      Vive su: filo della testata, scheda attiva, pulsanti
+      primari, gagliardetto, propria riga nelle rose, barre di
+      avanzamento neutre. Non tocca mai i delta, i ruoli, le
+      difficoltà di calendario.
+   3. I COLORI DI RUOLO stanno solo su fili verticali e chip
+      quadrati piccoli. Mai come riempimento di superfici, mai
+      come testo. Restano la convenzione del fantacalcio (P
+      ambra, D verde, C blu, A rosso): sono identità posizionale,
+      non portano un valore, e chi arriva dal sito ufficiale li
+      riconosce. Il verde del difensore e il verde delle salite
+      non si incontrano mai nello stesso registro — uno è un filo
+      da 4px a sinistra della riga, l'altro è una cifra.
+   ============================================================ */
+
+:root{
+  /* ---------- tipografia ---------- */
+  --fr-font-testo:'Barlow', system-ui, -apple-system, sans-serif;
+  --fr-font-num:'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+
+  /* scala: ogni gradino ha un solo mestiere */
+  --fr-t-mini:11px;    /* etichette dentro i quadratini, tag */
+  --fr-t-et:12px;      /* etichette sopra i valori, didascalie */
+  --fr-t-piccolo:13px; /* testo secondario, motivi, frasi */
+  --fr-t-base:15px;    /* corpo */
+  --fr-t-titolo:17px;  /* titoli di blocco, marchio */
+  --fr-t-num:19px;     /* numeri dentro le righe */
+  --fr-t-grande:27px;  /* numeri degli indici, nome in chiamata */
+  --fr-t-enorme:44px;  /* conto alla rovescia, punteggio di giornata */
+
+  --fr-peso-testo:400;
+  --fr-peso-medio:500;
+  --fr-peso-forte:600;
+  --fr-peso-num:700;
+
+  --fr-interlinea:1.45;
+  --fr-interlinea-stretta:1.2;
+
+  /* ---------- densità ---------- */
+  /* Una sola scala. Le righe di dati usano --fr-riga-y, i blocchi
+     --fr-pad. Non si inventano valori intermedi. */
+  --fr-riga-y:9px;      /* padding verticale di una riga di dati */
+  --fr-riga-x:13px;     /* padding orizzontale di riga e blocco */
+  --fr-pad:14px;        /* padding interno dei pannelli */
+  --fr-gap:10px;        /* distanza fra elementi affiancati */
+  --fr-gap-stretto:6px;
+  --fr-blocco-y:16px;   /* distanza fra blocchi */
+  --fr-lim:820px;       /* larghezza massima della colonna */
+
+  --fr-filo-h:26px;     /* altezza del filo di ruolo in una riga */
+  --fr-chip:20px;       /* lato del chip di ruolo */
+
+  /* ---------- forme ---------- */
+  --fr-r:3px;           /* raggio standard */
+  --fr-r-grande:8px;    /* cassetti che salgono dal basso */
+  --fr-bordo:1px;
+
+  /* ---------- movimento ---------- */
+  --fr-mov:.12s linear;         /* lancette e cursori: immediato */
+  --fr-mov-lento:.15s ease-out; /* leve e interruttori */
+
+  /* ---------- colori di ruolo (identici nei due temi) ---------- */
+  --fr-ruolo-p:#E4B857;
+  --fr-ruolo-d:#5CC78B;
+  --fr-ruolo-c:#6BAAEC;
+  --fr-ruolo-a:#F0836A;
+  --fr-ruolo-ink:#131A20;  /* testo dentro i chip di ruolo */
+
+  /* ---------- colore squadra ---------- */
+  /* Valori di partenza. A runtime vengono riscritti da
+     colore-squadra.ts, che corregge la luminosità sul fondo del
+     tema corrente e sceglie l'inchiostro leggibile. */
+  --fr-marchio:#F2B03D;
+  --fr-marchio-ink:#131A20;
+  --fr-marchio-velo:rgba(242,176,61,.12);
+}
+
+/* ============================================================
+   TEMA NOTTE — il predefinito dell'app
+   ============================================================ */
+:root,
+:root[data-tema="notte"]{
+  --fr-fondo:#131A20;    /* sfondo della pagina */
+  --fr-pan:#1A232B;      /* pannelli e blocchi */
+  --fr-incasso:#0E151A;  /* campi, binari, superfici rientranti */
+  --fr-filo:#2A3742;     /* bordi dei blocchi */
+  --fr-filo-t:#222E37;   /* separatori fra righe */
+
+  --fr-ink:#ECF2F6;      /* testo principale */
+  --fr-fioco:#8EA3B2;    /* testo secondario, etichette */
+  --fr-spento:#63798A;   /* testo disattivo, note in coda */
+
+  --fr-su:#5FD09B;       /* sopra il riferimento */
+  --fr-giu:#F0685C;      /* sotto il riferimento */
+  --fr-fermo:#63798A;    /* fermo, o attenzione senza riferimento */
+  --fr-su-velo:rgba(95,208,155,.10);
+  --fr-giu-velo:rgba(240,104,92,.10);
+
+  --fr-ombra:none;
+
+  /* Difficoltà del calendario, da 1 (morbidissima) a 5 (durissima).
+     IL VERSO NON SI TOCCA: è quello di fixDiff() nel motore, che
+     restituisce 1 per la partita più facile e 5 per la più dura, e
+     finisce dritto nel nome della classe.
+
+     LA TONALITÀ PORTA IL SEGNALE, L'INTENSITÀ NO. Una rampa a tinta
+     unica qui è stata provata e non funziona: su un chip da 32px con
+     del testo sopra l'intensità non si distingue, la tonalità legge a
+     colpo d'occhio. La trasferta (.fix.away in legacy.css) è minuscolo
+     e peso più leggero, mai opacità: sbiadirebbe anche l'inchiostro
+     sotto 4,5:1, e i contrasti misurati qui non varrebbero più.
+
+     Verde e rosso sono legittimi qui, ed è la regola 1 letta per
+     intero: fixDiff() è centrato su 3, cioè sull'avversario medio, e
+     una partita più facile della media è uno scostamento in positivo
+     da un riferimento dichiarato. Quello che non si fa è usare gli
+     stessi valori dei delta: queste sono velature con inchiostro
+     sopra — un chip pieno, non una cifra nuda. Registro diverso,
+     lettura diversa. */
+  --fr-diff-1:#174E3C; --fr-diff-1-ink:#8FE6BA;   /* molto favorevole */
+  --fr-diff-2:#294327; --fr-diff-2-ink:#C3E19C;
+  --fr-diff-3:#29343D; --fr-diff-3-ink:#A3B6C3;   /* l'avversario medio: neutro */
+  --fr-diff-4:#4B2B1B; --fr-diff-4-ink:#F0B18C;
+  --fr-diff-5:#4C201C; --fr-diff-5-ink:#F3A49B;   /* molto sfavorevole */
+}
+
+/* ============================================================
+   TEMA GIORNO
+   ============================================================ */
+:root[data-tema="giorno"]{
+  --fr-fondo:#F5F7F8;
+  --fr-pan:#FFFFFF;
+  --fr-incasso:#EDF1F3;
+  --fr-filo:#D9E0E4;
+  --fr-filo-t:#E7ECEF;
+
+  --fr-ink:#141B20;
+  --fr-fioco:#5F7280;
+  --fr-spento:#8FA1AD;
+
+  --fr-su:#1C7C4A;
+  --fr-giu:#C2362B;
+  --fr-fermo:#8FA1AD;
+  --fr-su-velo:rgba(28,124,74,.08);
+  --fr-giu-velo:rgba(194,54,43,.08);
+
+  --fr-ombra:0 1px 2px rgba(20,30,26,.06);
+
+  /* la stessa scala, velature chiare con l'inchiostro scuro sopra.
+     Più cariche di quanto sembri servire: sul bianco una velatura
+     pallida sparisce, e d4 si confondeva con d5. */
+  --fr-diff-1:#BFE5CC; --fr-diff-1-ink:#0E5230;
+  --fr-diff-2:#D8EAC2; --fr-diff-2-ink:#3D5B1A;
+  --fr-diff-3:#E3E7EA; --fr-diff-3-ink:#4B5C65;
+  --fr-diff-4:#F7D6BE; --fr-diff-4-ink:#833710;
+  --fr-diff-5:#F5C6C0; --fr-diff-5-ink:#8F1A12;
+
+  /* i ruoli scuriscono un po' per reggere sul bianco */
+  --fr-ruolo-p:#B2842A;
+  --fr-ruolo-d:#2E8E58;
+  --fr-ruolo-c:#2F73C4;
+  --fr-ruolo-a:#CF5440;
+  --fr-ruolo-ink:#FFFFFF;
+}
+
+/* Prima scelta dell'utente: si segue il sistema.
+   Attenzione alla specificità — questa regola vale solo finché
+   data-tema non è impostato, e non deve mai battere una scelta
+   esplicita. */
+@media (prefers-color-scheme: light){
+  :root:not([data-tema]){
+    --fr-fondo:#F5F7F8; --fr-pan:#FFFFFF; --fr-incasso:#EDF1F3;
+    --fr-filo:#D9E0E4; --fr-filo-t:#E7ECEF;
+    --fr-ink:#141B20; --fr-fioco:#5F7280; --fr-spento:#8FA1AD;
+    --fr-su:#1C7C4A; --fr-giu:#C2362B; --fr-fermo:#8FA1AD;
+    --fr-su-velo:rgba(28,124,74,.08); --fr-giu-velo:rgba(194,54,43,.08);
+    --fr-ombra:0 1px 2px rgba(20,30,26,.06);
+    --fr-diff-1:#BFE5CC; --fr-diff-1-ink:#0E5230;
+    --fr-diff-2:#D8EAC2; --fr-diff-2-ink:#3D5B1A;
+    --fr-diff-3:#E3E7EA; --fr-diff-3-ink:#4B5C65;
+    --fr-diff-4:#F7D6BE; --fr-diff-4-ink:#833710;
+    --fr-diff-5:#F5C6C0; --fr-diff-5-ink:#8F1A12;
+    --fr-ruolo-p:#B2842A; --fr-ruolo-d:#2E8E58;
+    --fr-ruolo-c:#2F73C4; --fr-ruolo-a:#CF5440; --fr-ruolo-ink:#FFFFFF;
+  }
+}
+
+/* ============================================================
+   STAMPA — la vista dedicata, non la pagina a schermo
+   ------------------------------------------------------------
+   Trappola già pagata: le regole del tema notte hanno
+   specificità più alta, quindi qui serve !important sui token.
+   Il marchio diventa nero: la tinta della squadra è identità a
+   schermo, su carta è solo inchiostro sprecato.
+   ============================================================ */
+@media print{
+  :root, :root[data-tema="notte"], :root[data-tema="giorno"]{
+    --fr-fondo:#FFFFFF !important;
+    --fr-pan:#FFFFFF !important;
+    --fr-incasso:#F2F2F0 !important;
+    --fr-filo:#B9BFC2 !important;
+    --fr-filo-t:#D8DCDE !important;
+    --fr-ink:#111111 !important;
+    --fr-fioco:#4A5257 !important;
+    --fr-spento:#6E7579 !important;
+    --fr-su:#14663C !important;
+    --fr-giu:#9B2A20 !important;
+    --fr-ombra:none !important;
+    --fr-marchio:#111111 !important;
+    --fr-marchio-ink:#FFFFFF !important;
+    --fr-marchio-velo:#EDEDED !important;
+    /* le cinque caselle in grigio: su carta la tinta non serve,
+       serve che si distinguano ancora l'una dall'altra */
+    --fr-diff-1:#DCDCDC !important;
+    --fr-diff-2:#B5B5B5 !important;
+    --fr-diff-3:#8C8C8C !important;
+    --fr-diff-4:#636363 !important;
+    --fr-diff-5:#3A3A3A !important;
+    --fr-diff-1-ink:#111111 !important;
+    --fr-diff-2-ink:#111111 !important;
+    --fr-diff-3-ink:#111111 !important;
+    --fr-diff-4-ink:#FFFFFF !important;
+    --fr-diff-5-ink:#FFFFFF !important;
+    --fr-t-base:11px !important;
+    --fr-riga-y:4px !important;
+  }
+}
+
+/* ============================================================
+   BASE — l'unico posto dove i token toccano gli elementi nudi
+   ============================================================ */
+body{
+  background:var(--fr-fondo);
+  color:var(--fr-ink);
+  font-family:var(--fr-font-testo);
+  font-size:var(--fr-t-base);
+  line-height:var(--fr-interlinea);
+  font-variant-numeric:tabular-nums; /* le colonne di numeri non ballano */
+}
+
+/* Numeri: sempre questa classe, mai grassetto a mano. */
+.fr-num{
+  font-family:var(--fr-font-num);
+  font-weight:var(--fr-peso-num);
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.005em;
+}
+
+/* Scostamento da un riferimento: l'unico uso legittimo di su/giù. */
+.fr-delta{font-family:var(--fr-font-num);font-weight:var(--fr-peso-num);font-size:var(--fr-t-piccolo)}
+.fr-delta[data-verso="su"]{color:var(--fr-su)}
+.fr-delta[data-verso="giu"]{color:var(--fr-giu)}
+/* fermo: --fr-fioco, non --fr-fermo — come testo quello sta a 2,67:1 sul bianco */
+.fr-delta[data-verso="fermo"]{color:var(--fr-fioco)}
+
+/* Etichetta sopra un valore. */
+.fr-et{font-size:var(--fr-t-et);color:var(--fr-fioco);line-height:var(--fr-interlinea-stretta)}
+
+/* Filo verticale di ruolo: unico posto dove vive il colore ruolo. */
+.fr-filo-ruolo{display:block;width:4px;height:var(--fr-filo-h);border-radius:1px}
+.fr-filo-ruolo[data-ruolo="P"]{background:var(--fr-ruolo-p)}
+.fr-filo-ruolo[data-ruolo="D"]{background:var(--fr-ruolo-d)}
+.fr-filo-ruolo[data-ruolo="C"]{background:var(--fr-ruolo-c)}
+.fr-filo-ruolo[data-ruolo="A"]{background:var(--fr-ruolo-a)}
+
+.fr-chip{
+  width:var(--fr-chip);height:var(--fr-chip);border-radius:2px;
+  display:inline-grid;place-items:center;
+  font-size:var(--fr-t-mini);font-weight:var(--fr-peso-num);
+  color:var(--fr-ruolo-ink);
+}
+.fr-chip[data-ruolo="P"]{background:var(--fr-ruolo-p)}
+.fr-chip[data-ruolo="D"]{background:var(--fr-ruolo-d)}
+.fr-chip[data-ruolo="C"]{background:var(--fr-ruolo-c)}
+.fr-chip[data-ruolo="A"]{background:var(--fr-ruolo-a)}
+
+/* Difficoltà della singola partita: data-liv è fixDiff() arrotondato,
+   1 morbidissima … 5 durissima. */
+.fr-diff{display:inline-block;width:9px;height:15px;border-radius:1px}
+.fr-diff[data-liv="1"]{background:var(--fr-diff-1);color:var(--fr-diff-1-ink)}
+.fr-diff[data-liv="2"]{background:var(--fr-diff-2);color:var(--fr-diff-2-ink)}
+.fr-diff[data-liv="3"]{background:var(--fr-diff-3);color:var(--fr-diff-3-ink)}
+.fr-diff[data-liv="4"]{background:var(--fr-diff-4);color:var(--fr-diff-4-ink)}
+.fr-diff[data-liv="5"]{background:var(--fr-diff-5);color:var(--fr-diff-5-ink)}
+
+/* Contorno di messa a fuoco: sempre visibile, sempre il marchio. */
+:focus-visible{outline:2px solid var(--fr-marchio);outline-offset:2px}
+
+@media (prefers-reduced-motion: reduce){
+  :root{--fr-mov:0s;--fr-mov-lento:0s}
+  *,*::before,*::after{animation-duration:.001s !important;transition-duration:.001s !important}
+}

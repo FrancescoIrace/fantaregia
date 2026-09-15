@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useParams } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
-import { ROLES, type Motore } from '../domain/motore.ts'
-import type { RigheLega } from '../data/componi.ts'
+import { creaMotore, ROLES, type Motore } from '../domain/motore.ts'
+import { ingressoFinoA, type RigheLega } from '../data/componi.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
@@ -19,6 +19,8 @@ import Listone from './Listone.tsx'
 import Rose from './Rose.tsx'
 import Asta from './Asta.tsx'
 import { ORDINE, PRIME, modoAuto, modoSalvato, salvaModo, type Modo, type Scheda } from '../viste/modo.ts'
+import { usaTinta } from '../viste/colore-squadra.ts'
+import ColoreSquadra from './ColoreSquadra.tsx'
 
 /* le schede, ognuna con la chiave che gli ordini di modo.ts usano per
    metterle in fila. La Panoramica sta fuori: è la casa della lega (la
@@ -53,6 +55,27 @@ export default function Lega({ utenteId }: { utenteId: string }) {
     supabase.from('membri').select('utente_id, nome, ruolo').eq('lega_id', id)
       .then(({ data }) => setMembri((data ?? []) as Membro[]))
   }, [id])
+
+  /* Il marchio è il colore della propria squadra. Uscendo dalla lega torna
+     quello predefinito: l'elenco delle leghe non è di nessuna squadra. */
+  const miaTinta = righe?.squadre.find(s => s.id === righe.preferenze?.mia_squadra)?.colore ?? null
+  useEffect(() => {
+    usaTinta(miaTinta)
+    return () => { usaTinta(null) }
+  }, [miaTinta])
+
+  /* Il motore com'era prima di una giornata: gli stessi dati senza i voti da
+     quella in poi, per chiedere al modello cosa avrebbe consigliato senza
+     fargli vedere il risultato. Uno per giornata, ricordato finché i dati
+     della lega non cambiano. */
+  const motorePrima = useMemo(() => {
+    if (!righe) return null
+    const fatti = new Map<number, Motore>()
+    return (g: number) => {
+      if (!fatti.has(g)) fatti.set(g, creaMotore(ingressoFinoA(righe, g)))
+      return fatti.get(g)!
+    }
+  }, [righe])
 
   if (errore) return <div className="space-y-3"><Avviso tipo="errore">{errore}</Avviso><Link to="/" className="text-accent">← Le tue leghe</Link></div>
   if (!righe || !motore) return <p className="text-muted">Carico la lega…</p>
@@ -94,8 +117,8 @@ export default function Lega({ utenteId }: { utenteId: string }) {
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
         <Route path="rose" element={<Rose legaId={id} motore={motore} ricarica={ricarica}
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-        <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} />} />
-        <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica}
+        <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} motorePrima={motorePrima ?? undefined} />} />
+        <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica} motorePrima={motorePrima ?? undefined}
           puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
         <Route path="rendimento" element={<Rendimento motore={motore} />} />
         <Route path="titolari" element={<Titolari motore={motore} />} />
@@ -120,6 +143,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
     ricarica()
   }
   const giornate = motore.giornateGiocate()
+  const colore = (tid: number) => righe.squadre.find(s => s.id === tid)?.colore ?? null
 
   return (
     <div className="space-y-6">
@@ -152,7 +176,10 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
                 const st = motore.stats(t.id), g = motore.giudizio(t.id)
                 return (
                   <tr key={t.id} className={t.id === mia ? 'bg-accent-soft' : ''}>
-                    <td className="py-1.5 pr-3 font-semibold">{t.name}{t.id === mia && <span className="ml-2 text-[11px] text-accent">io</span>}</td>
+                    <td className="py-1.5 pr-3 font-semibold">
+                      {colore(t.id) && <span className="gagliardetto mr-2" style={{ ['--tinta' as string]: colore(t.id)! }} />}
+                      {t.name}{t.id === mia && <span className="ml-2 text-[11px] text-accent">io</span>}
+                    </td>
                     {ROLES.map(r => (
                       <td key={r} className={`px-1.5 py-1.5 text-center font-mono text-[12.5px] ${st.perRole[r].count >= motore.S.slots[r] ? 'text-muted' : ''}`}>
                         {st.perRole[r].count}/{motore.S.slots[r]}
@@ -169,6 +196,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
           </table>
         </div>
         <div className="mt-3"><Suggerimento>Crediti, tetto e giudizio vengono dal motore dell'app a file singolo, sui dati di questa lega.</Suggerimento></div>
+        <div className="mt-4 border-t border-line pt-3"><ColoreSquadra legaId={id} squadre={righe.squadre} mia={mia} mancante={righe.coloreMancante} admin={io?.ruolo === 'admin'} /></div>
       </Card>
 
       {io && io.ruolo !== 'lettore' && <CaricaDati legaId={id} righe={righe} motore={motore} />}

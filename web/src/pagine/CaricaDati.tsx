@@ -79,7 +79,7 @@ function Riga({ nome, stato, manca, azione }: { nome: string; stato: string; man
   return (
     <div className="py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className={`h-2 w-2 flex-none rounded-full ${manca ? 'bg-warn' : 'bg-ok'}`} />
+        <span className={`h-2 w-2 flex-none rounded-full ${manca ? 'border-2 border-ink bg-transparent' : 'bg-ok'}`} />
         <span className="w-56 font-semibold">{nome}</span>
         <span className="min-w-0 flex-1 text-sm text-muted">{stato}</span>
         <div className="flex flex-wrap items-center gap-2">{azione(setEsito)}</div>

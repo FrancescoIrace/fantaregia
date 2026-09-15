@@ -41,6 +41,29 @@ describe('vista Formazioni', () => {
     expect(html).toContain('fixstrip')
   })
 
+  it('i componenti nuovi: filo di ruolo su ogni riga di panchina, numeri condensati, delta sulla giornata prima', () => {
+    const g = motore.giornataOggi()
+    expect(g).toBeGreaterThan(1)                        // altrimenti non c'è una giornata prima con cui confrontare
+    const html = disegna({ [g]: motore.formazioneAutomatica(g, '3-4-3') })
+    const righePanchina = (html.match(/class="benchrow/g) ?? []).length
+    expect(righePanchina).toBeGreaterThan(0)
+    expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(righePanchina)
+    expect((html.match(/class="dsc fr-num"/g) ?? []).length).toBe(righePanchina)
+    // il ruolo lo dice il filo: la lettera senza sfondo, niente quadratino pieno accanto ai delta
+    expect((html.match(/class="ruolo-lettera"/g) ?? []).length).toBe(righePanchina)
+    expect(html).not.toContain('fr-chip')
+    expect((html.match(/class="gslot[^"]*"[^>]*>(?:(?!<\/button>).)*class="fr-num"/g) ?? []).length).toBe(11)
+    // un delta per riga di panchina, per maglia, e uno per il punteggio medio
+    expect((html.match(/class="fr-delta" data-verso="(su|giu|fermo)"/g) ?? []).length).toBe(righePanchina + 11 + 1)
+  })
+
+  it('ogni riga di panchina ha l\'interruttore «fisso», spento finché non lo si accende', () => {
+    const html = disegna({})
+    const righePanchina = (html.match(/class="benchrow/g) ?? []).length
+    expect((html.match(/class="fisso" aria-pressed="false"/g) ?? []).length).toBe(righePanchina)
+    expect(html).toContain('>Preferito<')
+  })
+
   it('senza la propria squadra scelta lo dice, e intanto mostra la prima', () => {
     expect(disegna({}, null)).toContain('Non hai ancora scelto la tua squadra')
   })

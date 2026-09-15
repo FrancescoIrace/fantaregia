@@ -1,0 +1,85 @@
+/* ══ Componenti del sistema nuovo ═══════════════════════════════════
+   Quello che le viste nuove usano e legacy.css non ha. Solo token, più
+   le misure di forma che non hanno un token (spessori, diagonali).     */
+
+/* ── il colore squadra ─────────────────────── */
+
+/* La tinta nel selettore è quella SCELTA, non corretta: è un campione,
+   non un marchio. Il filo intorno la stacca dal pannello qualunque sia. */
+.tinta{
+  width:var(--fr-chip);height:var(--fr-chip);border:0;padding:0;border-radius:var(--fr-r);
+  background:var(--tinta);box-shadow:inset 0 0 0 1px var(--fr-filo);cursor:pointer;flex:none;
+}
+.tinta:disabled{cursor:wait}
+.tinta.scelta{outline:2px solid var(--fr-ink);outline-offset:2px}
+/* Già di un'altra squadra: una diagonale sopra la tinta, non la tinta
+   spenta. L'opacità sbiadirebbe proprio il colore che si vuole vedere, ed
+   è una scelta ancora possibile — gli avvisi non sono divieti. */
+.tinta.presa{
+  background:
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--fr-pan) calc(50% - 1px),
+      var(--fr-pan) calc(50% + 1px), transparent calc(50% + 1px)),
+    var(--tinta);
+}
+/* Il selettore libero: un giro di tonalità (sono le tinte pronte) sopra
+   un input colore invisibile, che resta quello che si clicca. */
+.tinta.libera{
+  position:relative;overflow:hidden;
+  background:conic-gradient(#E1523D, #E68A4E, #F2B03D, #8DBF3F, #2AA79B, #4FC0E8, #3E7BD6, #C77DD8, #D94F8A, #E1523D);
+}
+.tinta.libera input{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;opacity:0;cursor:pointer}
+
+/* Il gagliardetto: la tinta di una squadra accanto al suo nome, perché la
+   lega la riconosca. */
+.gagliardetto{
+  display:inline-block;width:10px;height:10px;border-radius:2px;flex:none;vertical-align:0;
+  background:var(--tinta);box-shadow:inset 0 0 0 1px var(--fr-filo);
+}
+
+/* ── filo di ruolo, numeri e delta nelle viste portate ── */
+
+/* Il filo sta sul bordo sinistro della riga: la riga ha già il suo
+   padding, e il filo ci si appoggia sopra invece di spostare le colonne. */
+.benchrow{position:relative}
+.benchrow > .fr-filo-ruolo{position:absolute;left:0;top:5px;bottom:5px;height:auto}
+/* Il ruolo lo dice il filo: la lettera resta, ma senza sfondo. Filo e
+   quadratino pieno insieme ripetevano il ruolo, e il quadratino verde dei
+   difensori o rosso degli attaccanti finiva nella stessa riga di un delta
+   verde o rosso — proprio la vicinanza che la regola dei colori vieta. */
+.ruolo-lettera{
+  flex:none;width:1.1em;text-align:center;
+  font-family:var(--fr-font-num);font-weight:var(--fr-peso-num);font-size:var(--fr-t-et);color:var(--fr-fioco);
+}
+/* Il delta ha una larghezza fissa: le colonne non ballano quando cambia,
+   e quando un confronto non c'è lo spazio resta. */
+.benchrow .fr-delta{min-width:2.6em;text-align:right}
+/* Dentro la distinta «.dsv span» rende piccolo e grigio ogni span: il
+   delta ha bisogno di una regola più specifica. Il colore lo dà già il
+   verso, che vince per specificità. */
+.dsv .fr-delta{font-size:var(--fr-t-piccolo);font-weight:var(--fr-peso-num);margin-left:6px}
+.cand .cs .fr-delta{font-size:var(--fr-t-piccolo);margin-left:4px;vertical-align:middle}
+.gs-stat .fr-delta{font-size:var(--fr-t-mini)}
+
+/* ── titolari fissi ── */
+/* Un interruttore di forma, non di colore: il documento vuole la casella
+   bloccata con il bordo scuro pieno, e «fisso» acceso è scritto pieno. */
+.fisso{
+  flex:none;background:none;cursor:pointer;padding:1px 6px;border-radius:var(--fr-r);
+  border:1px solid var(--fr-filo);color:var(--fr-fioco);font-size:var(--fr-t-mini);font-weight:var(--fr-peso-medio);
+}
+.fisso:hover{border-color:var(--fr-ink);color:var(--fr-ink)}
+.fisso.on{border-color:var(--fr-ink);color:var(--fr-ink);font-weight:var(--fr-peso-forte)}
+.gslot.bloccata{border-color:var(--fr-ink)}
+.gs-fisso{margin-left:6px;font-size:var(--fr-t-mini);font-weight:var(--fr-peso-forte);color:var(--fr-fioco)}
+
+/* ── previsione contro realtà e testa a testa ── */
+/* Righe separate da filetti, non card: il documento le vuole così per i dati. */
+.prev-tabella{width:100%;border-collapse:collapse;font-size:var(--fr-t-piccolo)}
+.prev-tabella th{text-align:left;font-weight:var(--fr-peso-medio);color:var(--fr-fioco);font-size:var(--fr-t-et);
+  padding:0 var(--fr-gap-stretto) var(--fr-gap-stretto)}
+.prev-tabella td{padding:var(--fr-riga-y) var(--fr-gap-stretto);border-top:1px solid var(--fr-filo-t);white-space:nowrap}
+.tat-xi{list-style:none;margin:var(--fr-gap-stretto) 0 0;padding:0}
+.tat-xi li{position:relative;display:flex;align-items:center;gap:var(--fr-gap-stretto);padding:6px 0 6px 12px;
+  border-top:1px solid var(--fr-filo-t);font-size:var(--fr-t-piccolo)}
+.tat-xi li > .fr-filo-ruolo{position:absolute;left:0;top:5px;bottom:5px;height:auto}
+.tat-totale{font-size:var(--fr-t-grande);line-height:1}

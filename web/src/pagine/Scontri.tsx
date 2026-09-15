@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ROLES, type Motore } from '../domain/motore.ts'
 import type { Ruolo } from '../domain/tipi.ts'
 import { salvaAbbinamento, salvaMiaSquadra } from '../data/lega.ts'
+import TestaATesta from './TestaATesta.tsx'
 import { ABBR } from '../viste/colori.ts'
 import { Avviso, Card } from '../ui.tsx'
 
@@ -21,19 +22,26 @@ const CONSIGLI = {
    affronti; quello di serie A quanto è dura per i tuoi. Qui si incrociano:
    il punteggio atteso delle due rose, la probabilità di vincere, cosa
    conviene fare, e da chi arriva il pericolo.                          */
-export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, ricarica }: {
-  legaId: string; utenteId: string; motore: Motore; puoScrivere: boolean; ricarica: () => void
+export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, ricarica, motorePrima }: {
+  legaId: string; utenteId: string; motore: Motore; puoScrivere: boolean; ricarica: () => void; motorePrima?: (g: number) => Motore
 }) {
   const [scelta, setScelta] = useState<number | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
 
   if (!m.legaOn()) return (
-    <Card titolo="Il calendario della lega non c'è ancora">
-      <p className="hint max-w-[74ch]">
-        Questa pagina dice <b>chi affronti</b> ogni giornata e quanto ci si aspetta che faccia la sua rosa — cose che il listone
-        da solo non sa. Serve il calendario della tua lega: per ora entra con l'import dall'app a file singolo.
-      </p>
-    </Card>
+    <div className="space-y-[18px]">
+      <Card titolo="Il calendario della lega non c'è ancora">
+        <p className="hint max-w-[74ch]">
+          Questa pagina dice <b>chi affronti</b> ogni giornata e quanto ci si aspetta che faccia la sua rosa — cose che il listone
+          da solo non sa. Serve il calendario della tua lega: caricalo in <b>Panoramica → Carica dati</b>.
+        </p>
+      </Card>
+      {motorePrima && (
+        <Card titolo="Testa a testa" azioni={<span className="hint">due rose, le formazioni del modello</span>}>
+          <TestaATesta m={m} motorePrima={motorePrima} a={m.meId()} />
+        </Card>
+      )}
+    </div>
   )
 
   const oggi = m.legaOggi()
@@ -123,7 +131,7 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
           <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
             {m.S.teams.map(t => (
               <label key={t.id} className="grid gap-0.5 text-[12.5px]">
-                <span className={`truncate font-semibold ${m.legaIdx(t.id) === null ? 'text-warn' : 'text-muted'}`}>{t.name}</span>
+                <span className={`truncate font-semibold ${m.legaIdx(t.id) === null ? 'text-ink' : 'text-muted'}`}>{t.name}</span>
                 <select disabled={!puoScrivere} value={m.legaIdx(t.id) ?? ''}
                   onChange={e => void segnala(salvaAbbinamento(legaId, t.id, e.target.value === '' ? null : Number(e.target.value)))}
                   className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-sm">
@@ -134,6 +142,12 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
             ))}
           </div>
           {!puoScrivere && <p className="hint mt-2">Gli abbinamenti li cambiano admin e banditori.</p>}
+        </Card>
+      )}
+
+      {motorePrima && (
+        <Card titolo="Testa a testa" azioni={<span className="hint">due rose, le formazioni del modello</span>}>
+          <TestaATesta m={m} motorePrima={motorePrima} a={tid} b={s?.avv.tid} ga={s?.ga} />
         </Card>
       )}
 

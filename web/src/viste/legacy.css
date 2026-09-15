@@ -5,27 +5,32 @@
    Tailwind; qui resta quello che ha un disegno suo (il campo, le maglie,
    la striscia delle partite, i segni di titolarità e rigori).          */
 :root {
-  --f1: #DCEFE2; --f1t: #14603A; --f2: #E9F1D8; --f2t: #4E6E27;
-  --f3: #F3EBDC; --f3t: #7A6134; --f4: #F8E3D6; --f4t: #9C4517; --f5: #F9DCD9; --f5t: #A32017;
+  /* Le cinque caselle del calendario vengono dai token (verde → neutro
+     → rosso, sulla tonalità): qui restano solo gli alias, così
+     .fix.d1…d5 continua a funzionare senza toccare le viste. Il verso è
+     quello di fixDiff(), 1 morbidissima … 5 durissima — non si inverte.
+     La trasferta è minuscolo, non opacità: vedi .fix.away più sotto. */
+  --f1: var(--fr-diff-1); --f1t: var(--fr-diff-1-ink);
+  --f2: var(--fr-diff-2); --f2t: var(--fr-diff-2-ink);
+  --f3: var(--fr-diff-3); --f3t: var(--fr-diff-3-ink);
+  --f4: var(--fr-diff-4); --f4t: var(--fr-diff-4-ink);
+  --f5: var(--fr-diff-5); --f5t: var(--fr-diff-5-ink);
   --erba: #C8E2CE; --erba-2: #BEDBC6; --erba-linea: rgba(255,255,255,.9);
   --oro: #8A6410; --oro-2: #D6A82C; --arg: #586167; --arg-2: #98A6AE;
   --bro: #6E4222; --bro-2: #B4794C; --gre: #5A666C; --gre-2: #8B989F;
-  --f-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
-  --f-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
-  --f-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+  /* alias sul sistema nuovo: due tagli soli, e ogni numero condensato */
+  --f-display: var(--fr-font-testo);
+  --f-body: var(--fr-font-testo);
+  --f-mono: var(--fr-font-num);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --f1: #1B5240; --f1t: #8FE6BA; --f2: #2B4529; --f2t: #C3E19C;
-    --f3: #3B3524; --f3t: #DCCB9C; --f4: #4C2C1C; --f4t: #F0B18C; --f5: #4D211D; --f5t: #F3A49B;
+  :root:not([data-tema="giorno"]) {
     --erba: #183A2E; --erba-2: #143327; --erba-linea: rgba(198,244,218,.34);
     --oro: #7A5A12; --oro-2: #C9A238; --arg: #4C575D; --arg-2: #8A979E;
     --bro: #5F3A1E; --bro-2: #A66E44; --gre: #414D53; --gre-2: #77848B;
   }
 }
-:root[data-theme="dark"] {
-  --f1: #1B5240; --f1t: #8FE6BA; --f2: #2B4529; --f2t: #C3E19C;
-  --f3: #3B3524; --f3t: #DCCB9C; --f4: #4C2C1C; --f4t: #F0B18C; --f5: #4D211D; --f5t: #F3A49B;
+:root[data-tema="notte"] {
   --erba: #183A2E; --erba-2: #143327; --erba-linea: rgba(198,244,218,.34);
   --oro: #7A5A12; --oro-2: #C9A238; --arg: #4C575D; --arg-2: #8A979E;
   --bro: #5F3A1E; --bro-2: #A66E44; --gre: #414D53; --gre-2: #77848B;
@@ -36,7 +41,7 @@
 .hint{font-size:12.5px;color:var(--muted);margin:0}
 .pteam{font-size:12px;color:var(--muted)}
 .tag{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em}
-.tag.ok{background:var(--ok-soft);color:var(--ok)} .tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)} .tag.warn{background:transparent;color:var(--ink);border:1px dashed var(--warn);padding:1px 6px}
 .tag.crit{background:var(--crit-soft);color:var(--crit)} .tag.neu{background:var(--surface-2);color:var(--muted)}
 .empty{padding:34px 20px;text-align:center;color:var(--muted);font-size:14px}
 
@@ -103,7 +108,9 @@
 /* ── Calendario: la striscia delle partite ── */
 .fixstrip{display:flex;gap:3px;align-items:center}
 .fix{font-family:var(--f-mono);font-size:10px;font-weight:600;padding:3px 4px;border-radius:4px;min-width:32px;text-align:center;letter-spacing:.02em;flex:none}
-.fix.away{opacity:.78;font-weight:500;text-transform:lowercase}
+/* trasferta: minuscolo e peso più leggero. Niente opacità: nell'originale
+   era .78, e sbiadiva anche l'inchiostro sotto 4,5:1 in tutti e due i temi */
+.fix.away{font-weight:500;text-transform:lowercase}
 .fix.d1{background:var(--f1);color:var(--f1t)} .fix.d2{background:var(--f2);color:var(--f2t)}
 .fix.d3{background:var(--f3);color:var(--f3t)} .fix.d4{background:var(--f4);color:var(--f4t)}
 .fix.d5{background:var(--f5);color:var(--f5t)}
@@ -169,7 +176,7 @@
 .gslot:hover{border-color:var(--accent);transform:translateY(-2px)}
 .gslot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .gslot.ko{border-color:var(--crit)}
-.gslot.meglio{border-color:var(--warn)}
+.gslot.meglio{border-color:var(--warn);box-shadow:inset 0 3px 0 var(--ink)}
 .gs-rate{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   padding:9px 4px;background:linear-gradient(160deg,var(--fa),var(--fb))}
 .gslot.f-oro{--fa:var(--oro-2);--fb:var(--oro)}
@@ -195,7 +202,7 @@
 .gsv b{font-family:var(--f-mono);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 .gs-why{font-size:10.5px;color:var(--muted);line-height:1.3;margin-top:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gs-meglio{font-size:10.5px;color:var(--warn);font-weight:650;
+.gs-meglio{font-size:10.5px;color:var(--ink);font-weight:650;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gslot.vuoto{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;min-height:96px;border-style:dashed;background:transparent;box-shadow:none;
@@ -357,7 +364,7 @@ table.list tbody tr:hover{background:var(--surface-2)}
 .pern em{display:block;font-style:normal;color:var(--muted);font-size:11.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .perig{display:inline-block;margin-left:5px;font-size:9.5px;font-weight:700;line-height:13px;
-  width:14px;height:14px;text-align:center;border-radius:3px;background:var(--warn);color:#fff;
+  width:14px;height:14px;text-align:center;border-radius:3px;background:var(--ink);color:var(--surface);
   vertical-align:1px}
 .perbar{display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
 .perbar i{display:block;height:100%;border-radius:3px;background:var(--crit);opacity:.72}
@@ -407,7 +414,7 @@ table.list tbody tr:hover{background:var(--surface-2)}
 .rshead{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .rspill{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.01em}
 .rspill.ok{background:var(--ok-soft);color:var(--ok)}
-.rspill.warn{background:var(--warn-soft);color:var(--warn)}
+.rspill.warn{background:transparent;color:var(--ink);border:1px dashed var(--warn);padding:1px 7px}
 .rspill.crit{background:var(--crit-soft);color:var(--crit)}
 .rspill.muted{background:var(--surface-2);color:var(--muted)}
 .rslist{margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -565,7 +572,7 @@ table.list.riep{min-width:820px}
 .rp .x{background:none;border:0;color:var(--line-strong);font-size:14px;padding:0 2px;line-height:1}
 .rp .x:hover{color:var(--crit)}
 .rp.hole{color:var(--muted);font-style:italic;font-size:12.5px}
-.rp.trovato{background:var(--warn-soft);border-radius:6px;margin:0 -4px;padding-left:4px;padding-right:4px}
+.rp.trovato{background:var(--accent-soft);border-radius:6px;margin:0 -4px;padding-left:4px;padding-right:4px}
 .giud{padding:11px 14px;border-top:1px solid var(--line);background:var(--surface-2)}
 .gh{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--muted);font-weight:600;margin-bottom:9px}
@@ -650,7 +657,7 @@ table.list tr.fuori .pname{text-decoration:line-through;text-decoration-thicknes
 .app .abar span{display:block;height:100%;border-radius:3px}
 .app .an{font-family:var(--f-mono);font-size:13px;font-weight:600;width:26px;text-align:right;font-variant-numeric:tabular-nums}
 .starbtn{background:none;border:0;padding:2px 4px;font-size:15px;line-height:1;color:var(--line-strong)}
-.starbtn.on,.starbtn:hover{color:var(--warn)}
+.starbtn.on,.starbtn:hover{color:var(--accent)}
 .takenby{font-size:11.5px;font-weight:600;white-space:nowrap}
 .attv{font-family:var(--f-mono);font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
 .tmax{width:62px;padding:3px 5px;font-size:12.5px;text-align:right;font-family:var(--f-mono);
@@ -767,7 +774,7 @@ table.list.stats .colfm{display:table-cell}
 .mktipo{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
   text-align:center;padding:3px 0;border-radius:4px}
 .mktipo.scambio{background:var(--accent-soft);color:var(--accent)}
-.mktipo.svincolo{background:var(--warn-soft);color:var(--warn)}
+.mktipo.svincolo{background:var(--surface-2);color:var(--muted)}
 .mkchi{font-size:13px;min-width:0}
 .mkmv{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mkchi em{font-style:normal;color:var(--muted);font-size:11.5px;display:block;margin-top:2px}
@@ -802,9 +809,9 @@ table.list.stats .colfm{display:table-cell}
 .infn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
 .inftag{font-size:12.5px;color:var(--muted)}
 .inftag i{font-style:normal;opacity:.75}
-.inftag.inf{color:var(--warn)}
+.inftag.inf{color:var(--ink);font-weight:600}
 .inftag.squal{color:var(--crit)}
-.inftag.diff{color:var(--warn)}
+.inftag.diff{color:var(--ink);font-weight:600}
 .inftag.rosso{color:var(--crit)}
 @media(max-width:640px){
   .infrow{grid-template-columns:auto 1fr auto;row-gap:2px}
