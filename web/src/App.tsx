@@ -8,6 +8,7 @@ import Leghe from './pagine/Leghe.tsx'
 import { Avviso } from './ui.tsx'
 import SceltaTema from './viste/SceltaTema.tsx'
 import { useTelefono } from './viste/telefono.ts'
+import InCima from './viste/InCima.tsx'
 
 // la pagina della lega porta con sé motore e caricamenti: si scarica quando serve
 const Lega = lazy(() => import('./pagine/Lega.tsx'))
@@ -23,6 +24,7 @@ export default function App() {
   const nelGuscio = telefono && !!sessione && pathname.startsWith('/lega/')
   return (
     <div className="min-h-screen">
+      <InCima />
       {/* il filo in cima è il marchio: dentro una lega il colore della propria squadra, fuori l'ambra */}
       {!nelGuscio && <header className="sticky top-0 z-40 border-t-[3px] border-b border-t-accent border-b-line bg-surface">
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-5 py-3">
