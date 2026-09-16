@@ -40,6 +40,17 @@ describe('il tema', () => {
     expect(temaSalvato()).toBeNull()
   })
 
+  it('la barra del browser segue il tema', () => {
+    /* Il meta theme-color non legge i token: senza qualcuno che lo riscriva
+       resta al valore di index.html, cioè il pannello del notte, anche sul
+       tema giorno. Vale --fr-pan, quello che sta appena sotto la barra. */
+    const colore = () => document.head.querySelector('meta[name="theme-color"]')?.getAttribute('content')
+    scegliTema('notte')
+    expect(colore()).toBe('#1A232B')
+    scegliTema('giorno')
+    expect(colore()).toBe('#FFFFFF')
+  })
+
   it('cambiando tema il marchio si ricorregge sul fondo nuovo', () => {
     /* L'ambra sul pannello notte regge da sola (8,4:1); sul bianco va
        scurita. Se la tinta si riapplicasse prima di cambiare attributo,
