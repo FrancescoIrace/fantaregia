@@ -505,3 +505,46 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   .cd-riga > .cd-nome{width:auto}
   .cd-riga > .cd-stato, .cd-riga > .cd-azioni{grid-column:2}
 }
+
+/* ── Formazioni: la testa ── */
+.m-fascia{margin:calc(-1 * var(--fr-pad)) calc(-1 * var(--fr-riga-x)) 0}
+/* Sette moduli in una riga sola, senza scorrere: a 390px ognuno ha ~48px,
+   e «3-4-3» nella condensata ne occupa 32. */
+.m-moduli{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:10px 0}
+.m-moduli button{
+  min-height:var(--fr-tocco);padding:0;cursor:pointer;font-size:var(--fr-t-piccolo);
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-fioco);
+}
+/* il modulo scelto è marchio, come la scheda attiva: è una scelta, non un valore */
+.m-moduli button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
+.m-comandi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.m-comandi > button{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+.m-preferito{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:10px;font-size:var(--fr-t-base)}
+.m-preferito em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.m-spie{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 12px}
+.m-spie:empty{display:none}
+
+/* ── Formazioni: il campo ── */
+.m-campo-guscio{
+  margin:0 calc(-1 * var(--fr-riga-x));padding:6px 0 2px;
+  background:var(--fr-incasso);border-top:1px solid var(--fr-filo);border-bottom:1px solid var(--fr-filo);
+}
+.m-campo-svg{display:block;width:100%;max-width:520px;height:auto;margin:0 auto}
+.m-disco{cursor:pointer;outline:none}
+/* la messa a fuoco da tastiera è il marchio sul bordo del disco, come ovunque */
+.m-disco:focus-visible > circle:first-of-type{stroke:var(--fr-marchio);stroke-width:3.5}
+.m-disco-num{font-family:var(--fr-font-num);font-weight:var(--fr-peso-num);text-anchor:middle}
+/* Nome e casa/fuori stanno sull'erba: inchiostro con un alone del colore
+   dell'erba, che nei due temi è il contrario dell'inchiostro. */
+.m-disco-nome, .m-disco-dove{
+  text-anchor:middle;fill:var(--fr-ink);paint-order:stroke;stroke:var(--fr-erba);stroke-linejoin:round;
+}
+.m-disco-nome{font-family:var(--fr-font-testo);font-weight:var(--fr-peso-forte);stroke-width:2.6px}
+.m-disco-dove{font-family:var(--fr-font-testo);stroke-width:2.2px}
+.m-legenda{margin-top:8px;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+/* in panchina, chi farebbe più di quattro punti di un titolare: tratteggio,
+   che è la forma degli avvisi, e non un colore */
+.m-supera{
+  flex:none;padding:0 4px;border:1px dashed var(--fr-fioco);border-radius:2px;
+  font-size:var(--fr-t-mini);font-weight:var(--fr-peso-forte);color:var(--fr-ink);white-space:nowrap;
+}
