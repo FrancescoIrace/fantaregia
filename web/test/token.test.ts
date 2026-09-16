@@ -220,10 +220,12 @@ describe('le tre regole del telefono', () => {
      qui si controlla solo che le regole ci siano ancora, e dentro il punto
      di rottura: da scrivania non devono toccare niente. */
   const componenti = readFileSync(fileURLToPath(new URL('../src/viste/componenti.css', import.meta.url)), 'utf8').replace(/\s+/g, '')
-  const blocco = componenti.slice(componenti.indexOf('@media(max-width:899.98px){input:not'))
+  const inizio = componenti.indexOf('══Letreregoledeltelefono')
+  const blocco = inizio < 0 ? '' : componenti.slice(inizio)
 
   it('stanno sotto i 900px', () => {
-    expect(blocco.length, 'blocco delle regole del telefono non trovato').toBeGreaterThan(0)
+    expect(inizio, 'blocco delle regole del telefono non trovato').toBeGreaterThan(-1)
+    expect(blocco).toMatch(/^[^@]*@media\(max-width:899\.98px\)\{/)
   })
   it('nessun campo sotto i 16px: Safari su iOS ingrandisce la pagina e non torna indietro', () => {
     expect(blocco).toMatch(/select,textarea\{font-size:16px!important;\}/)
