@@ -55,6 +55,43 @@ describe('vista Lega', () => {
     expect(html).not.toContain('class="legasc"')
   })
 
+  describe('sul telefono', () => {
+    const telefono = (m: ReturnType<typeof motore>) => renderToString(createElement(MemoryRouter, null,
+      createElement(Scontri, { legaId: 'l1', utenteId: 'u1', motore: m, puoScrivere: true, ricarica: () => {}, motorePrima: () => m, telefono: true })))
+
+    it('in cima la giornata con le frecce, poi il tuo scontro, gli altri del turno, la classifica', () => {
+      const m = motore(3), html = telefono(m)
+      const posto = (x: string) => html.indexOf(x)
+      expect(posto('m-selettore')).toBeGreaterThan(-1)
+      expect(html).not.toContain('type="number"')        // le frecce al posto del campo numerico
+      expect(posto('Il tuo scontro')).toBeGreaterThan(posto('m-selettore'))
+      expect(posto('Gli altri scontri')).toBeGreaterThan(posto('Il tuo scontro'))
+      expect(posto('>Classifica<')).toBeGreaterThan(posto('Gli altri scontri'))
+      // tutte le partite del turno tranne la propria, e una riga per squadra in classifica
+      const gl = m.legaOggi()
+      expect(conta(html, 'm-riga partita')).toBe(m.legaPartite(gl).length - 1)
+      expect(conta(html, 'm-riga cl')).toBe(m.classificaLega().length)
+      expect((html.match(/class="m-riga cl mia"/g) ?? []).length).toBe(1)
+    })
+
+    it('niente sparisce: tutto il resto è una riga che apre il suo cassetto', () => {
+      const html = telefono(motore(3))
+      for (const voce of ['Rosa contro rosa', 'Chi mi porta i punti', 'Da chi mi arriva il pericolo', 'Le previsioni tengono?',
+        'Testa a testa', 'giornate', 'Abbinamenti', 'Chi sono io', 'Come nascono questi numeri']) {
+        expect(html, voce).toContain(voce)
+      }
+      expect(conta(html, 'm-voce')).toBe(9)
+      expect(html).not.toContain('class="modal')          // chiusi finché non si tocca
+    })
+
+    it('senza abbinamento lo dice e tiene la riga degli abbinamenti', () => {
+      const html = telefono(motore(10))
+      expect(html).toContain('non è ancora abbinata')
+      expect(html).toContain('Abbinamenti')
+      expect(html).not.toContain('Rosa contro rosa')      // senza scontro non c'è niente da confrontare
+    })
+  })
+
   it('senza calendario di lega spiega cosa serve', () => {
     expect(disegna(motore(3, { ...shared, lega: null }))).toContain('Il calendario della lega non c&#x27;è ancora')
   })

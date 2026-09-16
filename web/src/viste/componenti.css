@@ -386,3 +386,86 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 .g-leva[data-on="true"]{background:var(--fr-marchio)}
 .g-leva[data-on="true"]::after{left:22px}
+
+/* ══ Le viste sul telefono ═══════════════════════════════════════════
+   Righe, gruppi e titoli di sezione che le viste usano sotto i 900px. Come
+   il guscio, stanno fuori da una @media: le disegna solo il ramo telefono
+   dei componenti. La vista arriva ai bordi (il guscio mette un margine, e
+   qui lo si riprende): una lista toccata col pollice non ha un bordo che la
+   stacca dal vetro, e le righe vanno da un lato all'altro. */
+.m-vista{margin:calc(-1 * var(--fr-pad)) calc(-1 * var(--fr-riga-x)) 0}
+.m-dentro{padding:var(--fr-gap) var(--fr-riga-x) 0}
+.m-titolo{
+  display:flex;justify-content:space-between;align-items:baseline;gap:var(--fr-gap);
+  padding:16px var(--fr-riga-x) 7px;font-size:var(--fr-t-et);color:var(--fr-fioco);
+}
+.m-pannello, .m-gruppo{background:var(--fr-pan);border-top:1px solid var(--fr-filo);border-bottom:1px solid var(--fr-filo)}
+.m-pannello{padding:var(--fr-pad) var(--fr-riga-x)}
+.m-nota{padding:12px var(--fr-riga-x) 4px;font-size:var(--fr-t-et);color:var(--fr-spento)}
+.m-campo{display:grid;gap:var(--fr-gap-stretto)}
+
+/* il selettore di giornata: frecce al posto del campo numerico, che sul
+   telefono apre la tastiera per spostarsi di una giornata */
+.m-selettore{
+  display:flex;align-items:center;gap:8px;padding:6px var(--fr-riga-x);
+  background:var(--fr-pan);border-bottom:1px solid var(--fr-filo);
+}
+.m-selettore button{
+  width:var(--fr-tocco);height:var(--fr-tocco);flex:none;cursor:pointer;background:none;
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);color:var(--fr-ink);font-size:20px;
+}
+/* spento con il grigio, non con l'opacità */
+.m-selettore button:disabled{color:var(--fr-spento);border-color:var(--fr-filo-t);cursor:default}
+.m-quale{flex:1;min-width:0;text-align:center}
+.m-quale b{display:block;font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base)}
+.m-quale em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+
+/* ── una riga ── */
+.m-riga{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  min-height:var(--fr-tocco);padding:var(--fr-riga-y) var(--fr-riga-x);border-bottom:1px solid var(--fr-filo-t);
+}
+.m-riga:last-child{border-bottom:0}
+/* la propria riga, come nel registro d'asta: velo e filo del marchio */
+.m-riga.mia{background:var(--fr-marchio-velo);box-shadow:inset 3px 0 0 var(--fr-marchio)}
+.m-testo{min-width:0}
+.m-nome{font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-meta{font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.m-pos{text-align:right;font-size:var(--fr-t-base);color:var(--fr-fioco)}
+.m-num{text-align:right;font-size:var(--fr-t-base)}
+.m-num.fioco{color:var(--fr-fioco)}
+.m-num.grande{font-size:var(--fr-t-num)}
+/* intestazione minuscola sopra le colonne di numeri, allineata alle righe */
+.m-intest{display:flex;justify-content:flex-end;gap:12px;padding:0 var(--fr-riga-x) 6px;font-size:var(--fr-t-mini);color:var(--fr-fioco)}
+
+/* una riga che apre qualcosa: nome sopra, cosa c'è dentro sotto */
+.m-voce{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  width:100%;min-height:56px;padding:12px var(--fr-riga-x);text-align:left;cursor:pointer;
+  border:0;border-bottom:1px solid var(--fr-filo-t);background:none;color:var(--fr-ink);font:inherit;font-size:var(--fr-t-base);
+}
+.m-voce:last-child{border-bottom:0}
+.m-voce em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco);margin-top:1px}
+.m-freccia{color:var(--fr-spento);font-size:17px}
+
+/* ── Giornata ── */
+.m-duello{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:var(--fr-gap);align-items:center}
+.m-duello .destro{text-align:right}
+.m-sq{font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base);line-height:1.2;overflow-wrap:anywhere}
+/* la tua squadra: il filo del marchio, che è identità e non un valore */
+.m-sq.io{box-shadow:inset 3px 0 0 var(--fr-marchio);padding-left:7px}
+.m-pt{font-size:var(--fr-t-grande);line-height:1;margin-top:4px}
+.m-pt.fioco{color:var(--fr-fioco)}
+.m-sd{font-size:var(--fr-t-et);color:var(--fr-fioco);margin-top:3px}
+.m-vs{font-size:var(--fr-t-et);color:var(--fr-spento)}
+.m-pannello .scfatta{margin:12px 0 0}
+.m-prob{height:8px;margin-top:14px;border-radius:4px;background:var(--fr-incasso);overflow:hidden}
+.m-prob i{display:block;height:100%}
+.m-prob-testo{display:flex;justify-content:space-between;margin-top:6px;font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.m-prob-testo b{font-size:var(--fr-t-titolo)}
+.m-pannello .lscons{margin-top:12px}
+.m-riga.cl{grid-template-columns:22px minmax(0,1fr) 52px 34px}
+.m-intest span{width:52px;text-align:right}
+.m-intest span:last-child{width:34px}
+.m-riga.partita{grid-template-columns:minmax(0,1fr) auto 52px}
+.m-coppia{display:grid;gap:2px;text-align:right;font-size:var(--fr-t-base)}

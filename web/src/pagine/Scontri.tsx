@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ROLES, type Motore } from '../domain/motore.ts'
 import type { Ruolo } from '../domain/tipi.ts'
 import { salvaAbbinamento, salvaMiaSquadra } from '../data/lega.ts'
 import TestaATesta from './TestaATesta.tsx'
 import { ABBR } from '../viste/colori.ts'
 import { Avviso, Card } from '../ui.tsx'
+import { useTelefono } from '../viste/telefono.ts'
+import Cassetto from '../viste/Cassetto.tsx'
 
 type Scontro = NonNullable<ReturnType<Motore['scontro']>>
 const p1 = (x: number) => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(1)
@@ -22,11 +24,15 @@ const CONSIGLI = {
    affronti; quello di serie A quanto è dura per i tuoi. Qui si incrociano:
    il punteggio atteso delle due rose, la probabilità di vincere, cosa
    conviene fare, e da chi arriva il pericolo.                          */
-export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, ricarica, motorePrima }: {
+export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, ricarica, motorePrima, telefono: forzato }: {
   legaId: string; utenteId: string; motore: Motore; puoScrivere: boolean; ricarica: () => void; motorePrima?: (g: number) => Motore
+  /** per i test di resa, che girano fuori dal browser: altrimenti decide la larghezza */
+  telefono?: boolean
 }) {
   const [scelta, setScelta] = useState<number | null>(null)
   const [errore, setErrore] = useState<string | null>(null)
+  const larghezza = useTelefono()
+  const telefono = forzato ?? larghezza
 
   if (!m.legaOn()) return (
     <div className="space-y-[18px]">
@@ -50,6 +56,14 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
   const s = tid ? m.scontro(tid, gl) : null
   const nonAbbinate = m.S.teams.filter(t => m.legaIdx(t.id) === null)
   const segnala = (p: Promise<unknown>) => p.then(() => { setErrore(null); ricarica() }, (e: Error) => setErrore(e.message))
+  const cambiaSquadra = (v: number) => void segnala(salvaMiaSquadra(legaId, utenteId, v))
+  const cambiaAbbinamento = (t: number, v: number | null) => void segnala(salvaAbbinamento(legaId, t, v))
+
+  if (telefono) return (
+    <GiornataTelefono m={m} tid={tid} gl={gl} oggi={oggi} s={s} errore={errore} puoScrivere={puoScrivere}
+      nonAbbinate={nonAbbinate.length} motorePrima={motorePrima}
+      onGiornata={setScelta} onSquadra={cambiaSquadra} onAbbinamento={cambiaAbbinamento} />
+  )
 
   return (
     <div className="space-y-[18px]">
@@ -61,10 +75,7 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
         </label>
         <label className="block w-[190px]">
           <span className="mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase">Chi sono io</span>
-          <select value={tid} onChange={e => void segnala(salvaMiaSquadra(legaId, utenteId, Number(e.target.value)))}
-            className="w-full rounded-[7px] border border-line-strong bg-surface px-2.5 py-1.5 text-sm">
-            {m.S.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          <ChiSonoIo m={m} tid={tid} onCambia={cambiaSquadra} />
         </label>
         <span className="hint ml-auto text-right">
           {m.legaGiornate()} giornate · {m.S.lega!.teams.length} squadre · la 1ª di lega è la {m.legaSerieA(1)}ª di serie A ·{' '}
@@ -128,20 +139,7 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
 
       {nonAbbinate.length > 0 && (
         <Card titolo="Abbinamenti" azioni={<span className="hint">{nonAbbinate.length} {nonAbbinate.length === 1 ? 'squadra senza nome' : 'squadre senza nome'} nel calendario di lega</span>}>
-          <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-            {m.S.teams.map(t => (
-              <label key={t.id} className="grid gap-0.5 text-[12.5px]">
-                <span className={`truncate font-semibold ${m.legaIdx(t.id) === null ? 'text-ink' : 'text-muted'}`}>{t.name}</span>
-                <select disabled={!puoScrivere} value={m.legaIdx(t.id) ?? ''}
-                  onChange={e => void segnala(salvaAbbinamento(legaId, t.id, e.target.value === '' ? null : Number(e.target.value)))}
-                  className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-sm">
-                  <option value="">—</option>
-                  {m.S.lega!.teams.map((n, i) => <option key={i} value={i}>{n}</option>)}
-                </select>
-              </label>
-            ))}
-          </div>
-          {!puoScrivere && <p className="hint mt-2">Gli abbinamenti li cambiano admin e banditori.</p>}
+          <Abbinamenti m={m} puoScrivere={puoScrivere} onCambia={cambiaAbbinamento} />
         </Card>
       )}
 
@@ -153,21 +151,57 @@ export default function Scontri({ legaId, utenteId, motore: m, puoScrivere, rica
 
       <details className="rounded-card border border-line bg-surface p-4 text-sm shadow-card">
         <summary className="cursor-pointer font-semibold">Come nascono questi numeri, e quanto valgono</summary>
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
-          <div>
-            <h4 className="font-semibold">Il punteggio atteso</h4>
-            <p className="hint mt-1">Per ogni giocatore del miglior undici possibile: la sua pagella media, più i bonus per presenza corretti
-              dalla durezza della partita di serie A di quella giornata. Il tutto pesato dalla probabilità che giochi davvero: chi non
-              scende in campo lascia il posto a una riserva che rende meno.</p>
-          </div>
-          <div>
-            <h4 className="font-semibold">Lo scarto, e perché conta più della media</h4>
-            <p className="hint mt-1">Il fantavoto di un attaccante che segna spesso oscilla molto più di quello di un difensore: ogni gol vale 3
-              e porta varianza 9λ. Sommando i giocatori viene lo scarto della squadra, e da media e scarto la probabilità di vincere.
-              I giocatori sono trattati come indipendenti, quindi lo scarto vero è un po' più largo di quello scritto qui.</p>
-          </div>
-        </div>
+        <SpiegaNumeri />
       </details>
+    </div>
+  )
+}
+
+function ChiSonoIo({ m, tid, onCambia }: { m: Motore; tid: number; onCambia: (tid: number) => void }) {
+  return (
+    <select value={tid} onChange={e => onCambia(Number(e.target.value))}
+      className="w-full rounded-[7px] border border-line-strong bg-surface px-2.5 py-1.5 text-sm">
+      {m.S.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+    </select>
+  )
+}
+
+function Abbinamenti({ m, puoScrivere, onCambia }: { m: Motore; puoScrivere: boolean; onCambia: (tid: number, idx: number | null) => void }) {
+  return (
+    <>
+      <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+        {m.S.teams.map(t => (
+          <label key={t.id} className="grid gap-0.5 text-[12.5px]">
+            <span className={`truncate font-semibold ${m.legaIdx(t.id) === null ? 'text-ink' : 'text-muted'}`}>{t.name}</span>
+            <select disabled={!puoScrivere} value={m.legaIdx(t.id) ?? ''}
+              onChange={e => onCambia(t.id, e.target.value === '' ? null : Number(e.target.value))}
+              className="rounded-[7px] border border-line-strong bg-surface px-2 py-1 text-sm">
+              <option value="">—</option>
+              {m.S.lega!.teams.map((n, i) => <option key={i} value={i}>{n}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
+      {!puoScrivere && <p className="hint mt-2">Gli abbinamenti li cambiano admin e banditori.</p>}
+    </>
+  )
+}
+
+function SpiegaNumeri() {
+  return (
+    <div className="mt-3 grid gap-4 md:grid-cols-2">
+      <div>
+        <h4 className="font-semibold">Il punteggio atteso</h4>
+        <p className="hint mt-1">Per ogni giocatore del miglior undici possibile: la sua pagella media, più i bonus per presenza corretti
+          dalla durezza della partita di serie A di quella giornata. Il tutto pesato dalla probabilità che giochi davvero: chi non
+          scende in campo lascia il posto a una riserva che rende meno.</p>
+      </div>
+      <div>
+        <h4 className="font-semibold">Lo scarto, e perché conta più della media</h4>
+        <p className="hint mt-1">Il fantavoto di un attaccante che segna spesso oscilla molto più di quello di un difensore: ogni gol vale 3
+          e porta varianza 9λ. Sommando i giocatori viene lo scarto della squadra, e da media e scarto la probabilità di vincere.
+          I giocatori sono trattati come indipendenti, quindi lo scarto vero è un po' più largo di quello scritto qui.</p>
+      </div>
     </div>
   )
 }
@@ -374,6 +408,190 @@ function Striscia({ m, tid, gl, onScegli }: { m: Motore; tid: number; gl: number
         la durezza del turno di serie A per i tuoi. Clicca una giornata per aprirla sopra.</p>
       <p className="hint mt-1">La giornata peggiore è la <b>{peggio.gl}</b> contro {peggio.avv.nome} ({peggio.ga}ª di serie A); la più comoda
         la <b>{meglio.gl}</b> contro {meglio.avv.nome}.</p>
+    </>
+  )
+}
+
+/* ══ Giornata, sul telefono ══════════════════════════════════════════
+   Lo stesso contenuto della vista da scrivania, in un altro ordine: sul
+   telefono si scorre dall'alto, quindi in cima va la domanda del sabato.
+   Prima la giornata (con le frecce, al posto del campo numerico), poi
+   il tuo scontro, gli altri del turno, la classifica. Tutto il resto —
+   rosa contro rosa, il tuo undici, i pericolosi, la verifica, il testa a
+   testa, le giornate, gli abbinamenti, «chi sono io» e come nascono i
+   numeri — sta in righe che aprono ciascuna il suo cassetto: niente è
+   sparito, è sotto invece che accanto.                                */
+type Approfondimento = 'reparti' | 'undici' | 'pericolosi' | 'verifica' | 'testa' | 'giornate' | 'abbinamenti' | 'chisono' | 'numeri'
+
+function GiornataTelefono({ m, tid, gl, oggi, s, errore, puoScrivere, nonAbbinate, motorePrima, onGiornata, onSquadra, onAbbinamento }: {
+  m: Motore; tid: number; gl: number; oggi: number; s: Scontro | null; errore: string | null; puoScrivere: boolean
+  nonAbbinate: number; motorePrima?: (g: number) => Motore
+  onGiornata: (g: number) => void; onSquadra: (tid: number) => void; onAbbinamento: (tid: number, idx: number | null) => void
+}) {
+  const [aperto, setAperto] = useState<Approfondimento | null>(null)
+  const chiudi = () => setAperto(null)
+  const giocate = m.legaGiocate().length
+  const voci: { k: Approfondimento; titolo: string; spiega: string; c: boolean }[] = [
+    { k: 'reparti', titolo: 'Rosa contro rosa', spiega: 'punti attesi per reparto', c: !!s },
+    { k: 'undici', titolo: 'Chi mi porta i punti', spiega: 'il mio undici, per questa giornata', c: !!s },
+    { k: 'pericolosi', titolo: 'Da chi mi arriva il pericolo', spiega: 'i più temibili della rosa avversaria', c: !!s?.avv.tid },
+    { k: 'verifica', titolo: 'Le previsioni tengono?', spiega: 'previsto contro successo, giornata per giornata', c: giocate > 0 },
+    { k: 'testa', titolo: 'Testa a testa', spiega: 'due rose, le formazioni del modello', c: !!motorePrima },
+    { k: 'giornate', titolo: `Le ${m.legaGiornate()} giornate`, spiega: 'avversario di lega × calendario di serie A', c: true },
+    { k: 'abbinamenti', titolo: 'Abbinamenti', spiega: `${nonAbbinate} ${nonAbbinate === 1 ? 'squadra senza nome' : 'squadre senza nome'} nel calendario di lega`, c: nonAbbinate > 0 },
+    { k: 'chisono', titolo: 'Chi sono io', spiega: m.teamName(tid), c: true },
+    { k: 'numeri', titolo: 'Come nascono questi numeri', spiega: 'e quanto valgono', c: true },
+  ]
+  const titolo = (k: Approfondimento) => voci.find(v => v.k === k)!.titolo
+  const contenuto: Record<Approfondimento, () => ReactNode> = {
+    reparti: () => s && <Reparti s={s} />,
+    undici: () => s && <Undici m={m} s={s} />,
+    pericolosi: () => s && <Pericolosi m={m} s={s} />,
+    verifica: () => <Verifica m={m} tid={tid} />,
+    testa: () => motorePrima && <TestaATesta m={m} motorePrima={motorePrima} a={tid} b={s?.avv.tid} ga={s?.ga} />,
+    giornate: () => <Striscia m={m} tid={tid} gl={gl} onScegli={g => { onGiornata(g); chiudi() }} />,
+    abbinamenti: () => <Abbinamenti m={m} puoScrivere={puoScrivere} onCambia={onAbbinamento} />,
+    chisono: () => (
+      <label className="m-campo">
+        <span className="hint">La squadra da cui guardi la lega</span>
+        <ChiSonoIo m={m} tid={tid} onCambia={onSquadra} />
+      </label>
+    ),
+    numeri: () => <SpiegaNumeri />,
+  }
+
+  return (
+    <div className="m-vista">
+      <div className="m-selettore">
+        <button type="button" disabled={gl <= 1} onClick={() => onGiornata(gl - 1)} aria-label="Giornata precedente">‹</button>
+        <div className="m-quale">
+          <b>{gl}ª giornata di lega</b>
+          <em>{m.legaSerieA(gl)}ª di serie A · {gl === oggi ? <span className="oggi">oggi</span> : <>oggi è la {oggi}ª</>}</em>
+        </div>
+        <button type="button" disabled={gl >= m.legaGiornate()} onClick={() => onGiornata(gl + 1)} aria-label="Giornata successiva">›</button>
+      </div>
+      {errore && <div className="m-dentro"><Avviso tipo="errore">{errore}</Avviso></div>}
+
+      <p className="m-titolo"><span>Il tuo scontro</span>{s && <span>{s.avv.casa ? 'in casa' : 'fuori casa'}</span>}</p>
+      <div className="m-pannello">
+        {!s ? (
+          <p className="hint">Questa squadra non è ancora abbinata a un nome del calendario di lega: sceglilo in <b>Abbinamenti</b>, qui sotto.</p>
+        ) : (
+          <>
+            <div className="m-duello">
+              <div>
+                <p className="m-sq io">{m.teamName(tid)}</p>
+                <p className="m-pt fr-num">{s.mia.media.toFixed(1)}</p>
+                <p className="m-sd">± {s.mia.sd.toFixed(1)} · {s.mia.mod}</p>
+              </div>
+              <span className="m-vs">contro</span>
+              <div className="destro">
+                <p className="m-sq">{s.avv.nome}</p>
+                <p className="m-pt fr-num fioco">{s.sua ? s.sua.media.toFixed(1) : '—'}</p>
+                {s.sua && <p className="m-sd">± {s.sua.sd.toFixed(1)} · {s.sua.mod}</p>}
+              </div>
+            </div>
+            <Giocata m={m} tid={tid} gl={gl} />
+            {s.sua ? <ProbabilitaTelefono s={s} /> : (
+              <p className="hint mt-2"><b>{s.avv.nome}</b> non è abbinato a nessuna squadra dell'asta, quindi la sua rosa non la conosco.</p>
+            )}
+          </>
+        )}
+      </div>
+
+      <AltriScontri m={m} tid={tid} gl={gl} />
+
+      {giocate > 0 && (
+        <>
+          <p className="m-titolo"><span>Classifica</span><span>{giocate === 1 ? 'dopo 1 giornata' : `dopo ${giocate} giornate`}</span></p>
+          <div className="m-intest"><span>fantapunti</span><span>punti</span></div>
+          <div className="m-gruppo">
+            {m.classificaLega().map((x, i) => (
+              <div key={x.i} className={`m-riga cl${x.i === m.legaIdx(tid) ? ' mia' : ''}`}>
+                <span className="m-pos fr-num">{i + 1}</span>
+                <div className="m-testo">
+                  <p className="m-nome">{x.nome}</p>
+                  <p className="m-meta">{x.g} giocate · {x.v} V {x.n} N {x.p} P · gol {x.gf}:{x.gs}</p>
+                </div>
+                <span className="m-num fioco fr-num">{x.pf.toFixed(1)}</span>
+                <b className="m-num grande fr-num">{x.pt}</b>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p className="m-titolo"><span>Approfondimenti</span></p>
+      <div className="m-gruppo">
+        {voci.filter(v => v.c).map(v => (
+          <button key={v.k} type="button" className="m-voce" onClick={() => setAperto(v.k)}>
+            <span>{v.titolo}<em>{v.spiega}</em></span><span className="m-freccia">›</span>
+          </button>
+        ))}
+      </div>
+      <p className="m-nota">
+        {m.legaGiornate()} giornate · {m.S.lega!.teams.length} squadre · la 1ª di lega è la {m.legaSerieA(1)}ª di serie A.
+      </p>
+
+      {aperto && <Cassetto titolo={titolo(aperto)} onChiudi={chiudi}>{contenuto[aperto]()}</Cassetto>}
+    </div>
+  )
+}
+
+function ProbabilitaTelefono({ s }: { s: Scontro }) {
+  const pv = Math.round(s.pVinco! * 100), col = probCol(pv)
+  const [titolo, testo] = CONSIGLI[s.strategia!]
+  return (
+    <>
+      <div className="m-prob" role="img" aria-label={`probabilità di vincere ${pv}%`}><i style={{ width: `${pv}%`, background: col }} /></div>
+      <div className="m-prob-testo">
+        <span>vinci <b className="fr-num" style={{ color: col }}>{pv}%</b></span>
+        <span className="fr-num">{p1(s.diff!)} punti attesi</span>
+      </div>
+      <div className={`lscons ${s.strategia}`}><b>{titolo}</b><p>{testo}</p></div>
+    </>
+  )
+}
+
+/* Gli altri incroci del turno. Il motore sa già fare lo scontro di
+   qualunque squadra (scontro() prende il tid), quindi qui non c'è un conto
+   nuovo: a giornata giocata il risultato vero, prima i due attesi. Una
+   squadra non abbinata non ha una rosa, e il suo numero resta «—». */
+function AltriScontri({ m, tid, gl }: { m: Motore; tid: number; gl: number }) {
+  const mio = m.legaIdx(tid)
+  const partite = m.legaPartite(gl).filter(p => p.casaI !== mio && p.ospI !== mio)
+  if (!partite.length) return null
+  const f1 = (x: number | null | undefined) => x === null || x === undefined ? '—' : x.toFixed(1)
+  return (
+    <>
+      <p className="m-titolo"><span>Gli altri scontri</span><span>{gl}ª</span></p>
+      <div className="m-gruppo">
+        {partite.map(p => {
+          // si guarda dal lato di chi è abbinato, e se è l'ospite si rigira
+          const lato = p.casa ?? p.osp, girato = p.casa === null
+          const e = lato !== null ? m.esitoDi(lato, gl) : null
+          let a: string, b: string, meta: string
+          if (e) {
+            const [pa, pb, ga, gb] = girato ? [e.pc, e.pf, e.gc, e.gf] : [e.pf, e.pc, e.gf, e.gc]
+            a = f1(pa); b = f1(pb); meta = ga !== null ? `finita ${ga}–${gb}` : 'finita'
+          } else {
+            const sc = lato !== null ? m.scontro(lato, gl) : null
+            const x = f1(sc?.mia.media), y = f1(sc?.sua?.media)
+            a = girato ? y : x; b = girato ? x : y
+            meta = 'punti attesi'
+          }
+          return (
+            <div key={`${p.casaI}-${p.ospI}`} className="m-riga partita">
+              <div className="m-testo">
+                <p className="m-nome">{p.casaNome}</p>
+                <p className="m-nome">{p.ospNome}</p>
+              </div>
+              <span className="m-meta">{meta}</span>
+              <div className="m-coppia fr-num"><b>{a}</b><b>{b}</b></div>
+            </div>
+          )
+        })}
+      </div>
     </>
   )
 }
