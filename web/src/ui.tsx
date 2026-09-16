@@ -26,7 +26,9 @@ export function Bottone({ variante = 'normale', piccolo, className = '', ...p }:
   return (
     <button
       {...p}
-      className={`rounded-[7px] border font-medium disabled:cursor-not-allowed disabled:opacity-50 ${piccolo ? 'px-2.5 py-1 text-[12.5px]' : 'px-3.5 py-1.5 text-[13.5px]'} ${stile} ${className}`}
+      /* fr-bottone: un nome stabile, che il foglio del telefono usa per alzarlo a
+         46px — le utility di Tailwind non si selezionano in modo affidabile */
+      className={`fr-bottone rounded-[7px] border font-medium disabled:cursor-not-allowed disabled:opacity-50 ${piccolo ? 'px-2.5 py-1 text-[12.5px]' : 'px-3.5 py-1.5 text-[13.5px]'} ${stile} ${className}`}
     />
   )
 }

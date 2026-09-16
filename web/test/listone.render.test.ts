@@ -53,6 +53,53 @@ describe('Listone', () => {
     expect((html.match(/col-secondaria/g) ?? []).length).toBe(2 * (righe + 1))
   })
 
+  describe('sul telefono', () => {
+    const telefono = (cassettoAperto: 'filtri' | 'ordina' | null = null) => renderToString(createElement(Listone, {
+      legaId: 'l1', utenteId: 'u1', righe, motore: m, puoScrivere: true, ricarica: () => {}, telefono: true, cassettoAperto,
+    }))
+
+    it('niente tabella: una riga per giocatore con due numeri, prezzo atteso e appetibilità', () => {
+      const html = telefono(), n = Math.min(400, players.length)
+      expect(html).not.toContain('<table')
+      expect((html.match(/class="m-riga giocatore/g) ?? []).length).toBe(n)
+      expect((html.match(/class="m-num fr-num"/g) ?? []).length).toBe(n)          // atteso
+      expect((html.match(/class="m-num grande fr-num"/g) ?? []).length).toBe(n)   // appetibilità
+      expect((html.match(/class="fr-filo-ruolo"/g) ?? []).length).toBe(n)
+      expect(html).toContain('>atteso<')
+      expect(html).toContain('i primi 400')
+      expect(html).toContain('★')                                                 // l'obiettivo salvato
+      // chi è già preso lo dice la riga, a chi e a quanto
+      expect((html.match(/ a <span class="fr-num">/g) ?? []).length).toBeGreaterThan(0)
+    })
+
+    it('in vista: la ricerca, i cinque ruoli, il pulsante dei filtri e l\'ordinamento in chiaro', () => {
+      const html = telefono()
+      expect(html).toContain('type="search"')
+      expect((html.match(/aria-pressed="(true|false)">(Tutti|P|D|C|A)</g) ?? []).length).toBe(5)
+      expect(html).toContain('Filtri')
+      expect(html).toMatch(/per quotazione \(qt\.a\) ▼/)
+      expect(html).not.toContain('class="modal')
+    })
+
+    it('il cassetto dei filtri ha tutti i filtri di scrivania, più Pulisci e Mostra', () => {
+      const html = telefono('filtri')
+      for (const x of ['Ruolo', 'Cerca', 'Squadra', 'Qt. min', 'Qt. max', 'Da giornata', 'Per quante', 'Solo svincolati', 'Solo obiettivi', 'Solo la mia rosa', 'Pulisci', 'Mostra ']) {
+        expect(html, x).toContain(x)
+      }
+      expect((html.match(/type="checkbox"/g) ?? []).length).toBe(3)
+      // nessun campo sotto i 16px: sono tutti m-input o m-select
+      expect((html.match(/<input type="number"[^>]*class="m-input"/g) ?? []).length).toBe(4)
+    })
+
+    it('il cassetto dell\'ordinamento ha ogni colonna ordinabile da scrivania, e i due versi', () => {
+      const html = telefono('ordina')
+      expect((html.match(/class="m-voce"/g) ?? []).length).toBe(11)
+      expect(html).toContain('dal più alto')
+      expect(html).toContain('dal più basso')
+      expect((html.match(/class="m-voce" aria-pressed="true"/g) ?? []).length).toBe(1)
+    })
+  })
+
   it('senza listone dice dove caricarlo', () => {
     expect(listone(creaMotore({ players: [], stato: shared }))).toContain('Il listone non è caricato')
   })

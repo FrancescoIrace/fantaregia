@@ -5,20 +5,39 @@ import type { RigheLega } from '../data/componi.ts'
 import { salvaObiettivi } from '../data/lega.ts'
 import { appetCol, fmCol } from '../viste/colori.ts'
 import { FixStrip, MentChip, OutBadge, RigBadge, TitDot } from '../viste/segni.tsx'
-import { Card } from '../ui.tsx'
+import { Bottone, Card } from '../ui.tsx'
 import Scheda from './Scheda.tsx'
+import Cassetto from '../viste/Cassetto.tsx'
+import { useTelefono } from '../viste/telefono.ts'
+import { useAzione } from '../viste/barra-azione.ts'
 
 type Chiave = 'star' | 'r' | 'n' | 'q' | 'f' | 'att' | 'v' | 'app' | 'fm' | 'cal' | 'max'
 const ORDINE_RUOLO: Record<Ruolo, number> = { P: 0, D: 1, C: 2, A: 3 }
 const scoreCol = (s: number) => s >= 3.4 ? 'var(--ok)' : s <= 2.75 ? 'var(--crit)' : 'var(--muted)'
 
+/* Sul telefono l'intestazione di colonna non si tocca — è un gesto da
+   mouse — quindi l'ordinamento è un elenco di voci in chiaro. Ci sono tutte
+   le colonne che da scrivania si possono ordinare. */
+const ORDINAMENTI: [Chiave, string][] = [
+  ['app', 'Appetibilità'], ['att', 'Prezzo atteso'], ['q', 'Quotazione (Qt.A)'], ['f', 'FVM'], ['v', 'Convenienza'],
+  ['fm', 'Fantamedia'], ['cal', 'Calendario delle prossime giornate'], ['max', 'Il tuo prezzo massimo'],
+  ['star', 'Obiettivi'], ['r', 'Ruolo'], ['n', 'Nome'],
+]
+
 /* ══ Listone ═════════════════════════════════════════════════════════
    renderList() dell'app a file singolo: 518 giocatori con prezzo atteso,
    convenienza, appetibilità, fantamedia e prossime partite. Gli obiettivi
    con il prezzo massimo sono privati: li vede solo chi li segna.       */
-export default function Listone({ legaId, utenteId, righe, motore: m, puoScrivere, ricarica }: {
+export default function Listone({ legaId, utenteId, righe, motore: m, puoScrivere, ricarica, telefono: forzato, cassettoAperto = null }: {
   legaId: string; utenteId: string; righe: RigheLega; motore: Motore; puoScrivere: boolean; ricarica: () => void
+  /** per i test di resa, che girano fuori dal browser: altrimenti decide la larghezza */
+  telefono?: boolean
+  /** per i test: con quale cassetto aperto disegnare */
+  cassettoAperto?: 'filtri' | 'ordina' | null
 }) {
+  const larghezza = useTelefono()
+  const telefono = forzato ?? larghezza
+  const [cassetto, setCassetto] = useState<'filtri' | 'ordina' | null>(cassettoAperto)
   const [ruolo, setRuolo] = useState<Ruolo | ''>('')
   const [q, setQ] = useState('')
   const [squadra, setSquadra] = useState('')
@@ -85,7 +104,148 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
     </th>
   )
 
+  // quanti filtri sono accesi fra quelli che non si vedono: ruolo e ricerca stanno già in vista
+  const oggi = m.giornataOggi()
+  const nascosti = [squadra !== '', qmin !== '', qmax !== '', from !== oggi, span !== 5, soloLiberi, soloObiettivi, soloMiei].filter(Boolean).length
+  useAzione(m.PL.length ? {
+    titolo: `${righeVis.length} giocatori`,
+    sotto: nascosti ? `${nascosti} ${nascosti > 1 ? 'filtri accesi' : 'filtro acceso'}` : 'nessun filtro oltre ruolo e ricerca',
+    etichetta: 'Filtri',
+    fai: () => setCassetto('filtri'),
+  } : null)
+
   if (!m.PL.length) return <Card><div className="empty">Il listone non è caricato: fallo da <b>Carica dati</b>, in Panoramica.</div></Card>
+
+  const scheda = aperto !== null && (
+    <Scheda m={m} id={aperto} legaId={legaId} puoScrivere={puoScrivere} finestra={{ from: f, span: sp }}
+      obiettivo={obiettivi[aperto]} onObiettivo={o => segna(aperto, o)}
+      onChiudi={() => setAperto(null)} ricarica={ricarica} />
+  )
+
+  /* ══ Sul telefono ══════════════════════════════════════════════════
+     In riga due numeri, quelli che si cercano scorrendo: prezzo atteso e
+     appetibilità. Quotazione, FVM, convenienza, fantamedia, prossime
+     partite e il tuo prezzo massimo stanno nella scheda del giocatore, che
+     si apre toccando la riga. In cima la ricerca e i ruoli; tutti gli altri
+     filtri nel cassetto «Filtri», l'ordinamento nel cassetto «Ordina». */
+  if (telefono) {
+    const pulisci = () => {
+      setRuolo(''); setQ(''); setSquadra(''); setQmin(''); setQmax(''); setFrom(oggi); setSpan(5)
+      setSoloLiberi(false); setSoloObiettivi(false); setSoloMiei(false)
+    }
+    const nomeOrdine = ORDINAMENTI.find(([k]) => k === ordine.k)![1]
+    const ruoli = (
+      <div className="m-ruoli" role="group" aria-label="Ruolo">
+        {(['', 'P', 'D', 'C', 'A'] as const).map(r => (
+          <button key={r} type="button" aria-pressed={ruolo === r} onClick={() => setRuolo(r)}>{r || 'Tutti'}</button>
+        ))}
+      </div>
+    )
+    return (
+      <div className="m-vista">
+        <div className="m-cerca">
+          <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Cerca un giocatore o una squadra"
+            autoComplete="off" enterKeyHint="search" aria-label="Cerca" className="m-input" />
+          <button type="button" className="m-tasto" aria-haspopup="dialog" onClick={() => setCassetto('filtri')}>
+            Filtri{nascosti > 0 && <b className="m-conta fr-num">{nascosti}</b>}
+          </button>
+        </div>
+        <div className="m-dentro">{ruoli}</div>
+        <p className="m-titolo">
+          <span>{righeVis.length > 400 ? `${righeVis.length} giocatori, i primi 400` : `${righeVis.length} giocatori`}</span>
+          <button type="button" className="m-link" aria-haspopup="dialog" onClick={() => setCassetto('ordina')}>
+            {`per ${nomeOrdine.toLowerCase()} ${ordine.dir > 0 ? '▲' : '▼'}`}
+          </button>
+        </p>
+        <div className="m-intest listone"><span>atteso</span><span>appet.</span></div>
+        <div className="m-gruppo">
+          {righeVis.slice(0, 400).map(p => {
+            const a = m.S.assign[p.id], t = obiettivi[p.id]
+            const base = m.attesa(p.id), ora = m.attesaOra(p.id), ap = m.appet(p, f, sp)
+            const d = ora !== null && base ? ora / base - 1 : 0
+            return (
+              <button key={p.id} type="button" onClick={() => setAperto(p.id)}
+                className={`m-riga giocatore${a ? (a.team === me ? ' mia' : ' presa') : ''}${m.isOut(p.id) ? ' fuori' : ''}`}>
+                <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
+                <span className="m-testo">
+                  <span className="m-nome">
+                    {t && <span className="m-stella" title="obiettivo">★</span>}{p.n}
+                    <TitDot m={m} p={p} /><RigBadge m={m} p={p} /><OutBadge m={m} p={p} />
+                  </span>
+                  <span className="m-meta">
+                    {p.s} · {a ? <>{m.teamName(a.team)} a <span className="fr-num">{a.price}</span></> : 'libero'}
+                    {!a && ora !== null && Math.abs(d) >= 0.1 && <> · listino <span className="fr-num">{base}</span></>}
+                    {t?.max ? <> · max <span className="fr-num">{t.max}</span></> : null}
+                  </span>
+                </span>
+                <span className="m-num fr-num">{a ? '—' : ora ?? base}</span>
+                <b className="m-num grande fr-num" style={{ color: appetCol(ap) }}>{ap}</b>
+              </button>
+            )
+          })}
+          {!righeVis.length && <p className="m-nota">Nessun giocatore con questi filtri.</p>}
+        </div>
+
+        {cassetto === 'filtri' && (
+          <Cassetto titolo="Filtri" sotto={`${righeVis.length} giocatori con questi filtri`} onChiudi={() => setCassetto(null)}>
+            <div className="m-filtri">
+              <div className="m-campo"><span>Ruolo</span>{ruoli}</div>
+              <label className="m-campo"><span>Cerca</span>
+                <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Nome giocatore…" autoComplete="off" className="m-input" />
+              </label>
+              <label className="m-campo"><span>Squadra</span>
+                <select value={squadra} onChange={e => setSquadra(e.target.value)} className="m-select">
+                  <option value="">Tutte</option>
+                  {[...new Set(m.PL.map(p => p.s))].sort().map(t => <option key={t}>{t}</option>)}
+                </select>
+              </label>
+              <div className="m-affiancati">
+                <label className="m-campo"><span>Qt. min</span>
+                  <input type="number" inputMode="numeric" min={0} value={qmin} placeholder="0" onChange={e => setQmin(e.target.value)} className="m-input" />
+                </label>
+                <label className="m-campo"><span>Qt. max</span>
+                  <input type="number" inputMode="numeric" min={0} value={qmax} placeholder="36" onChange={e => setQmax(e.target.value)} className="m-input" />
+                </label>
+              </div>
+              <div className="m-affiancati">
+                <label className="m-campo"><span>Da giornata</span>
+                  <input type="number" inputMode="numeric" min={1} max={38} value={f} onChange={e => setFrom(parseInt(e.target.value) || 1)} className="m-input" />
+                </label>
+                <label className="m-campo"><span>Per quante</span>
+                  <input type="number" inputMode="numeric" min={1} max={38} value={sp} onChange={e => setSpan(parseInt(e.target.value) || 1)} className="m-input" />
+                </label>
+              </div>
+              <label className="m-spunta"><input type="checkbox" checked={soloLiberi} onChange={e => setSoloLiberi(e.target.checked)} /> Solo svincolati</label>
+              <label className="m-spunta"><input type="checkbox" checked={soloObiettivi} onChange={e => setSoloObiettivi(e.target.checked)} /> Solo obiettivi</label>
+              <label className="m-spunta"><input type="checkbox" checked={soloMiei} onChange={e => setSoloMiei(e.target.checked)} /> Solo la mia rosa</label>
+            </div>
+            <div className="m-piede">
+              <Bottone onClick={pulisci}>Pulisci</Bottone>
+              <Bottone variante="primario" onClick={() => setCassetto(null)}>Mostra {righeVis.length}</Bottone>
+            </div>
+          </Cassetto>
+        )}
+
+        {cassetto === 'ordina' && (
+          <Cassetto titolo="Ordina" onChiudi={() => setCassetto(null)}>
+            <div className="m-versi" role="group" aria-label="Verso">
+              <button type="button" aria-pressed={ordine.dir < 0} onClick={() => setOrdine(o => ({ ...o, dir: -1 }))}>dal più alto</button>
+              <button type="button" aria-pressed={ordine.dir > 0} onClick={() => setOrdine(o => ({ ...o, dir: 1 }))}>dal più basso</button>
+            </div>
+            <div className="m-gruppo">
+              {ORDINAMENTI.map(([k, lab]) => (
+                <button key={k} type="button" className="m-voce" aria-pressed={ordine.k === k}
+                  onClick={() => { setOrdine(o => ({ k, dir: o.dir })); setCassetto(null) }}>
+                  <span>{lab}</span><span className="m-freccia">{ordine.k === k ? '✓' : ''}</span>
+                </button>
+              ))}
+            </div>
+          </Cassetto>
+        )}
+        {scheda}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">
@@ -222,11 +382,7 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
         </div>
       </div>
 
-      {aperto !== null && (
-        <Scheda m={m} id={aperto} legaId={legaId} puoScrivere={puoScrivere} finestra={{ from: f, span: sp }}
-          obiettivo={obiettivi[aperto]} onObiettivo={o => segna(aperto, o)}
-          onChiudi={() => setAperto(null)} ricarica={ricarica} />
-      )}
+      {scheda}
     </div>
   )
 }

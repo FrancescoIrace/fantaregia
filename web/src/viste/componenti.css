@@ -386,3 +386,328 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 .g-leva[data-on="true"]{background:var(--fr-marchio)}
 .g-leva[data-on="true"]::after{left:22px}
+
+/* ══ Le viste sul telefono ═══════════════════════════════════════════
+   Righe, gruppi e titoli di sezione che le viste usano sotto i 900px. Come
+   il guscio, stanno fuori da una @media: le disegna solo il ramo telefono
+   dei componenti. La vista arriva ai bordi (il guscio mette un margine, e
+   qui lo si riprende): una lista toccata col pollice non ha un bordo che la
+   stacca dal vetro, e le righe vanno da un lato all'altro. */
+.m-vista{margin:calc(-1 * var(--fr-pad)) calc(-1 * var(--fr-riga-x)) 0}
+.m-dentro{padding:var(--fr-gap) var(--fr-riga-x) 0}
+.m-titolo{
+  display:flex;justify-content:space-between;align-items:baseline;gap:var(--fr-gap);
+  padding:16px var(--fr-riga-x) 7px;font-size:var(--fr-t-et);color:var(--fr-fioco);
+}
+.m-pannello, .m-gruppo{background:var(--fr-pan);border-top:1px solid var(--fr-filo);border-bottom:1px solid var(--fr-filo)}
+.m-pannello{padding:var(--fr-pad) var(--fr-riga-x)}
+.m-nota{padding:12px var(--fr-riga-x) 4px;font-size:var(--fr-t-et);color:var(--fr-spento)}
+.m-campo{display:grid;gap:var(--fr-gap-stretto)}
+
+/* il selettore di giornata: frecce al posto del campo numerico, che sul
+   telefono apre la tastiera per spostarsi di una giornata */
+.m-selettore{
+  display:flex;align-items:center;gap:8px;padding:6px var(--fr-riga-x);
+  background:var(--fr-pan);border-bottom:1px solid var(--fr-filo);
+}
+.m-selettore button{
+  width:var(--fr-tocco);height:var(--fr-tocco);flex:none;cursor:pointer;background:none;
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);color:var(--fr-ink);font-size:20px;
+}
+/* spento con il grigio, non con l'opacità */
+.m-selettore button:disabled{color:var(--fr-spento);border-color:var(--fr-filo-t);cursor:default}
+.m-quale{flex:1;min-width:0;text-align:center}
+.m-quale b{display:block;font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base)}
+.m-quale em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+
+/* ── una riga ── */
+.m-riga{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  min-height:var(--fr-tocco);padding:var(--fr-riga-y) var(--fr-riga-x);border-bottom:1px solid var(--fr-filo-t);
+}
+.m-riga:last-child{border-bottom:0}
+/* la propria riga, come nel registro d'asta: velo e filo del marchio */
+.m-riga.mia{background:var(--fr-marchio-velo);box-shadow:inset 3px 0 0 var(--fr-marchio)}
+.m-testo{min-width:0}
+.m-nome{font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-meta{font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.m-pos{text-align:right;font-size:var(--fr-t-base);color:var(--fr-fioco)}
+.m-num{text-align:right;font-size:var(--fr-t-base)}
+.m-num.fioco{color:var(--fr-fioco)}
+.m-num.grande{font-size:var(--fr-t-num)}
+/* intestazione minuscola sopra le colonne di numeri, allineata alle righe */
+.m-intest{display:flex;justify-content:flex-end;gap:12px;padding:0 var(--fr-riga-x) 6px;font-size:var(--fr-t-mini);color:var(--fr-fioco)}
+
+/* una riga che apre qualcosa: nome sopra, cosa c'è dentro sotto */
+.m-voce{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  width:100%;min-height:56px;padding:12px var(--fr-riga-x);text-align:left;cursor:pointer;
+  border:0;border-bottom:1px solid var(--fr-filo-t);background:none;color:var(--fr-ink);font:inherit;font-size:var(--fr-t-base);
+}
+.m-voce:last-child{border-bottom:0}
+.m-voce em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco);margin-top:1px}
+.m-freccia{color:var(--fr-spento);font-size:17px}
+
+/* ── Giornata ── */
+.m-duello{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:var(--fr-gap);align-items:center}
+.m-duello .destro{text-align:right}
+.m-sq{font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base);line-height:1.2;overflow-wrap:anywhere}
+/* la tua squadra: il filo del marchio, che è identità e non un valore */
+.m-sq.io{box-shadow:inset 3px 0 0 var(--fr-marchio);padding-left:7px}
+.m-pt{font-size:var(--fr-t-grande);line-height:1;margin-top:4px}
+.m-pt.fioco{color:var(--fr-fioco)}
+.m-sd{font-size:var(--fr-t-et);color:var(--fr-fioco);margin-top:3px}
+.m-vs{font-size:var(--fr-t-et);color:var(--fr-spento)}
+.m-pannello .scfatta{margin:12px 0 0}
+.m-prob{height:8px;margin-top:14px;border-radius:4px;background:var(--fr-incasso);overflow:hidden}
+.m-prob i{display:block;height:100%}
+.m-prob-testo{display:flex;justify-content:space-between;margin-top:6px;font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.m-prob-testo b{font-size:var(--fr-t-titolo)}
+.m-pannello .lscons{margin-top:12px}
+.m-riga.cl{grid-template-columns:22px minmax(0,1fr) 52px 34px}
+.m-intest span{width:52px;text-align:right}
+.m-intest span:last-child{width:34px}
+.m-riga.partita{grid-template-columns:minmax(0,1fr) auto 52px}
+.m-coppia{display:grid;gap:2px;text-align:right;font-size:var(--fr-t-base)}
+
+/* ── Lega e dati: le squadre ── */
+/* Una riga per squadra al posto della tabella da 640px. A sinistra chi è
+   (nome, allenatore, slot per reparto), a destra i crediti che restano,
+   che sono il numero che si cerca. Il filo è la tinta della squadra: è
+   identità, come il gagliardetto da scrivania. */
+/* dentro la Card, che ha p-4: la lista arriva ai suoi bordi */
+.m-squadre{margin:0 -1rem}
+.m-squadra{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;
+  padding:var(--fr-riga-y) var(--fr-pad);border-bottom:1px solid var(--fr-filo-t);
+  box-shadow:inset 4px 0 0 var(--tinta, transparent);
+}
+.m-squadra:last-child{border-bottom:0}
+.m-squadra.mia{background:var(--fr-marchio-velo)}
+.m-io{margin-left:7px;padding:0 5px;border:1px solid var(--fr-marchio);border-radius:2px;font-size:var(--fr-t-mini);font-weight:var(--fr-peso-medio);color:var(--fr-ink)}
+.m-allenatore{margin-top:3px;font-size:var(--fr-t-piccolo)}
+.m-select{
+  min-height:var(--fr-tocco);max-width:100%;padding:0 8px;font-size:16px;
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-ink);
+}
+.m-slot{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.m-slot > span{display:inline-flex;align-items:baseline;gap:3px}
+.m-slot > span.pieno{color:var(--fr-ink)}
+.m-crediti{display:grid;justify-items:end;text-align:right;gap:1px}
+.m-crediti > b{font-size:var(--fr-t-grande);line-height:1}
+
+/* ── Lega e dati: i file ── */
+/* Stessa riga di sempre (CaricaDati.tsx), disposta a griglia: il nome sulla
+   prima riga accanto al pallino, sotto lo stato per intero e i pulsanti. Da
+   scrivania il nome largo 224px lasciava allo stato una colonna di tre
+   parole per riga. */
+@media (max-width:899.98px){
+  .cd-riga{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;row-gap:6px}
+  .cd-riga > .cd-nome{width:auto}
+  .cd-riga > .cd-stato, .cd-riga > .cd-azioni{grid-column:2}
+}
+
+/* ── Formazioni: la testa ── */
+.m-fascia{margin:calc(-1 * var(--fr-pad)) calc(-1 * var(--fr-riga-x)) 0}
+/* Sette moduli in una riga sola, senza scorrere: a 390px ognuno ha ~48px,
+   e «3-4-3» nella condensata ne occupa 32. */
+.m-moduli{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:10px 0}
+.m-moduli button{
+  min-height:var(--fr-tocco);padding:0;cursor:pointer;font-size:var(--fr-t-piccolo);
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-fioco);
+}
+/* il modulo scelto è marchio, come la scheda attiva: è una scelta, non un valore */
+.m-moduli button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
+.m-comandi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.m-comandi > button{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+.m-preferito{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:10px;font-size:var(--fr-t-base)}
+.m-preferito em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.m-spie{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 12px}
+.m-spie:empty{display:none}
+
+/* ── Formazioni: il campo ── */
+.m-campo-guscio{
+  margin:0 calc(-1 * var(--fr-riga-x));padding:6px 0 2px;
+  background:var(--fr-incasso);border-top:1px solid var(--fr-filo);border-bottom:1px solid var(--fr-filo);
+}
+.m-campo-svg{display:block;width:100%;max-width:520px;height:auto;margin:0 auto}
+.m-disco{cursor:pointer;outline:none}
+/* la messa a fuoco da tastiera è il marchio sul bordo del disco, come ovunque */
+.m-disco:focus-visible > circle:first-of-type{stroke:var(--fr-marchio);stroke-width:3.5}
+.m-disco-num{font-family:var(--fr-font-num);font-weight:var(--fr-peso-num);text-anchor:middle}
+/* Nome e casa/fuori stanno sull'erba: inchiostro con un alone del colore
+   dell'erba, che nei due temi è il contrario dell'inchiostro. */
+.m-disco-nome, .m-disco-dove{
+  text-anchor:middle;fill:var(--fr-ink);paint-order:stroke;stroke:var(--fr-erba);stroke-linejoin:round;
+}
+.m-disco-nome{font-family:var(--fr-font-testo);font-weight:var(--fr-peso-forte);stroke-width:2.6px}
+.m-disco-dove{font-family:var(--fr-font-testo);stroke-width:2.2px}
+.m-legenda{margin-top:8px;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+/* in panchina, chi farebbe più di quattro punti di un titolare: tratteggio,
+   che è la forma degli avvisi, e non un colore */
+.m-supera{
+  flex:none;padding:0 4px;border:1px dashed var(--fr-fioco);border-radius:2px;
+  font-size:var(--fr-t-mini);font-weight:var(--fr-peso-forte);color:var(--fr-ink);white-space:nowrap;
+}
+
+/* ── Listone ── */
+.m-cerca{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:8px var(--fr-riga-x);
+  background:var(--fr-pan);border-bottom:1px solid var(--fr-filo);
+}
+/* 16px e non meno: sotto quella misura Safari su iOS ingrandisce la pagina
+   al tocco del campo e non torna indietro */
+.m-input{
+  width:100%;min-height:var(--fr-tocco);padding:0 12px;font-size:16px;color:var(--fr-ink);
+  background:var(--fr-incasso);border:1px solid var(--fr-filo);border-radius:var(--fr-r);
+}
+.m-tasto{
+  display:inline-flex;align-items:center;gap:6px;min-height:var(--fr-tocco);padding:0 14px;cursor:pointer;
+  font-size:var(--fr-t-base);font-weight:var(--fr-peso-forte);color:var(--fr-ink);
+  background:var(--fr-pan);border:1px solid var(--fr-filo);border-radius:var(--fr-r);
+}
+/* quanti filtri accesi: marchio, come la scheda attiva — è lo stato di una
+   tua scelta, non un valore */
+.m-conta{
+  min-width:20px;height:20px;padding:0 5px;border-radius:10px;display:inline-grid;place-items:center;
+  font-size:var(--fr-t-mini);background:var(--fr-marchio);color:var(--fr-marchio-ink);
+}
+.m-ruoli{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.m-ruoli button{
+  min-height:var(--fr-tocco);cursor:pointer;font-size:var(--fr-t-base);font-weight:var(--fr-peso-forte);
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-fioco);
+}
+.m-ruoli button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
+.m-link{
+  min-height:var(--fr-tocco);margin:-14px 0;padding:0;background:none;border:0;cursor:pointer;
+  font:inherit;font-size:var(--fr-t-et);color:var(--fr-ink);text-decoration:underline;text-underline-offset:3px;
+}
+.m-intest.listone span, .m-intest.listone span:last-child{width:40px}
+
+/* la riga è un pulsante: apre la scheda del giocatore */
+.m-riga.giocatore{
+  position:relative;width:100%;grid-template-columns:minmax(0,1fr) 40px 40px;
+  text-align:left;cursor:pointer;background:none;border:0;border-bottom:1px solid var(--fr-filo-t);
+  color:var(--fr-ink);font:inherit;
+}
+.m-riga.giocatore:last-child{border-bottom:0}
+.m-riga.giocatore > .fr-filo-ruolo{position:absolute;left:0;top:7px;bottom:7px;height:auto}
+.m-riga.giocatore .m-nome, .m-riga.giocatore .m-meta{display:block}
+.m-riga.giocatore .m-nome > .tdot, .m-riga.giocatore .m-nome > .rig, .m-riga.giocatore .m-nome > .outb{margin-left:5px}
+.m-stella{color:var(--fr-marchio);margin-right:4px}
+/* già presa da un'altra squadra: grigio leggibile e nome più leggero, come
+   da scrivania — mai opacità */
+.m-riga.presa .m-nome{color:var(--fr-fioco);font-weight:var(--fr-peso-medio)}
+
+/* ── i cassetti Filtri e Ordina ── */
+.m-filtri{display:grid;gap:14px}
+.m-filtri .m-campo > span{font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.m-filtri .m-select{width:100%}
+.m-affiancati{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.m-spunta{display:flex;align-items:center;gap:10px;min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+.m-spunta input{width:22px;height:22px;flex:none;accent-color:var(--fr-marchio)}
+/* Pulisci e Mostra restano in fondo al cassetto mentre si scorrono i filtri */
+.m-piede{
+  position:sticky;bottom:calc(-1 * var(--fr-pad));display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;
+  margin:16px calc(-1 * var(--fr-pad)) calc(-1 * var(--fr-pad));padding:10px var(--fr-pad) calc(10px + env(safe-area-inset-bottom));
+  background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+}
+.m-piede > button{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+.m-versi{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.m-versi button{
+  min-height:var(--fr-tocco);cursor:pointer;font-size:var(--fr-t-base);
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-fioco);
+}
+.m-versi button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
+.m-voce[aria-pressed="true"]{font-weight:var(--fr-peso-forte)}
+.m-voce[aria-pressed="true"] .m-freccia{color:var(--fr-marchio)}
+
+/* ══ Le tre regole del telefono, per tutte le viste ══════════════════
+   Sotto i 900px, in tutte le viste — anche quelle che non hanno un disegno
+   da telefono loro (Asta, Rose, Rendimento, Titolari, Calendario,
+   Infermeria, Mercato). Da scrivania non cambia niente: il puntatore
+   prende mire piccole, e righe strette fanno vedere più dati.
+   Le misure vengono da test/anteprime.test.ts (telefono.html), che le
+   controlla dentro iframe da 390px. */
+@media (max-width:899.98px){
+  /* 1. Nessun campo sotto i 16px: sotto quella misura Safari su iOS
+     ingrandisce la pagina quando si tocca il campo, e non torna indietro.
+     !important perché i campi portano la misura scritta in classe
+     (text-sm, text-[12.5px]) e alcune regole di legacy.css hanno una
+     specificità più alta di qualunque selettore d'elemento. */
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]), select, textarea{
+    font-size:16px !important;
+  }
+
+  /* 2. Nessun bersaglio sotto i 44px. */
+  button, select, summary,
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]){
+    min-height:var(--fr-tocco);
+  }
+  .fr-bottone{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+  /* i pulsanti di un solo segno (✕ ▲ ▼) sono stretti quanto il segno:
+     anche la larghezza va portata al pollice */
+  .x, .mv, .pclose{min-width:var(--fr-tocco)}
+  /* le spunte: la riga intera è il bersaglio, la casella si vede */
+  label:has(> input[type=checkbox]){min-height:var(--fr-tocco);display:flex;align-items:center}
+  input[type=checkbox]{width:22px;height:22px;accent-color:var(--fr-marchio)}
+  /* le tinte: un quadratino da 20px a 44, vanno a capo da sole (flex-wrap) */
+  .tinta{width:var(--fr-tocco);height:var(--fr-tocco)}
+  /* i nomi che aprono la scheda: tutta la riga alta, non solo le lettere */
+  .pname.clic{display:inline-flex;align-items:center}
+
+  /* 3. Niente scorrimenti annidati: scorre la pagina e basta. Una lista che
+     scorre dentro una pagina che scorre fa perdere il segno al pollice. */
+  .max-h-\[68vh\], .benchlist{max-height:none;overflow:visible}
+
+  /* il cassetto arriva al bordo del telefono: il contenuto in fondo non
+     finisce sotto la barra di sistema */
+  .pcard{padding-bottom:env(safe-area-inset-bottom)}
+}
+
+/* ── La panchina sul telefono, su due livelli ── */
+/* Con «fisso» e le due frecce alti 46px per il pollice, su una riga sola il
+   nome restava con una manciata di pixel («Ru…»): proprio il difetto che la
+   regola dei 620px aveva già corretto. Sopra il nome per intero, il
+   punteggio e il delta; sotto la partita, gli avvisi, «fisso» e le frecce.
+   Il markup è quello di scrivania: lo ridispone `order`, e il ::after a
+   tutta larghezza manda a capo il secondo livello. */
+@media (max-width:899.98px){
+  .benchrow{flex-wrap:wrap;row-gap:0;padding-top:8px;padding-bottom:2px}
+  .benchrow > .ord{order:1}
+  .benchrow > .ruolo-lettera{order:2}
+  .benchrow > .bn{order:3;flex:1 1 0}
+  .benchrow > .dsc{order:4}
+  .benchrow > .fr-delta{order:5}
+  .benchrow::after{content:"";order:6;flex-basis:100%}
+  .benchrow > .m-supera, .benchrow > .fixstrip, .benchrow > .outb{order:7}
+  /* il secondo livello parte sotto il nome, non sotto il numero d'ordine */
+  .benchrow > .m-supera, .benchrow > .fixstrip{margin-left:34px}
+  .benchrow > .m-supera + .fixstrip{margin-left:0}
+  .benchrow > .fisso{order:8;margin-left:auto}
+  /* le frecce erano del colore del bordo (1,3:1): comandi, quindi leggibili */
+  .benchrow > .mv{order:9;color:var(--fr-fioco)}
+}
+
+/* ── la barra azione ── */
+/* Sopra la navigazione, appoggiata a lei: l'azione principale della pagina
+   a portata di pollice, con a sinistra quello che serve sapere prima di
+   toccarla. C'è solo se la pagina ne ha una (viste/barra-azione.ts). */
+.g-azione{
+  position:fixed;left:0;right:0;z-index:44;
+  bottom:calc(var(--g-nav-h) + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:var(--fr-gap);
+  padding:8px var(--fr-riga-x);background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+}
+.g-azione-testo{flex:1;min-width:0}
+.g-azione-testo b{display:block;font-weight:var(--fr-peso-forte);font-size:var(--fr-t-piccolo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-azione-testo em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* pulsante primario: è marchio, come ogni pulsante primario */
+.g-principale{
+  flex:none;min-height:var(--fr-tocco);padding:0 16px;cursor:pointer;white-space:nowrap;
+  font-size:var(--fr-t-base);font-weight:var(--fr-peso-num);
+  background:var(--fr-marchio);color:var(--fr-marchio-ink);border:0;border-radius:var(--fr-r);
+}
+.g-principale:disabled{cursor:wait;background:var(--fr-filo);color:var(--fr-fioco)}
+/* con la fascia, l'ultima riga della pagina deve restarle sopra */
+.guscio.con-azione .g-corpo{padding-bottom:calc(var(--g-nav-h) + 62px + var(--fr-pad) + env(safe-area-inset-bottom))}

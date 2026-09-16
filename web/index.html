@@ -11,6 +11,17 @@
          applicaTema() in src/viste/tema.ts, che è l'unico posto che sa qual è
          il tema corrente. -->
     <meta name="theme-color" content="#1A232B" />
+    <!-- Installabile sulla schermata home: si apre senza la barra del browser.
+         Solo il manifest, nessun service worker — quindi niente offline, per
+         scelta: una cache metterebbe listone e voti nello storage del telefono,
+         e quella è una decisione da prendere apposta (vedi test/manifest.test.ts). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <!-- iOS non legge le icone del manifest e riempie di nero la trasparenza:
+         la maskable è piena fino al bordo, e gli angoli li arrotonda iOS. -->
+    <link rel="apple-touch-icon" href="/icons/icon-maskable-192.png" />
+    <meta name="apple-mobile-web-app-title" content="Fantaregia" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Fantaregia · asta e stagione</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

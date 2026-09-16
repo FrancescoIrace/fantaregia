@@ -13,6 +13,9 @@ import { ABBR, appetCol, dataBreve, deltaCol, fmCol, segno } from '../viste/colo
 import { Delta, FixStrip, OutBadge, RigBadge, TitDot } from '../viste/segni.tsx'
 import { Avviso, Bottone, Card } from '../ui.tsx'
 import PrevisioneRealta from './PrevisioneRealta.tsx'
+import { useTelefono } from '../viste/telefono.ts'
+import Campo from '../viste/Campo.tsx'
+import { useAzione } from '../viste/barra-azione.ts'
 
 const REPARTI: [Ruolo, string][] = [['A', 'Attacco'], ['C', 'Centrocampo'], ['D', 'Difesa'], ['P', 'Porta']]
 const NOME_REPARTO: Record<Ruolo, string> = { P: 'Porta', D: 'Difesa', C: 'Centrocampo', A: 'Attacco' }
@@ -22,9 +25,13 @@ const NOME_REPARTO: Record<Ruolo, string> = { P: 'Porta', D: 'Difesa', C: 'Centr
    maglia per casella con il punteggio di giornata e la frase che lo
    spiega, la panchina in ordine d'ingresso, «Schiera la migliore».
    La formazione è privata: la vede solo chi la fa.                     */
-export default function Formazioni({ legaId, utenteId, righe, motore: m, motorePrima }: {
+export default function Formazioni({ legaId, utenteId, righe, motore: m, motorePrima, telefono: forzato }: {
   legaId: string; utenteId: string; righe: RigheLega; motore: Motore; motorePrima?: (g: number) => Motore
+  /** per i test di resa, che girano fuori dal browser: altrimenti decide la larghezza */
+  telefono?: boolean
 }) {
+  const larghezza = useTelefono()
+  const telefono = forzato ?? larghezza
   const oggi = m.giornataOggi()
   const [g, setG] = useState(oggi)
   const [tutte, setTutte] = useState<Record<string, Formazione>>(() => (righe.preferenze?.formazioni ?? {}) as Record<string, Formazione>)
@@ -87,6 +94,26 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
   const ko = xi.filter(p => m.isOut(p.id)).length
   const media = xi.length ? Math.round(xi.reduce((a, p) => a + sc(p), 0) / xi.length) : null
   const mediaPrima = xi.length && g > 1 ? Math.round(xi.reduce((a, p) => a + (scPrima(p) ?? 0), 0) / xi.length) : null
+  const spie = <>
+    {mancano ? <span className="tag warn">{mancano} {mancano > 1 ? 'caselle vuote' : 'casella vuota'}</span>
+      : L.bench.length ? <span className="tag ok">formazione completa</span> : null}
+    {ko > 0 && <span className="tag crit">{ko} in campo {ko > 1 ? 'sono segnati indisponibili' : 'è segnato indisponibile'}</span>}
+  </>
+  // i disponibili di un reparto rimasti fuori dall'undici: chi potrebbe prendere il posto di un titolare
+  const alternative = (r: Ruolo) => R[r].map(x => x.p).filter(x => !dentro.has(x.id) && !m.isOut(x.id))
+  /* In panchina, sul telefono: la casella da scrivania diceva «↑ nome in
+     panchina»; il disco del campo non ha lo spazio, quindi lo dice la riga di
+     chi entrerebbe. Stessa soglia: più di quattro punti sopra un titolare. */
+  /* La barra azione del telefono: il modulo e il punteggio a sinistra, e
+     quello che manca se manca qualcosa — è la domanda prima di schierare. */
+  useAzione(rosa.length ? {
+    titolo: mancano ? `${L.mod} · ${mancano} ${mancano > 1 ? 'caselle vuote' : 'casella vuota'}` : `${L.mod} · ${media ?? '—'} di media`,
+    sotto: ko > 0 ? `${ko} in campo ${ko > 1 ? 'indisponibili' : 'indisponibile'}` : `giornata ${g}`,
+    etichetta: 'Schiera la migliore',
+    fai: () => schiera(),
+  } : null)
+  const superaTitolare = (p: Giocatore) => !m.isOut(p.id)
+    && L.start[p.r].some(id => { const q = id ? giocatore(id) : null; return !!q && sc(p) > sc(q) + 4 })
 
   return (
     <div>
@@ -100,7 +127,40 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
           </Avviso>
         </div>
       )}
-      <div className="gbar">
+      {telefono && (
+        <div className="m-formazione">
+          <div className="m-fascia">
+            <div className="m-selettore">
+              <button type="button" disabled={g <= 1} onClick={() => setG(g - 1)} aria-label="Giornata precedente">‹</button>
+              <div className="m-quale">
+                <b>Giornata {g}</b>
+                <em>{dataBreve(m.CAL.dates[g - 1])}{g === oggi && <> · <span className="oggi">oggi</span></>}</em>
+              </div>
+              <button type="button" disabled={g >= 38} onClick={() => setG(g + 1)} aria-label="Giornata successiva">›</button>
+            </div>
+          </div>
+          {/* i sette moduli a portata di pollice: una tendina chiede due tocchi e copre il campo */}
+          <div className="m-moduli" role="group" aria-label="Modulo della giornata">
+            {Object.keys(MODULI).map(mod => (
+              <button key={mod} type="button" aria-pressed={L.mod === mod} className="fr-num" onClick={() => cambia(conModulo(L, mod))}>{mod}</button>
+            ))}
+          </div>
+          <div className="m-comandi">
+            <Bottone variante="primario" disabled={!rosa.length} onClick={() => schiera()}>Schiera la migliore</Bottone>
+            <Bottone onClick={() => cambia(vuota(L.mod))}>Svuota</Bottone>
+          </div>
+          <label className="m-preferito" title="Il modulo da cui partono le giornate che non hai ancora toccato. Cambiare modulo in una giornata non cambia la preferenza.">
+            <span>Modulo preferito<em>da cui partono le giornate che non hai toccato</em></span>
+            <select value={preferito ?? ''} className="m-select"
+              onChange={e => { const v = e.target.value || null; setPreferito(v); salvaModuloPreferito(legaId, v) }}>
+              <option value="">nessuno</option>
+              {Object.keys(MODULI).map(mod => <option key={mod}>{mod}</option>)}
+            </select>
+          </label>
+          <p className="m-spie">{spie}{stato && <span className="hint">{stato}</span>}</p>
+        </div>
+      )}
+      {!telefono && <div className="gbar">
         <div className="gnav">
           <button type="button" disabled={g <= 1} onClick={() => setG(g - 1)} title="Giornata precedente">‹</button>
           <div className="gcur">
@@ -128,12 +188,10 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
           onClick={() => schiera()}>Schiera la migliore</Bottone>
         <Bottone onClick={() => cambia(vuota(L.mod))}>Svuota</Bottone>
         <span className="ml-auto flex max-w-[40ch] flex-wrap items-center justify-end gap-1.5 text-right">
-          {mancano ? <span className="tag warn">{mancano} {mancano > 1 ? 'caselle vuote' : 'casella vuota'}</span>
-            : L.bench.length ? <span className="tag ok">formazione completa</span> : null}
-          {ko > 0 && <span className="tag crit">{ko} in campo {ko > 1 ? 'sono segnati indisponibili' : 'è segnato indisponibile'}</span>}
+          {spie}
           {stato && <span className="hint w-full">{stato}</span>}
         </span>
-      </div>
+      </div>}
 
       {note.g === g && note.note.length > 0 && (
         <div className="mb-4">
@@ -166,6 +224,19 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
             {ko > 0 && <Dato v={ko} k="indisponibili in campo" col="var(--crit)" />}
           </div>
 
+          {telefono ? (
+            <>
+              <div className="m-campo-guscio">
+                <Campo m={m} g={g} L={L} giocatore={giocatore} sc={sc} fissi={fissi} alternative={alternative}
+                  onApri={(r, i) => setCasella({ r, i })} />
+              </div>
+              <p className="m-legenda">
+                Tocca un giocatore per cambiarlo: si apre il confronto con gli altri del reparto, ciascuno con il suo perché.
+                Nel disco c'è il punteggio di giornata; il puntino vuol dire titolare fisso, la freccia che in panchina c'è di meglio,
+                il bordo rosso che non può giocare.
+              </p>
+            </>
+          ) : (
           <div className="campo">
             <div className="linee" aria-hidden="true">
               <span className="lmezzo" /><span className="lcerchio" /><span className="larea" /><span className="lareola" />
@@ -176,13 +247,14 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
                 <div className="prow" data-n={L.start[r].length}>
                   {L.start[r].map((id, i) => (
                     <CasellaCampo key={i} m={m} g={g} p={id ? giocatore(id) : null} sc={sc} scPrima={scPrima} fisso={!!id && fissi.includes(id)}
-                      alternative={R[r].map(x => x.p).filter(x => !dentro.has(x.id) && !m.isOut(x.id))}
+                      alternative={alternative(r)}
                       onApri={() => setCasella({ r, i })} />
                   ))}
                 </div>
               </div>
             ))}
           </div>
+          )}
 
           <div className="mt-[18px]">
             <Card denso titolo="Panchina" azioni={<>
@@ -205,6 +277,7 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
                       <span className="ord">{i + 1}</span>
                       <span className="ruolo-lettera">{p.r}</span>
                       <span className="bn">{p.n} <span className="pteam">{p.s}</span></span>
+                      {telefono && superaTitolare(p) && <span className="m-supera">supera un titolare</span>}
                       <FixStrip m={m} team={p.s} r={p.r} from={g} span={1} />
                       <OutBadge m={m} p={p} />
                       <span className="dsc fr-num" style={{ color: appetCol(s), margin: 0 }}>{s}</span>
