@@ -548,3 +548,75 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   flex:none;padding:0 4px;border:1px dashed var(--fr-fioco);border-radius:2px;
   font-size:var(--fr-t-mini);font-weight:var(--fr-peso-forte);color:var(--fr-ink);white-space:nowrap;
 }
+
+/* ── Listone ── */
+.m-cerca{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:8px var(--fr-riga-x);
+  background:var(--fr-pan);border-bottom:1px solid var(--fr-filo);
+}
+/* 16px e non meno: sotto quella misura Safari su iOS ingrandisce la pagina
+   al tocco del campo e non torna indietro */
+.m-input{
+  width:100%;min-height:var(--fr-tocco);padding:0 12px;font-size:16px;color:var(--fr-ink);
+  background:var(--fr-incasso);border:1px solid var(--fr-filo);border-radius:var(--fr-r);
+}
+.m-tasto{
+  display:inline-flex;align-items:center;gap:6px;min-height:var(--fr-tocco);padding:0 14px;cursor:pointer;
+  font-size:var(--fr-t-base);font-weight:var(--fr-peso-forte);color:var(--fr-ink);
+  background:var(--fr-pan);border:1px solid var(--fr-filo);border-radius:var(--fr-r);
+}
+/* quanti filtri accesi: marchio, come la scheda attiva — è lo stato di una
+   tua scelta, non un valore */
+.m-conta{
+  min-width:20px;height:20px;padding:0 5px;border-radius:10px;display:inline-grid;place-items:center;
+  font-size:var(--fr-t-mini);background:var(--fr-marchio);color:var(--fr-marchio-ink);
+}
+.m-ruoli{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.m-ruoli button{
+  min-height:var(--fr-tocco);cursor:pointer;font-size:var(--fr-t-base);font-weight:var(--fr-peso-forte);
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-fioco);
+}
+.m-ruoli button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
+.m-link{
+  min-height:var(--fr-tocco);margin:-14px 0;padding:0;background:none;border:0;cursor:pointer;
+  font:inherit;font-size:var(--fr-t-et);color:var(--fr-ink);text-decoration:underline;text-underline-offset:3px;
+}
+.m-intest.listone span, .m-intest.listone span:last-child{width:40px}
+
+/* la riga è un pulsante: apre la scheda del giocatore */
+.m-riga.giocatore{
+  position:relative;width:100%;grid-template-columns:minmax(0,1fr) 40px 40px;
+  text-align:left;cursor:pointer;background:none;border:0;border-bottom:1px solid var(--fr-filo-t);
+  color:var(--fr-ink);font:inherit;
+}
+.m-riga.giocatore:last-child{border-bottom:0}
+.m-riga.giocatore > .fr-filo-ruolo{position:absolute;left:0;top:7px;bottom:7px;height:auto}
+.m-riga.giocatore .m-nome, .m-riga.giocatore .m-meta{display:block}
+.m-riga.giocatore .m-nome > .tdot, .m-riga.giocatore .m-nome > .rig, .m-riga.giocatore .m-nome > .outb{margin-left:5px}
+.m-stella{color:var(--fr-marchio);margin-right:4px}
+/* già presa da un'altra squadra: grigio leggibile e nome più leggero, come
+   da scrivania — mai opacità */
+.m-riga.presa .m-nome{color:var(--fr-fioco);font-weight:var(--fr-peso-medio)}
+
+/* ── i cassetti Filtri e Ordina ── */
+.m-filtri{display:grid;gap:14px}
+.m-filtri .m-campo > span{font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.m-filtri .m-select{width:100%}
+.m-affiancati{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.m-spunta{display:flex;align-items:center;gap:10px;min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+.m-spunta input{width:22px;height:22px;flex:none;accent-color:var(--fr-marchio)}
+/* Pulisci e Mostra restano in fondo al cassetto mentre si scorrono i filtri */
+.m-piede{
+  position:sticky;bottom:calc(-1 * var(--fr-pad));display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;
+  margin:16px calc(-1 * var(--fr-pad)) calc(-1 * var(--fr-pad));padding:10px var(--fr-pad) calc(10px + env(safe-area-inset-bottom));
+  background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+}
+.m-piede > button{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+.m-versi{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.m-versi button{
+  min-height:var(--fr-tocco);cursor:pointer;font-size:var(--fr-t-base);
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-fioco);
+}
+.m-versi button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
+.m-voce[aria-pressed="true"]{font-weight:var(--fr-peso-forte)}
+.m-voce[aria-pressed="true"] .m-freccia{color:var(--fr-marchio)}
