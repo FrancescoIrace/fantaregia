@@ -267,3 +267,122 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
    così il rosso resta ai malus veri. */
 .perrow.primo .pertet{color:var(--fr-ink);font-weight:var(--fr-peso-num)}
 .perbar i{background:var(--fr-fioco);opacity:1}
+
+/* ══ Il guscio del telefono ══════════════════════════════════════════
+   Queste regole non stanno dentro una @media: il guscio si disegna solo
+   sotto i 900px, e chi lo decide è `useTelefono()` in viste/telefono.ts.
+   Quando queste classi esistono nel documento, siamo già sul telefono.
+
+   La pagina scorre e basta: la testata si appiccica in cima, la barra è
+   fissa in fondo, e in mezzo non c'è nessun contenitore che scorre per
+   conto suo. Gli scroll annidati sul telefono fanno perdere il segno. */
+.guscio{--g-nav-h:58px;display:flex;flex-direction:column;min-height:100dvh}
+
+/* ── la testata: una riga sola ── */
+.g-testata{
+  position:sticky;top:0;z-index:40;background:var(--fr-pan);
+  border-top:3px solid var(--fr-marchio);border-bottom:1px solid var(--fr-filo);
+  padding-top:env(safe-area-inset-top);
+}
+.g-riga{
+  display:flex;align-items:center;gap:9px;height:50px;
+  padding-left:max(12px, env(safe-area-inset-left));
+  padding-right:max(10px, env(safe-area-inset-right));
+}
+/* il gagliardetto qui è più alto che largo: accanto a un nome fa da
+   bandierina, mentre il quadratino di 10px si perdeva */
+.g-gagl{width:8px;height:14px;border-radius:1px}
+.g-chi{min-width:0;flex:1}
+.g-nome{
+  font-weight:var(--fr-peso-forte);font-size:var(--fr-t-titolo);
+  line-height:var(--fr-interlinea-stretta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.g-sotto{font-size:var(--fr-t-et);color:var(--fr-fioco);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-spia{color:var(--fr-marchio);font-weight:var(--fr-peso-forte)}
+.g-tondo{
+  width:var(--fr-tocco);height:var(--fr-tocco);flex:none;display:grid;place-items:center;
+  border:0;background:none;border-radius:var(--fr-r);color:var(--fr-fioco);cursor:pointer;
+}
+.g-tondo:hover{color:var(--fr-ink)}
+.g-tondo svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── il corpo ── */
+/* In fondo ci va lo spazio della barra fissa, altrimenti l'ultima riga di
+   ogni pagina resta sotto e non si tocca più. */
+.g-corpo{
+  flex:1;min-width:0;
+  padding:var(--fr-pad) var(--fr-riga-x) calc(var(--g-nav-h) + var(--fr-pad) + env(safe-area-inset-bottom));
+}
+
+/* ── la barra in basso ── */
+.g-nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:45;
+  display:grid;grid-template-columns:repeat(5,1fr);
+  background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.g-vai{
+  display:grid;justify-items:center;align-content:center;gap:3px;
+  min-height:var(--g-nav-h);padding:7px 2px 8px;border:0;background:none;cursor:pointer;
+  font-size:var(--fr-t-mini);line-height:1.15;text-align:center;text-decoration:none;color:var(--fr-spento);
+}
+.g-vai svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* la scheda attiva è marchio: è identità, non un valore */
+.g-vai.on{color:var(--fr-marchio)}
+
+/* ── il cassetto ── */
+/* Sale dal basso come la scheda giocatore e «Chi schierare», e riusa la
+   stessa animazione: sul telefono i pannelli che si aprono si comportano
+   tutti allo stesso modo. */
+.g-velo{position:fixed;inset:0;z-index:50;background:rgba(8,12,15,.66)}
+.g-cassetto{
+  position:fixed;left:0;right:0;bottom:0;z-index:51;
+  max-height:88dvh;overflow-y:auto;overscroll-behavior:contain;
+  background:var(--fr-pan);border-top:3px solid var(--fr-marchio);
+  border-radius:var(--fr-r-grande) var(--fr-r-grande) 0 0;
+  box-shadow:0 -12px 40px -18px rgba(0,0,0,.55);
+  padding-bottom:calc(var(--fr-pad) + env(safe-area-inset-bottom));
+  animation:cassetto var(--fr-mov-lento);
+}
+.g-maniglia{width:38px;height:4px;border-radius:2px;background:var(--fr-filo);margin:9px auto 2px}
+.g-cassetto-t{display:flex;align-items:center;gap:var(--fr-gap);padding:8px var(--fr-riga-x) 12px;border-bottom:1px solid var(--fr-filo-t)}
+.g-cassetto-t h2{font-size:var(--fr-t-titolo);font-weight:var(--fr-peso-forte)}
+.g-chiudi{
+  margin-left:auto;height:var(--fr-tocco);padding:0 13px;background:none;cursor:pointer;
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);font-size:var(--fr-t-piccolo);color:var(--fr-fioco);
+}
+/* Una voce del cassetto ha lo spazio per spiegarsi, che una scheda in
+   barra non ha: nome sopra, cosa c'è dentro sotto. */
+.g-voce{
+  display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:center;
+  width:100%;min-height:56px;padding:13px var(--fr-riga-x);text-align:left;
+  border:0;border-bottom:1px solid var(--fr-filo-t);background:none;cursor:pointer;
+  color:var(--fr-ink);font:inherit;font-size:var(--fr-t-base);text-decoration:none;
+}
+.g-voce svg{width:20px;height:20px;stroke:var(--fr-fioco);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.g-voce em{font-style:normal;display:block;font-size:var(--fr-t-et);color:var(--fr-fioco);margin-top:1px}
+.g-freccia{color:var(--fr-spento);font-size:17px}
+.g-voce.primaria, .g-voce.on{background:var(--fr-marchio-velo)}
+.g-voce.primaria svg, .g-voce.on svg{stroke:var(--fr-marchio)}
+.g-voce.statica{cursor:default}
+.g-gruppo-t{
+  font-size:var(--fr-t-et);color:var(--fr-spento);background:var(--fr-incasso);
+  padding:13px var(--fr-riga-x) 6px;border-bottom:1px solid var(--fr-filo-t);
+}
+/* L'interruttore della modalità asta. Da scrivania sta in testata, e sotto
+   i 620px perdeva l'etichetta: restava una levetta senza nome proprio dove
+   serviva di più. Qui ha il nome per esteso e dice cosa fa. */
+.g-interruttore{
+  display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+  width:100%;min-height:var(--fr-tocco);padding:14px var(--fr-riga-x);text-align:left;
+  border:0;border-bottom:1px solid var(--fr-filo-t);background:none;cursor:pointer;color:var(--fr-ink);font:inherit;
+}
+.g-interruttore b{font-weight:var(--fr-peso-forte);font-size:var(--fr-t-base)}
+.g-interruttore em{font-style:normal;display:block;font-size:var(--fr-t-et);color:var(--fr-fioco);margin-top:2px}
+.g-leva{width:46px;height:27px;flex:none;position:relative;border-radius:14px;background:var(--fr-filo)}
+.g-leva::after{
+  content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;
+  background:var(--fr-pan);transition:left var(--fr-mov-lento);
+}
+.g-leva[data-on="true"]{background:var(--fr-marchio)}
+.g-leva[data-on="true"]::after{left:22px}

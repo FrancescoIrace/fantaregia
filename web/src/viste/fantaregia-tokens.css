@@ -66,6 +66,12 @@
   --fr-filo-h:26px;     /* altezza del filo di ruolo in una riga */
   --fr-chip:20px;       /* lato del chip di ruolo */
 
+  /* Il lato minimo di qualunque cosa si tocchi col pollice. 44px è la
+     soglia sotto cui si sbaglia bersaglio; 46 lascia due pixel di
+     respiro. Vale solo sul telefono: da scrivania il puntatore prende
+     mire più piccole, e stringere le righe fa vedere più dati. */
+  --fr-tocco:46px;
+
   /* ---------- forme ---------- */
   --fr-r:3px;           /* raggio standard */
   --fr-r-grande:8px;    /* cassetti che salgono dal basso */

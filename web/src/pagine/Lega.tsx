@@ -19,36 +19,23 @@ import Mercato from './Mercato.tsx'
 import Listone from './Listone.tsx'
 import Rose from './Rose.tsx'
 import Asta from './Asta.tsx'
-import { ORDINE, PRIME, modoAuto, modoSalvato, salvaModo, type Modo, type Scheda } from '../viste/modo.ts'
+import { ORDINE, PRIME, SCHEDE, modoAuto, modoSalvato, salvaModo, type Modo } from '../viste/modo.ts'
 import { usaTinta } from '../viste/colore-squadra.ts'
+import { useTelefono } from '../viste/telefono.ts'
+import Guscio from '../viste/Guscio.tsx'
 import ColoreSquadra from './ColoreSquadra.tsx'
-
-/* le schede, ognuna con la chiave che gli ordini di modo.ts usano per
-   metterle in fila. La Panoramica sta fuori: è la casa della lega (la
-   rotta index, e dentro ci sono carica dati e rose ufficiali), quindi
-   resta prima e non va mai in secondo piano. */
-const SCHEDE: Record<Scheda, { path: string; testo: string }> = {
-  asta:       { path: 'asta',       testo: 'Asta live' },
-  listone:    { path: 'listone',    testo: 'Listone' },
-  rose:       { path: 'rose',       testo: 'Rose' },
-  formazioni: { path: 'formazioni', testo: 'Formazioni' },
-  scontri:    { path: 'scontri',    testo: 'Lega' },
-  rendimento: { path: 'rendimento', testo: 'Rendimento' },
-  titolari:   { path: 'titolari',   testo: 'Titolari' },
-  calendario: { path: 'calendario', testo: 'Calendario' },
-  infermeria: { path: 'infermeria', testo: 'Infermeria' },
-  mercato:    { path: 'mercato',    testo: 'Mercato' },
-}
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
 /* La lega: intestazione, schede, e sotto la vista scelta. I dati si
    caricano una volta qui e le viste li ricevono già calcolati dal motore;
    il realtime li aggiorna per tutte insieme. */
-export default function Lega({ utenteId }: { utenteId: string }) {
+export default function Lega({ utenteId, email }: { utenteId: string; email?: string | null }) {
   const { id = '' } = useParams()
   const { righe, motore, errore, ricarica } = useLega(id, utenteId)
   const [membri, setMembri] = useState<Membro[]>([])
+  // sotto i 900px la lega si mette il guscio del telefono; sopra resta com'era
+  const telefono = useTelefono()
   // null: nessuna scelta su questo dispositivo, decide modoAuto() sui dati
   const [modoScelto, setModoScelto] = useState<Modo | null>(() => modoSalvato(id))
 
@@ -89,6 +76,38 @@ export default function Lega({ utenteId }: { utenteId: string }) {
   const modo: Modo = modoScelto ?? modoAuto(motore)
   const cambiaModo = (v: Modo) => { setModoScelto(v); salvaModo(id, v) }
 
+  /* Le rotte sono le stesse nei due gusci: cambia solo quello che ci sta
+     intorno — la testata e il modo di passare da una pagina all'altra. */
+  const rotte = (
+    <Routes>
+      <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
+      <Route path="listone" element={<Listone legaId={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica}
+        puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+      <Route path="asta" element={<Asta legaId={id} motore={motore} ricarica={ricarica}
+        puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+      <Route path="rose" element={<Rose legaId={id} motore={motore} ricarica={ricarica}
+        puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+      <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} motorePrima={motorePrima ?? undefined} />} />
+      <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica} motorePrima={motorePrima ?? undefined}
+        puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+      <Route path="rendimento" element={<Rendimento motore={motore} />} />
+      <Route path="titolari" element={<Titolari motore={motore} />} />
+      <Route path="calendario" element={<Calendario motore={motore} />} />
+      <Route path="infermeria" element={<Infermeria legaId={id} motore={motore} ricarica={ricarica}
+        puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+      <Route path="mercato" element={<Mercato legaId={id} motore={motore} ricarica={ricarica}
+        puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
+    </Routes>
+  )
+
+  if (telefono) return (
+    <Guscio legaId={id} nomeLega={righe.lega.nome}
+      squadra={miaSquadra ? { nome: miaSquadra.nome, colore: miaSquadra.colore } : null}
+      modo={modo} onModo={cambiaModo} email={email} onEsci={() => void supabase.auth.signOut()}>
+      {rotte}
+    </Guscio>
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-baseline gap-3">
@@ -118,25 +137,7 @@ export default function Lega({ utenteId }: { utenteId: string }) {
           <NavLink key={k} to={`/lega/${id}/${SCHEDE[k].path}`} className={scheda(i >= PRIME)}>{SCHEDE[k].testo}</NavLink>
         ))}
       </nav>
-      <Routes>
-        <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
-        <Route path="listone" element={<Listone legaId={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica}
-          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-        <Route path="asta" element={<Asta legaId={id} motore={motore} ricarica={ricarica}
-          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-        <Route path="rose" element={<Rose legaId={id} motore={motore} ricarica={ricarica}
-          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-        <Route path="formazioni" element={<Formazioni legaId={id} utenteId={utenteId} righe={righe} motore={motore} motorePrima={motorePrima ?? undefined} />} />
-        <Route path="scontri" element={<Scontri legaId={id} utenteId={utenteId} motore={motore} ricarica={ricarica} motorePrima={motorePrima ?? undefined}
-          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-        <Route path="rendimento" element={<Rendimento motore={motore} />} />
-        <Route path="titolari" element={<Titolari motore={motore} />} />
-        <Route path="calendario" element={<Calendario motore={motore} />} />
-        <Route path="infermeria" element={<Infermeria legaId={id} motore={motore} ricarica={ricarica}
-          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-        <Route path="mercato" element={<Mercato legaId={id} motore={motore} ricarica={ricarica}
-          puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
-      </Routes>
+      {rotte}
     </div>
   )
 }

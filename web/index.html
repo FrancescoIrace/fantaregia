@@ -2,7 +2,15 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: la pagina arriva sotto la tacca e sotto la barra di
+         sistema, e i margini se li prende chi serve con env(safe-area-inset-*).
+         Senza, il telefono lascia due fasce e la barra in basso galleggia. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Il colore della barra del browser. Questo è il valore di partenza (il
+         pannello del tema notte); a ogni cambio di tema lo riscrive
+         applicaTema() in src/viste/tema.ts, che è l'unico posto che sa qual è
+         il tema corrente. -->
+    <meta name="theme-color" content="#1A232B" />
     <title>Fantaregia · asta e stagione</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
