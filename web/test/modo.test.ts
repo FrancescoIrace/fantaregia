@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { creaMotore } from '../src/domain/motore.ts'
 import { calendarioDaRighe, parseCSV, righeInGiocatori } from '../src/domain/importa.ts'
-import { ORDINE, PRIME, modoAuto, modoSalvato, salvaModo } from '../src/viste/modo.ts'
+import { ORDINE, PRIME, SCHEDE, modoAuto, modoSalvato, salvaModo, type Scheda } from '../src/viste/modo.ts'
 import { costruisciLega } from './lega-sintetica.ts'
 
 const ESEMPI = fileURLToPath(new URL('../../esempi/', import.meta.url))
@@ -32,13 +32,41 @@ describe('ordine del menu', () => {
   })
 
   it('in primo piano ci sono le quattro voci del momento', () => {
+    /* Sul telefono queste quattro sono la barra in basso, più «Altro»:
+       cambiarne una cambia cosa si tocca col pollice. In stagione viene
+       prima Giornata, perché la domanda del sabato è «chi affronto», e la
+       formazione si schiera sapendo quello. */
     expect(ORDINE.asta.slice(0, PRIME)).toEqual(['asta', 'listone', 'titolari', 'rose'])
-    expect(ORDINE.stagione.slice(0, PRIME)).toEqual(['formazioni', 'scontri', 'infermeria', 'titolari'])
+    expect(ORDINE.stagione.slice(0, PRIME)).toEqual(['scontri', 'formazioni', 'infermeria', 'titolari'])
   })
 
   it('l\'asta è la prima con l\'interruttore acceso, l\'ultima da spento', () => {
     expect(ORDINE.asta[0]).toBe('asta')
     expect(ORDINE.stagione.at(-1)).toBe('asta')
+  })
+})
+
+describe('le schede', () => {
+  it('ogni voce degli ordini ha un nome e una riga che la spiega', () => {
+    // il cassetto del telefono le scrive tutte: una senza spiega uscirebbe monca
+    for (const k of ORDINE.stagione) {
+      expect(SCHEDE[k], k).toBeDefined()
+      expect(SCHEDE[k].testo.length, k).toBeGreaterThan(0)
+      expect(SCHEDE[k].spiega.length, k).toBeGreaterThan(0)
+    }
+    expect(Object.keys(SCHEDE).sort()).toEqual([...ORDINE.stagione].sort())
+  })
+
+  it('i path delle rotte non cambiano quando cambia un\'etichetta', () => {
+    /* «Lega» è diventata «Giornata», ma la rotta resta `scontri`: i link
+       già in giro puntano lì. Questo test è la rete per la prossima volta
+       che si rinomina una voce. */
+    const path = Object.fromEntries((Object.keys(SCHEDE) as Scheda[]).map(k => [k, SCHEDE[k].path]))
+    expect(path).toEqual({
+      asta: 'asta', listone: 'listone', rose: 'rose', formazioni: 'formazioni', scontri: 'scontri',
+      rendimento: 'rendimento', titolari: 'titolari', calendario: 'calendario', infermeria: 'infermeria', mercato: 'mercato',
+    })
+    expect(SCHEDE.scontri.testo).toBe('Giornata')
   })
 })
 

@@ -19,26 +19,9 @@ import Mercato from './Mercato.tsx'
 import Listone from './Listone.tsx'
 import Rose from './Rose.tsx'
 import Asta from './Asta.tsx'
-import { ORDINE, PRIME, modoAuto, modoSalvato, salvaModo, type Modo, type Scheda } from '../viste/modo.ts'
+import { ORDINE, PRIME, SCHEDE, modoAuto, modoSalvato, salvaModo, type Modo } from '../viste/modo.ts'
 import { usaTinta } from '../viste/colore-squadra.ts'
 import ColoreSquadra from './ColoreSquadra.tsx'
-
-/* le schede, ognuna con la chiave che gli ordini di modo.ts usano per
-   metterle in fila. La Panoramica sta fuori: è la casa della lega (la
-   rotta index, e dentro ci sono carica dati e rose ufficiali), quindi
-   resta prima e non va mai in secondo piano. */
-const SCHEDE: Record<Scheda, { path: string; testo: string }> = {
-  asta:       { path: 'asta',       testo: 'Asta live' },
-  listone:    { path: 'listone',    testo: 'Listone' },
-  rose:       { path: 'rose',       testo: 'Rose' },
-  formazioni: { path: 'formazioni', testo: 'Formazioni' },
-  scontri:    { path: 'scontri',    testo: 'Lega' },
-  rendimento: { path: 'rendimento', testo: 'Rendimento' },
-  titolari:   { path: 'titolari',   testo: 'Titolari' },
-  calendario: { path: 'calendario', testo: 'Calendario' },
-  infermeria: { path: 'infermeria', testo: 'Infermeria' },
-  mercato:    { path: 'mercato',    testo: 'Mercato' },
-}
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
