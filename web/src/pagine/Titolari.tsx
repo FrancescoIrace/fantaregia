@@ -72,8 +72,11 @@ export default function Titolari({ motore: m }: { motore: Motore }) {
         : schede.length ? <div className="titgrid">{schede}</div>
           : <Card><div className="empty">Nessuna squadra con questi filtri.</div></Card>}
       <Card titolo="Da dove vengono questi dati">
-        <p className="hint max-w-[76ch]">I <b>rigoristi</b> sono quelli caricati nella lega. Il badge pieno segna chi è confermato da entrambe le fonti,
-          quello sbiadito chi compare in una sola.</p>
+        {/* la legenda mostra i badge veri, con le stesse classi delle righe:
+            descriveva ancora «pieno/sbiadito», che era il disegno di prima */}
+        <p className="hint max-w-[76ch]">I <b>rigoristi</b> sono quelli caricati nella lega.
+          Il badge pieno <span className="rig first">R</span> è il primo rigorista, quello vuoto <span className="rig">R2</span> il secondo;
+          il bordo tratteggiato <span className="rig soft">R2</span> vuol dire che a indicarlo è una sola delle due fonti.</p>
         <p className="hint mt-2.5 max-w-[76ch]">La <b>titolarità</b> non viene da una lista di probabili formazioni, che dopo una giornata è ancora
           ballerina: è dedotta dalle quotazioni stesse, cioè da quanto il mercato si aspetta che uno giochi. Dentro ogni squadra e ruolo, chi è
           quotato di più è dato titolare; alla controprova, 17 dei 18 primi rigoristi risultano titolari. Man mano che arrivano i voti passa ai
