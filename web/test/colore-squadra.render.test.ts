@@ -7,9 +7,9 @@ import ColoreSquadra from '../src/pagine/ColoreSquadra.tsx'
 import type { RigaSquadra } from '../src/data/componi.ts'
 
 const squadre: RigaSquadra[] = [
-  { id: 1, nome: 'Regia FC', posizione: 1, lega_idx: null, colore: '#E1523D' },
-  { id: 2, nome: 'I Duran Thuram', posizione: 2, lega_idx: null, colore: '#2AA79B' },
-  { id: 3, nome: 'Real Pizzeria', posizione: 3, lega_idx: null, colore: null },
+  { id: 1, nome: 'Regia FC', posizione: 1, lega_idx: null, colore: '#E1523D', allenatore: null },
+  { id: 2, nome: 'I Duran Thuram', posizione: 2, lega_idx: null, colore: '#2AA79B', allenatore: null },
+  { id: 3, nome: 'Real Pizzeria', posizione: 3, lega_idx: null, colore: null, allenatore: null },
 ]
 const disegna = (p: Partial<Parameters<typeof ColoreSquadra>[0]>) =>
   renderToString(createElement(ColoreSquadra, { legaId: 'l1', squadre, mia: 1, ...p }))

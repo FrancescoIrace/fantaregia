@@ -24,7 +24,7 @@ export interface RigaLega {
   versione: number
   aggiornata_il: string
 }
-export interface RigaSquadra { id: number; nome: string; posizione: number; lega_idx: number | null; colore: string | null }
+export interface RigaSquadra { id: number; nome: string; posizione: number; lega_idx: number | null; colore: string | null; allenatore: string | null }
 export interface RigaAssegnazione { giocatore_id: number; squadra_id: number; prezzo: number; snap: Snap | null }
 export interface RigaLog { giocatore_id: number; squadra_id: number; prezzo: number; registrata_il: string }
 export interface RigaMovimento {
@@ -61,6 +61,8 @@ export interface RigheLega {
   preferenze: RigaPreferenze | null
   /** il database non ha ancora squadre.colore (migrazione colore_squadra non applicata) */
   coloreMancante?: boolean
+  /** il database non ha ancora squadre.allenatore (migrazione allenatore non applicata) */
+  allenatoreMancante?: boolean
 }
 
 /** lo stato condiviso della lega, nella forma di S */

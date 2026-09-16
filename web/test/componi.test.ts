@@ -10,7 +10,7 @@ const righe: RigheLega = {
     plan: { P: 7, D: 19, C: 32, A: 42 }, squal_on: true, voti_meta: null, rose_meta: null,
     versione: 4, aggiornata_il: '2026-09-11T10:00:00Z',
   },
-  squadre: [{ id: 12, nome: 'Due', posizione: 2, lega_idx: null, colore: null }, { id: 11, nome: 'Uno', posizione: 1, lega_idx: 3, colore: '#3E7BD6' }],
+  squadre: [{ id: 12, nome: 'Due', posizione: 2, lega_idx: null, colore: null, allenatore: null }, { id: 11, nome: 'Uno', posizione: 1, lega_idx: 3, colore: '#3E7BD6', allenatore: null }],
   assegnazioni: [{ giocatore_id: 7, squadra_id: 11, prezzo: 20, snap: { id: 7, r: 'A', n: 'Sette S.', s: 'Alfa', q: 15 } }],
   log: [
     { giocatore_id: 5, squadra_id: 12, prezzo: 3, registrata_il: '2026-09-01T20:00:00Z' },

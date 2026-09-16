@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
 import { creaMotore, ROLES, type Motore } from '../domain/motore.ts'
 import { ingressoFinoA, type RigheLega } from '../data/componi.ts'
+import { salvaAllenatore } from '../data/lega.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
@@ -153,9 +154,33 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
   const giornate = motore.giornateGiocate()
   const colore = (tid: number) => righe.squadre.find(s => s.id === tid)?.colore ?? null
 
+  /* «La mia squadra» qui sopra è una preferenza privata: serve a chi tiene la
+     lega da solo e guarda le altre squadre. L'allenatore invece è pubblico —
+     con due fantallenatori la lega deve sapere chi è chi. */
+  const [erroreAll, setErroreAll] = useState<string | null>(null)
+  const allenatore = (tid: number) => righe.squadre.find(s => s.id === tid)?.allenatore ?? null
+  const nomeMembro = (uid: string) => membri.find(m => m.utente_id === uid)?.nome ?? 'un altro membro'
+  const squadraDi = (uid: string) => righe.squadre.find(s => s.allenatore === uid) ?? null
+  const puoAssegnare = !!io && io.ruolo !== 'lettore'
+  const cambiaAllenatore = async (tid: number, uid: string | null) => {
+    setErroreAll(null)
+    try { await salvaAllenatore(id, tid, uid); ricarica() } catch (e) { setErroreAll((e as Error).message) }
+  }
+
   return (
     <div className="space-y-6">
-      {io?.ruolo === 'lettore' && <Avviso>Sei in sola lettura: vedi tutto aggiornarsi in tempo reale, ma non puoi scrivere.</Avviso>}
+      {/* «sola lettura» diceva il falso: un lettore è un fantallenatore a tutti
+          gli effetti — la sua squadra, il suo colore, i suoi obiettivi e le sue
+          formazioni sono suoi (le preferenze hanno una policy per utente). */}
+      {io?.ruolo === 'lettore' && (
+        <Avviso>La tua squadra la gestisci tu: colore, obiettivi e formazioni sono tuoi e restano privati.
+          L'asta, i file della lega e i dati condivisi li tiene chi ha i permessi di scrittura.</Avviso>
+      )}
+      {righe.allenatoreMancante && (
+        <Avviso>Chi gioca quale squadra non è ancora nel database: manca la migrazione «allenatore».
+          Fino ad allora ognuno vede solo la sua scelta privata qui sotto.</Avviso>
+      )}
+      {erroreAll && <Avviso tipo="errore">{erroreAll}</Avviso>}
 
       <Card titolo="Squadre" azioni={
         <label className="flex items-center gap-2 text-sm">
@@ -172,6 +197,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
             <thead>
               <tr className="text-left text-[11px] tracking-wider text-muted uppercase">
                 <th className="py-1.5 pr-3 font-semibold">Squadra</th>
+                <th className="px-2 py-1.5 font-semibold">Allenatore</th>
                 {ROLES.map(r => <th key={r} className="px-1.5 py-1.5 text-center"><Ruolo r={r} /></th>)}
                 <th className="px-2 py-1.5 text-right font-semibold">Spesi</th>
                 <th className="px-2 py-1.5 text-right font-semibold">Residuo</th>
@@ -187,6 +213,20 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
                     <td className="py-1.5 pr-3 font-semibold">
                       {colore(t.id) && <span className="gagliardetto mr-2" style={{ ['--tinta' as string]: colore(t.id)! }} />}
                       {t.name}{t.id === mia && <span className="ml-2 text-[11px] text-accent">io</span>}
+                    </td>
+                    <td className="px-2 py-1.5 text-[12.5px]">
+                      {righe.allenatoreMancante ? <span className="text-muted">—</span>
+                        : puoAssegnare ? (
+                          <select value={allenatore(t.id) ?? ''} onChange={e => void cambiaAllenatore(t.id, e.target.value || null)}
+                            className="rounded-[7px] border border-line-strong bg-surface px-1.5 py-0.5 text-[12.5px]">
+                            <option value="">libera</option>
+                            {membri.map(m => <option key={m.utente_id} value={m.utente_id}>{m.nome ?? 'utente'}</option>)}
+                          </select>
+                        ) : allenatore(t.id) ? (
+                          <span className={allenatore(t.id) === utenteId ? 'font-semibold' : 'text-muted'}>
+                            {allenatore(t.id) === utenteId ? 'tu' : nomeMembro(allenatore(t.id)!)}
+                          </span>
+                        ) : <Bottone piccolo onClick={() => void cambiaAllenatore(t.id, utenteId)}>Prendila</Bottone>}
                     </td>
                     {ROLES.map(r => (
                       <td key={r} className={`px-1.5 py-1.5 text-center font-mono text-[12.5px] ${st.perRole[r].count >= motore.S.slots[r] ? 'text-muted' : ''}`}>
@@ -228,6 +268,7 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
               <li key={m.utente_id} className="flex items-center gap-2">
                 <span className="font-medium">{m.nome ?? 'utente'}</span>
                 {m.utente_id === utenteId && <span className="text-[11px] text-muted">(tu)</span>}
+                {squadraDi(m.utente_id) && <span className="text-[11px] text-muted">· {squadraDi(m.utente_id)!.nome}</span>}
                 <span className="ml-auto text-[11px] font-semibold text-muted">{NOME_RUOLO[m.ruolo]}</span>
               </li>
             ))}
@@ -254,8 +295,11 @@ function Inviti({ legaId }: { legaId: string }) {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
+        {/* «lettore» nel database è il fantallenatore: gestisce la sua squadra
+            e legge il resto. Il bottone lo chiama col suo nome, invece di
+            «sola lettura», che faceva sembrare l'invito una visita guidata. */}
+        <Bottone piccolo onClick={() => void crea('lettore')}>Invita un allenatore</Bottone>
         <Bottone piccolo onClick={() => void crea('banditore')}>Invita un banditore</Bottone>
-        <Bottone piccolo onClick={() => void crea('lettore')}>Invita in sola lettura</Bottone>
       </div>
       {errore && <Avviso tipo="errore">{errore}</Avviso>}
       {link && (
@@ -264,7 +308,7 @@ function Inviti({ legaId }: { legaId: string }) {
           <Bottone piccolo onClick={() => void navigator.clipboard.writeText(link.url).then(() => setCopiato(true))}>{copiato ? 'Copiato' : 'Copia'}</Bottone>
         </div>
       )}
-      <Suggerimento>Il link vale 14 giorni e fino a 20 persone. Banditore: scrive asta, voti e impostazioni. Sola lettura: vede tutto e basta.</Suggerimento>
+      <Suggerimento>Il link vale 14 giorni e fino a 20 persone. Allenatore: si prende la sua squadra e la gestisce — colore, obiettivi, formazioni, che restano privati — e vede tutto il resto aggiornarsi. Banditore: in più scrive asta, voti e impostazioni della lega.</Suggerimento>
     </div>
   )
 }
