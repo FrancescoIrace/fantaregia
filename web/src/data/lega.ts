@@ -19,19 +19,34 @@ function dati<T>(r: Risposta<T>, cosa: string): T {
   return r.data as T
 }
 
-/* Le squadre, con il colore se il database ce l'ha. La colonna arriva con
-   la migrazione colore_squadra: finché su un database non è applicata,
-   chiederla fa fallire il caricamento dell'intera lega («column
-   squadre.colore does not exist»). Allora si richiede senza: ogni squadra
-   resta senza colore, il marchio usa l'ambra predefinita, e la Panoramica
-   dice cosa manca invece di nasconderlo. Ogni altro errore resta un errore. */
+/* Le squadre, con il colore e l'allenatore se il database ce li ha. Le due
+   colonne arrivano con le migrazioni colore_squadra e allenatore: finché su
+   un database non sono applicate, chiederle fa fallire il caricamento
+   dell'intera lega («column squadre.colore does not exist»). Allora si
+   scende di un gradino alla volta — prima senza l'allenatore, poi senza
+   nemmeno il colore — e la Panoramica dice cosa manca invece di
+   nasconderlo. Ogni altro errore resta un errore. */
 const COLONNE_SQUADRE = 'id, nome, posizione, lega_idx'
+const colonnaAssente = (r: Risposta<RigaSquadra[]>) =>
+  !!r.error && (r.error.code === '42703' || /does not exist/i.test(r.error.message))
+
 export async function leggiSquadre(chiedi: (colonne: string) => PromiseLike<Risposta<RigaSquadra[]>>) {
-  const r = await chiedi(`${COLONNE_SQUADRE}, colore`)
-  const manca = !!r.error && (r.error.code === '42703' || /colore.*does not exist/i.test(r.error.message))
-  if (!manca) return { squadre: dati(r, 'squadre'), coloreMancante: false }
+  const tutte = await chiedi(`${COLONNE_SQUADRE}, colore, allenatore`)
+  if (!colonnaAssente(tutte)) return { squadre: dati(tutte, 'squadre'), coloreMancante: false, allenatoreMancante: false }
+
+  const soloColore = await chiedi(`${COLONNE_SQUADRE}, colore`)
+  if (!colonnaAssente(soloColore)) {
+    return {
+      squadre: dati(soloColore, 'squadre').map(s => ({ ...s, allenatore: null })),
+      coloreMancante: false, allenatoreMancante: true,
+    }
+  }
+
   const senza = await chiedi(COLONNE_SQUADRE)
-  return { squadre: dati(senza, 'squadre').map(s => ({ ...s, colore: null })), coloreMancante: true }
+  return {
+    squadre: dati(senza, 'squadre').map(s => ({ ...s, colore: null, allenatore: null })),
+    coloreMancante: true, allenatoreMancante: true,
+  }
 }
 
 export async function caricaRighe(legaId: string, utenteId: string): Promise<RigheLega> {
@@ -55,6 +70,7 @@ export async function caricaRighe(legaId: string, utenteId: string): Promise<Rig
     lega: l,
     squadre: sq.squadre,
     coloreMancante: sq.coloreMancante,
+    allenatoreMancante: sq.allenatoreMancante,
     assegnazioni: dati<RigaAssegnazione[]>(assegnazioni, 'assegnazioni'),
     log: dati<RigaLog[]>(log, 'registro d\'asta'),
     movimenti: dati<RigaMovimento[]>(movimenti, 'movimenti'),
@@ -171,6 +187,15 @@ export async function salvaAbbinamento(legaId: string, squadraId: number, idx: n
     quella corretta sul tema. */
 export async function salvaColoreSquadra(legaId: string, squadraId: number, colore: string | null) {
   const { error } = await supabase.rpc('imposta_colore', { p_lega: legaId, p_squadra: squadraId, p_colore: colore })
+  if (error) throw new Error(error.message)
+}
+
+/** chi gioca quale squadra è un dato di lega, pubblico come il colore: serve
+    perché la lega sappia chi è chi quando i fantallenatori sono più d'uno.
+    Admin e banditori lo mettono a chiunque, ognuno può prendersi una squadra
+    libera (vedi la migrazione allenatore). null la lascia libera. */
+export async function salvaAllenatore(legaId: string, squadraId: number, utenteId: string | null) {
+  const { error } = await supabase.rpc('imposta_allenatore', { p_lega: legaId, p_squadra: squadraId, p_utente: utenteId })
   if (error) throw new Error(error.message)
 }
 
