@@ -475,7 +475,8 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
    (nome, allenatore, slot per reparto), a destra i crediti che restano,
    che sono il numero che si cerca. Il filo è la tinta della squadra: è
    identità, come il gagliardetto da scrivania. */
-.m-squadre{margin:0 calc(-1 * var(--fr-pad))}
+/* dentro la Card, che ha p-4: la lista arriva ai suoi bordi */
+.m-squadre{margin:0 -1rem}
 .m-squadra{
   display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;
   padding:var(--fr-riga-y) var(--fr-pad);border-bottom:1px solid var(--fr-filo-t);
@@ -620,3 +621,70 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 .m-versi button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
 .m-voce[aria-pressed="true"]{font-weight:var(--fr-peso-forte)}
 .m-voce[aria-pressed="true"] .m-freccia{color:var(--fr-marchio)}
+
+/* ══ Le tre regole del telefono, per tutte le viste ══════════════════
+   Sotto i 900px, in tutte le viste — anche quelle che non hanno un disegno
+   da telefono loro (Asta, Rose, Rendimento, Titolari, Calendario,
+   Infermeria, Mercato). Da scrivania non cambia niente: il puntatore
+   prende mire piccole, e righe strette fanno vedere più dati.
+   Le misure vengono da test/anteprime.test.ts (telefono.html), che le
+   controlla dentro iframe da 390px. */
+@media (max-width:899.98px){
+  /* 1. Nessun campo sotto i 16px: sotto quella misura Safari su iOS
+     ingrandisce la pagina quando si tocca il campo, e non torna indietro.
+     !important perché i campi portano la misura scritta in classe
+     (text-sm, text-[12.5px]) e alcune regole di legacy.css hanno una
+     specificità più alta di qualunque selettore d'elemento. */
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]), select, textarea{
+    font-size:16px !important;
+  }
+
+  /* 2. Nessun bersaglio sotto i 44px. */
+  button, select, summary,
+  input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]){
+    min-height:var(--fr-tocco);
+  }
+  .fr-bottone{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
+  /* i pulsanti di un solo segno (✕ ▲ ▼) sono stretti quanto il segno:
+     anche la larghezza va portata al pollice */
+  .x, .mv, .pclose{min-width:var(--fr-tocco)}
+  /* le spunte: la riga intera è il bersaglio, la casella si vede */
+  label:has(> input[type=checkbox]){min-height:var(--fr-tocco);display:flex;align-items:center}
+  input[type=checkbox]{width:22px;height:22px;accent-color:var(--fr-marchio)}
+  /* le tinte: un quadratino da 20px a 44, vanno a capo da sole (flex-wrap) */
+  .tinta{width:var(--fr-tocco);height:var(--fr-tocco)}
+  /* i nomi che aprono la scheda: tutta la riga alta, non solo le lettere */
+  .pname.clic{display:inline-flex;align-items:center}
+
+  /* 3. Niente scorrimenti annidati: scorre la pagina e basta. Una lista che
+     scorre dentro una pagina che scorre fa perdere il segno al pollice. */
+  .max-h-\[68vh\], .benchlist{max-height:none;overflow:visible}
+
+  /* il cassetto arriva al bordo del telefono: il contenuto in fondo non
+     finisce sotto la barra di sistema */
+  .pcard{padding-bottom:env(safe-area-inset-bottom)}
+}
+
+/* ── La panchina sul telefono, su due livelli ── */
+/* Con «fisso» e le due frecce alti 46px per il pollice, su una riga sola il
+   nome restava con una manciata di pixel («Ru…»): proprio il difetto che la
+   regola dei 620px aveva già corretto. Sopra il nome per intero, il
+   punteggio e il delta; sotto la partita, gli avvisi, «fisso» e le frecce.
+   Il markup è quello di scrivania: lo ridispone `order`, e il ::after a
+   tutta larghezza manda a capo il secondo livello. */
+@media (max-width:899.98px){
+  .benchrow{flex-wrap:wrap;row-gap:0;padding-top:8px;padding-bottom:2px}
+  .benchrow > .ord{order:1}
+  .benchrow > .ruolo-lettera{order:2}
+  .benchrow > .bn{order:3;flex:1 1 0}
+  .benchrow > .dsc{order:4}
+  .benchrow > .fr-delta{order:5}
+  .benchrow::after{content:"";order:6;flex-basis:100%}
+  .benchrow > .m-supera, .benchrow > .fixstrip, .benchrow > .outb{order:7}
+  /* il secondo livello parte sotto il nome, non sotto il numero d'ordine */
+  .benchrow > .m-supera, .benchrow > .fixstrip{margin-left:34px}
+  .benchrow > .m-supera + .fixstrip{margin-left:0}
+  .benchrow > .fisso{order:8;margin-left:auto}
+  /* le frecce erano del colore del bordo (1,3:1): comandi, quindi leggibili */
+  .benchrow > .mv{order:9;color:var(--fr-fioco)}
+}

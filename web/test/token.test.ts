@@ -215,6 +215,30 @@ describe('niente opacità per dire «meno importante»', () => {
   })
 })
 
+describe('le tre regole del telefono', () => {
+  /* Misurate in un browser vero con test/anteprime.test.ts (telefono.html);
+     qui si controlla solo che le regole ci siano ancora, e dentro il punto
+     di rottura: da scrivania non devono toccare niente. */
+  const componenti = readFileSync(fileURLToPath(new URL('../src/viste/componenti.css', import.meta.url)), 'utf8').replace(/\s+/g, '')
+  const blocco = componenti.slice(componenti.indexOf('@media(max-width:899.98px){input:not'))
+
+  it('stanno sotto i 900px', () => {
+    expect(blocco.length, 'blocco delle regole del telefono non trovato').toBeGreaterThan(0)
+  })
+  it('nessun campo sotto i 16px: Safari su iOS ingrandisce la pagina e non torna indietro', () => {
+    expect(blocco).toMatch(/select,textarea\{font-size:16px!important;\}/)
+  })
+  it('nessun bersaglio sotto i 44px', () => {
+    expect(componenti).toMatch(/--fr-tocco|fr-tocco/)
+    expect(readFileSync(fileURLToPath(new URL('../src/viste/fantaregia-tokens.css', import.meta.url)), 'utf8')).toMatch(/--fr-tocco:\s*(4[4-9]|[5-9]\d)px/)
+    expect(blocco).toContain('.fr-bottone{min-height:var(--fr-tocco);')
+    expect(blocco).toMatch(/button,select,summary,input:not\(\[type=checkbox\]\)[^{]*\{min-height:var\(--fr-tocco\);\}/)
+  })
+  it('niente liste che scorrono dentro una pagina che scorre', () => {
+    expect(blocco).toContain('.max-h-\\[68vh\\],.benchlist{max-height:none;overflow:visible}')
+  })
+})
+
 describe('i controlli del browser seguono il tema', () => {
   it('color-scheme per i tre stati: notte di partenza, giorno esplicito, sistema chiaro senza scelta', () => {
     /* Menu a tendina aperti, selettore colore e barre di scorrimento non

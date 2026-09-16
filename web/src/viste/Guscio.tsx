@@ -193,7 +193,9 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
    toccando si vuole l'altro di quello che si sta vedendo. */
 function BottoneTema() {
   const [tema, setTema] = useState<Tema | null>(temaSalvato)
-  const attuale: Tema = tema ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'notte' : 'giorno')
+  // fuori dal browser (le anteprime rese sul server) matchMedia non c'è: vale il notte, che è il tema di partenza
+  const scuro = typeof matchMedia !== 'function' || matchMedia('(prefers-color-scheme: dark)').matches
+  const attuale: Tema = tema ?? (scuro ? 'notte' : 'giorno')
   const altro: Tema = attuale === 'notte' ? 'giorno' : 'notte'
   return (
     <button type="button" className="g-tondo" aria-label={`Passa al tema ${altro}`} title={`Passa al tema ${altro}`}
