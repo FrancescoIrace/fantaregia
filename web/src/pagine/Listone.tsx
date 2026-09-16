@@ -9,6 +9,7 @@ import { Bottone, Card } from '../ui.tsx'
 import Scheda from './Scheda.tsx'
 import Cassetto from '../viste/Cassetto.tsx'
 import { useTelefono } from '../viste/telefono.ts'
+import { useAzione } from '../viste/barra-azione.ts'
 
 type Chiave = 'star' | 'r' | 'n' | 'q' | 'f' | 'att' | 'v' | 'app' | 'fm' | 'cal' | 'max'
 const ORDINE_RUOLO: Record<Ruolo, number> = { P: 0, D: 1, C: 2, A: 3 }
@@ -103,6 +104,16 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
     </th>
   )
 
+  // quanti filtri sono accesi fra quelli che non si vedono: ruolo e ricerca stanno già in vista
+  const oggi = m.giornataOggi()
+  const nascosti = [squadra !== '', qmin !== '', qmax !== '', from !== oggi, span !== 5, soloLiberi, soloObiettivi, soloMiei].filter(Boolean).length
+  useAzione(m.PL.length ? {
+    titolo: `${righeVis.length} giocatori`,
+    sotto: nascosti ? `${nascosti} ${nascosti > 1 ? 'filtri accesi' : 'filtro acceso'}` : 'nessun filtro oltre ruolo e ricerca',
+    etichetta: 'Filtri',
+    fai: () => setCassetto('filtri'),
+  } : null)
+
   if (!m.PL.length) return <Card><div className="empty">Il listone non è caricato: fallo da <b>Carica dati</b>, in Panoramica.</div></Card>
 
   const scheda = aperto !== null && (
@@ -118,9 +129,6 @@ export default function Listone({ legaId, utenteId, righe, motore: m, puoScriver
      si apre toccando la riga. In cima la ricerca e i ruoli; tutti gli altri
      filtri nel cassetto «Filtri», l'ordinamento nel cassetto «Ordina». */
   if (telefono) {
-    const oggi = m.giornataOggi()
-    // quanti filtri sono accesi fra quelli che non si vedono: ruolo e ricerca stanno già in vista
-    const nascosti = [squadra !== '', qmin !== '', qmax !== '', from !== oggi, span !== 5, soloLiberi, soloObiettivi, soloMiei].filter(Boolean).length
     const pulisci = () => {
       setRuolo(''); setQ(''); setSquadra(''); setQmin(''); setQmax(''); setFrom(oggi); setSpan(5)
       setSoloLiberi(false); setSoloObiettivi(false); setSoloMiei(false)

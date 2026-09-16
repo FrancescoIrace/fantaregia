@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useAzione } from '../viste/barra-azione.ts'
 import { ROLENAME, ROLES, type Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
 import { assegna, libera } from '../data/lega.ts'
@@ -39,8 +40,8 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
   const me = m.meId(), mioStato = m.stats(squadra || me)
   const mercato = m.mercato()
 
-  async function conferma(e: FormEvent) {
-    e.preventDefault()
+  async function conferma(e?: FormEvent) {
+    e?.preventDefault()
     if (!p) return
     const v = parseInt(prezzo)
     if (!(v >= 0)) { setErrore('Inserisci un prezzo valido'); return }
@@ -51,6 +52,15 @@ export default function Asta({ legaId, motore: m, puoScrivere, ricarica }: {
     } catch (err) { setErrore((err as Error).message) }
     setInvio(false)
   }
+  /* La barra azione del telefono: chi è chiamato, a quanto e a chi. C'è solo
+     con un giocatore chiamato e ancora libero, e per chi può assegnare. */
+  useAzione(p && puoScrivere && !m.S.assign[p.id] ? {
+    titolo: `${p.n} a ${prezzo || '—'}`,
+    sotto: `a ${m.teamName(squadra)} · tetto ${m.stats(squadra).max}`,
+    etichetta: invio ? 'Assegno…' : 'Assegna',
+    fai: () => void conferma(),
+    disabilitata: invio,
+  } : null)
   const liberaGiocatore = (pid: number) => void libera(legaId, pid).then(() => { setSel(null); ricarica() }, (e: Error) => setErrore(e.message))
 
   return (

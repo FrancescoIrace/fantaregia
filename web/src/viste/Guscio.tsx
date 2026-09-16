@@ -15,10 +15,11 @@
    file — lo legge da ORDINE e PRIME di modo.ts, che restano l'unica
    sorgente anche per le schede da scrivania.                          */
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, NavLink, useLocation } from 'react-router'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import { ORDINE, PANORAMICA, PRIME, SCHEDE, type Modo, type Scheda } from './modo.ts'
 import { scegliTema, temaSalvato, type Tema } from './tema.ts'
 import SceltaTema from './SceltaTema.tsx'
+import { ContestoAzione, type Azione } from './barra-azione.ts'
 
 /* Un disegno per voce: in barra l'icona è quello che si riconosce prima
    della parola. Sono tratti, non riempimenti, così seguono il colore. */
@@ -58,8 +59,11 @@ export interface GuscioProps {
 
 export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email, onEsci, children }: GuscioProps) {
   const [cassetto, setCassetto] = useState(false)
+  // l'azione principale della pagina aperta, se ne ha una (viste/barra-azione.ts)
+  const [azione, setAzione] = useState<Azione | null>(null)
   const chiudi = () => setCassetto(false)
   const { pathname } = useLocation()
+  const vai = useNavigate()
   /* «/lega/<id>/<pagina>», o «/lega/<id>» per la Panoramica */
   const attiva = pathname.split('/')[3] ?? ''
   const inBarra = ORDINE[modo].slice(0, PRIME)
@@ -77,7 +81,8 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
   }, [cassetto])
 
   return (
-    <div className="guscio">
+    <ContestoAzione.Provider value={setAzione}>
+    <div className={`guscio${azione ? ' con-azione' : ''}`}>
       <header className="g-testata">
         <div className="g-riga">
           {squadra?.colore && <span className="gagliardetto g-gagl" style={{ ['--tinta' as string]: squadra.colore }} />}
@@ -97,6 +102,13 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
       </header>
 
       <div className="g-corpo">{children}</div>
+
+      {azione && (
+        <div className="g-azione">
+          <div className="g-azione-testo"><b>{azione.titolo}</b>{azione.sotto && <em>{azione.sotto}</em>}</div>
+          <button type="button" className="g-principale" disabled={azione.disabilitata} onClick={azione.fai}>{azione.etichetta}</button>
+        </div>
+      )}
 
       <nav className="g-nav" aria-label="Le pagine della lega">
         {inBarra.map(k => (
@@ -140,7 +152,13 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
                 levetta senza nome proprio dove serviva di più. Qui ha il
                 nome per esteso e dice cosa fa. */}
             <button type="button" className="g-interruttore" role="switch" aria-checked={modo === 'asta'}
-              onClick={() => onModo(modo === 'asta' ? 'stagione' : 'asta')}>
+              onClick={() => {
+                /* cambiando modalità si arriva sulla sua prima pagina: accendere
+                   l'asta vuol dire voler chiamare, spegnerla voler vedere la giornata */
+                const nuovo: Modo = modo === 'asta' ? 'stagione' : 'asta'
+                onModo(nuovo); chiudi()
+                void vai(`/lega/${legaId}/${SCHEDE[ORDINE[nuovo][0]].path}`)
+              }}>
               <span>
                 <b>Modalità asta</b>
                 <em>{modo === 'asta'
@@ -183,6 +201,7 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
         </>
       )}
     </div>
+    </ContestoAzione.Provider>
   )
 }
 

@@ -15,6 +15,7 @@ import { Avviso, Bottone, Card } from '../ui.tsx'
 import PrevisioneRealta from './PrevisioneRealta.tsx'
 import { useTelefono } from '../viste/telefono.ts'
 import Campo from '../viste/Campo.tsx'
+import { useAzione } from '../viste/barra-azione.ts'
 
 const REPARTI: [Ruolo, string][] = [['A', 'Attacco'], ['C', 'Centrocampo'], ['D', 'Difesa'], ['P', 'Porta']]
 const NOME_REPARTO: Record<Ruolo, string> = { P: 'Porta', D: 'Difesa', C: 'Centrocampo', A: 'Attacco' }
@@ -103,6 +104,14 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
   /* In panchina, sul telefono: la casella da scrivania diceva «↑ nome in
      panchina»; il disco del campo non ha lo spazio, quindi lo dice la riga di
      chi entrerebbe. Stessa soglia: più di quattro punti sopra un titolare. */
+  /* La barra azione del telefono: il modulo e il punteggio a sinistra, e
+     quello che manca se manca qualcosa — è la domanda prima di schierare. */
+  useAzione(rosa.length ? {
+    titolo: mancano ? `${L.mod} · ${mancano} ${mancano > 1 ? 'caselle vuote' : 'casella vuota'}` : `${L.mod} · ${media ?? '—'} di media`,
+    sotto: ko > 0 ? `${ko} in campo ${ko > 1 ? 'indisponibili' : 'indisponibile'}` : `giornata ${g}`,
+    etichetta: 'Schiera la migliore',
+    fai: () => schiera(),
+  } : null)
   const superaTitolare = (p: Giocatore) => !m.isOut(p.id)
     && L.start[p.r].some(id => { const q = id ? giocatore(id) : null; return !!q && sc(p) > sc(q) + 4 })
 

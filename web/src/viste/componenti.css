@@ -688,3 +688,26 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   /* le frecce erano del colore del bordo (1,3:1): comandi, quindi leggibili */
   .benchrow > .mv{order:9;color:var(--fr-fioco)}
 }
+
+/* ── la barra azione ── */
+/* Sopra la navigazione, appoggiata a lei: l'azione principale della pagina
+   a portata di pollice, con a sinistra quello che serve sapere prima di
+   toccarla. C'è solo se la pagina ne ha una (viste/barra-azione.ts). */
+.g-azione{
+  position:fixed;left:0;right:0;z-index:44;
+  bottom:calc(var(--g-nav-h) + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:var(--fr-gap);
+  padding:8px var(--fr-riga-x);background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+}
+.g-azione-testo{flex:1;min-width:0}
+.g-azione-testo b{display:block;font-weight:var(--fr-peso-forte);font-size:var(--fr-t-piccolo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-azione-testo em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* pulsante primario: è marchio, come ogni pulsante primario */
+.g-principale{
+  flex:none;min-height:var(--fr-tocco);padding:0 16px;cursor:pointer;white-space:nowrap;
+  font-size:var(--fr-t-base);font-weight:var(--fr-peso-num);
+  background:var(--fr-marchio);color:var(--fr-marchio-ink);border:0;border-radius:var(--fr-r);
+}
+.g-principale:disabled{cursor:wait;background:var(--fr-filo);color:var(--fr-fioco)}
+/* con la fascia, l'ultima riga della pagina deve restarle sopra */
+.guscio.con-azione .g-corpo{padding-bottom:calc(var(--g-nav-h) + 62px + var(--fr-pad) + env(safe-area-inset-bottom))}
