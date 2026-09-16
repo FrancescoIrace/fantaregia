@@ -65,6 +65,14 @@ export interface RigheLega {
   allenatoreMancante?: boolean
 }
 
+/** La squadra di chi guarda. Prima la scelta privata, che resta il modo di
+    cambiare punto di vista per chi tiene la lega da solo; se non c'è, quella
+    di cui si risulta allenatore nella lega (migrazione allenatore). Senza
+    questo secondo gradino, a chi la squadra è stata assegnata dall'admin
+    l'app continuava a dire «scegli la tua squadra». */
+export const miaSquadraDi = (righe: RigheLega, utenteId: string): number | null =>
+  righe.preferenze?.mia_squadra ?? righe.squadre.find(s => s.allenatore === utenteId)?.id ?? null
+
 /** lo stato condiviso della lega, nella forma di S */
 export function componiStato(r: RigheLega): StatoLega {
   const squadre = [...r.squadre].sort((a, b) => a.posizione - b.posizione)

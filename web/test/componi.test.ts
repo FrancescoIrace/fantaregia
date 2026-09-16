@@ -1,7 +1,7 @@
 /* Dalle righe del database allo stato del motore: le forme devono essere
    esattamente quelle che l'app a file singolo teneva in S. */
 import { describe, expect, it } from 'vitest'
-import { componiStato, ingressoMotore, type RigheLega } from '../src/data/componi.ts'
+import { componiStato, ingressoMotore, miaSquadraDi, type RigheLega } from '../src/data/componi.ts'
 import { creaMotore } from '../src/domain/motore.ts'
 
 const righe: RigheLega = {
@@ -63,5 +63,35 @@ describe('componiStato', () => {
     expect(m.meId()).toBe(11)
     expect(m.stats(11)).toMatchObject({ spent: 16, left: 484 })   // 20 pagati, 4 di correzione dallo scambio
     expect(m.isOut(7)).toBe(true)
+  })
+})
+
+/* Qual è «la mia squadra»: la scelta privata, oppure — per chi se l'è vista
+   assegnare dall'admin, e quindi non ne ha nessuna salvata — quella di cui
+   risulta allenatore. Senza il secondo gradino l'app gli diceva «scegli la
+   tua squadra» e non lo lasciava colorarla. */
+describe('miaSquadraDi', () => {
+  const UTENTE = '00000000-0000-4000-8000-00000000004b'
+
+  it('la scelta privata viene prima', () => {
+    expect(miaSquadraDi(righe, UTENTE)).toBe(11)
+  })
+
+  it('senza scelta privata vale la squadra di cui si è allenatore', () => {
+    const legato: RigheLega = {
+      ...righe,
+      preferenze: null,
+      squadre: righe.squadre.map(s => s.id === 12 ? { ...s, allenatore: UTENTE } : s),
+    }
+    expect(miaSquadraDi(legato, UTENTE)).toBe(12)
+  })
+
+  it('l\'allenatore è un altro, e non ho scelto: nessuna squadra', () => {
+    const altrui: RigheLega = {
+      ...righe,
+      preferenze: null,
+      squadre: righe.squadre.map(s => ({ ...s, allenatore: 'altro-utente' })),
+    }
+    expect(miaSquadraDi(altrui, UTENTE)).toBeNull()
   })
 })

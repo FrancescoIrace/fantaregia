@@ -3,7 +3,7 @@ import { Link, NavLink, Route, Routes, useParams } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
 import { creaMotore, ROLES, type Motore } from '../domain/motore.ts'
-import { ingressoFinoA, type RigheLega } from '../data/componi.ts'
+import { ingressoFinoA, miaSquadraDi, type RigheLega } from '../data/componi.ts'
 import { salvaAllenatore } from '../data/lega.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
@@ -59,7 +59,7 @@ export default function Lega({ utenteId }: { utenteId: string }) {
 
   /* Il marchio è il colore della propria squadra. Uscendo dalla lega torna
      quello predefinito: l'elenco delle leghe non è di nessuna squadra. */
-  const miaSquadra = righe?.squadre.find(s => s.id === righe.preferenze?.mia_squadra) ?? null
+  const miaSquadra = righe ? righe.squadre.find(s => s.id === miaSquadraDi(righe, utenteId)) ?? null : null
   const miaTinta = miaSquadra?.colore ?? null
   useEffect(() => {
     usaTinta(miaTinta)
@@ -146,7 +146,7 @@ export default function Lega({ utenteId }: { utenteId: string }) {
 function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
   id: string; utenteId: string; righe: RigheLega; motore: Motore; ricarica: () => void; membri: Membro[]; io: Membro | undefined
 }) {
-  const mia = righe.preferenze?.mia_squadra ?? null
+  const mia = miaSquadraDi(righe, utenteId)
   const scegliSquadra = async (sq: string) => {
     await supabase.from('preferenze').upsert({ lega_id: id, utente_id: utenteId, mia_squadra: sq ? Number(sq) : null }, { onConflict: 'lega_id,utente_id' })
     ricarica()

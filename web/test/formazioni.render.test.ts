@@ -19,13 +19,24 @@ const cal = calendarioDaRighe(parseCSV(readFileSync(ESEMPI + 'calendario-esempio
 const { rig, hist, shared } = costruisciLega(players, cal)
 const motore = creaMotore({ players, cal, rig, hist, stato: shared, me: { myTeam: 3 } })
 
-const disegna = (formazioni: Record<string, unknown>, mia: number | null = 3) => renderToString(
+/* `squadre` c'è sempre: caricaRighe() lo riempie comunque, e da quando «la
+   mia squadra» può venire anche dal legame con l'allenatore la vista lo
+   legge. La fixture lo teneva fuori, ed era solo un buco della fixture. */
+const disegna = (formazioni: Record<string, unknown>, mia: number | null = 3, squadre: unknown[] = []) => renderToString(
   createElement(MemoryRouter, null, createElement(Formazioni, {
     legaId: 'l1', utenteId: 'u1', motore,
-    righe: { preferenze: { mia_squadra: mia, obiettivi: {}, formazioni } } as unknown as RigheLega,
+    righe: { squadre, preferenze: { mia_squadra: mia, obiettivi: {}, formazioni } } as unknown as RigheLega,
   })))
 
 describe('vista Formazioni', () => {
+  it('con la squadra assegnata dall\'admin non chiede di sceglierla', () => {
+    /* il caso vero, visto in prod: l'admin assegna la squadra a un membro,
+       che quindi non ha nessun mia_squadra salvato. Una squadra ce l'ha, e
+       l'avviso non deve comparire. */
+    const html = disegna({}, null, [{ id: 3, nome: 'Terza', posizione: 3, lega_idx: null, colore: null, allenatore: 'u1' }])
+    expect(html).not.toContain('Non hai ancora scelto la tua squadra')
+  })
+
   it('senza formazione: caselle vuote, panchina con tutta la rosa', () => {
     const html = disegna({})
     expect(html).toContain('gslot vuoto')
