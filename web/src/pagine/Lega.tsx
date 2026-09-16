@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Route, Routes, useParams } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
-import { creaMotore, ROLES, type Motore } from '../domain/motore.ts'
+import { creaMotore, type Motore } from '../domain/motore.ts'
 import { ingressoFinoA, miaSquadraDi, type RigheLega } from '../data/componi.ts'
 import { salvaAllenatore } from '../data/lega.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
-import { Avviso, Bottone, Card, Ruolo, Suggerimento } from '../ui.tsx'
+import { Avviso, Bottone, Card, Suggerimento } from '../ui.tsx'
 import CaricaDati from './CaricaDati.tsx'
 import RoseUfficiali from './RoseUfficiali.tsx'
 import Formazioni from './Formazioni.tsx'
@@ -24,6 +24,7 @@ import { usaTinta } from '../viste/colore-squadra.ts'
 import { useTelefono } from '../viste/telefono.ts'
 import Guscio from '../viste/Guscio.tsx'
 import ColoreSquadra from './ColoreSquadra.tsx'
+import SquadreLega from './SquadreLega.tsx'
 
 interface Membro { utente_id: string; nome: string | null; ruolo: RuoloMembro }
 
@@ -153,14 +154,11 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
     ricarica()
   }
   const giornate = motore.giornateGiocate()
-  const colore = (tid: number) => righe.squadre.find(s => s.id === tid)?.colore ?? null
 
   /* «La mia squadra» qui sopra è una preferenza privata: serve a chi tiene la
      lega da solo e guarda le altre squadre. L'allenatore invece è pubblico —
      con due fantallenatori la lega deve sapere chi è chi. */
   const [erroreAll, setErroreAll] = useState<string | null>(null)
-  const allenatore = (tid: number) => righe.squadre.find(s => s.id === tid)?.allenatore ?? null
-  const nomeMembro = (uid: string) => membri.find(m => m.utente_id === uid)?.nome ?? 'un altro membro'
   const squadraDi = (uid: string) => righe.squadre.find(s => s.allenatore === uid) ?? null
   const puoAssegnare = !!io && io.ruolo !== 'lettore'
   const cambiaAllenatore = async (tid: number, uid: string | null) => {
@@ -193,57 +191,8 @@ function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
           </select>
         </label>
       }>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="text-left text-[11px] tracking-wider text-muted uppercase">
-                <th className="py-1.5 pr-3 font-semibold">Squadra</th>
-                <th className="px-2 py-1.5 font-semibold">Allenatore</th>
-                {ROLES.map(r => <th key={r} className="px-1.5 py-1.5 text-center"><Ruolo r={r} /></th>)}
-                <th className="px-2 py-1.5 text-right font-semibold">Spesi</th>
-                <th className="px-2 py-1.5 text-right font-semibold">Residuo</th>
-                <th className="px-2 py-1.5 text-right font-semibold">Tetto</th>
-                <th className="py-1.5 pl-2 text-right font-semibold">Giudizio</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {motore.S.teams.map(t => {
-                const st = motore.stats(t.id), g = motore.giudizio(t.id)
-                return (
-                  <tr key={t.id} className={t.id === mia ? 'bg-accent-soft' : ''}>
-                    <td className="py-1.5 pr-3 font-semibold">
-                      {colore(t.id) && <span className="gagliardetto mr-2" style={{ ['--tinta' as string]: colore(t.id)! }} />}
-                      {t.name}{t.id === mia && <span className="ml-2 text-[11px] text-accent">io</span>}
-                    </td>
-                    <td className="px-2 py-1.5 text-[12.5px]">
-                      {righe.allenatoreMancante ? <span className="text-muted">—</span>
-                        : puoAssegnare ? (
-                          <select value={allenatore(t.id) ?? ''} onChange={e => void cambiaAllenatore(t.id, e.target.value || null)}
-                            className="rounded-[7px] border border-line-strong bg-surface px-1.5 py-0.5 text-[12.5px]">
-                            <option value="">libera</option>
-                            {membri.map(m => <option key={m.utente_id} value={m.utente_id}>{m.nome ?? 'utente'}</option>)}
-                          </select>
-                        ) : allenatore(t.id) ? (
-                          <span className={allenatore(t.id) === utenteId ? 'font-semibold' : 'text-muted'}>
-                            {allenatore(t.id) === utenteId ? 'tu' : nomeMembro(allenatore(t.id)!)}
-                          </span>
-                        ) : <Bottone piccolo onClick={() => void cambiaAllenatore(t.id, utenteId)}>Prendila</Bottone>}
-                    </td>
-                    {ROLES.map(r => (
-                      <td key={r} className={`px-1.5 py-1.5 text-center font-mono text-[12.5px] ${st.perRole[r].count >= motore.S.slots[r] ? 'text-muted' : ''}`}>
-                        {st.perRole[r].count}/{motore.S.slots[r]}
-                      </td>
-                    ))}
-                    <td className="px-2 py-1.5 text-right font-mono">{st.spent}</td>
-                    <td className="px-2 py-1.5 text-right font-mono font-semibold">{st.left}</td>
-                    <td className={`px-2 py-1.5 text-right font-mono ${st.slotsLeft > 0 && st.max <= 2 ? 'text-crit' : ''}`}>{st.slotsLeft > 0 ? st.max : '—'}</td>
-                    <td className={`py-1.5 pl-2 text-right font-mono font-semibold ${!g ? 'text-muted' : g.voto >= 70 ? 'text-ok' : g.voto >= 55 ? 'text-warn' : 'text-crit'}`}>{g ? g.voto : '—'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <SquadreLega motore={motore} righe={righe} mia={mia} utenteId={utenteId} membri={membri}
+          puoAssegnare={puoAssegnare} onAllenatore={(tid, uid) => void cambiaAllenatore(tid, uid)} />
         <div className="mt-3"><Suggerimento>Crediti, tetto e giudizio vengono dal motore dell'app a file singolo, sui dati di questa lega.</Suggerimento></div>
         <div className="mt-4 border-t border-line pt-3"><ColoreSquadra legaId={id} squadre={righe.squadre} mia={mia} mancante={righe.coloreMancante} admin={io?.ruolo === 'admin'} puoScrivere={!!io && io.ruolo !== 'lettore'} /></div>
       </Card>

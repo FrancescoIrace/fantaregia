@@ -469,3 +469,39 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 .m-intest span:last-child{width:34px}
 .m-riga.partita{grid-template-columns:minmax(0,1fr) auto 52px}
 .m-coppia{display:grid;gap:2px;text-align:right;font-size:var(--fr-t-base)}
+
+/* ── Lega e dati: le squadre ── */
+/* Una riga per squadra al posto della tabella da 640px. A sinistra chi è
+   (nome, allenatore, slot per reparto), a destra i crediti che restano,
+   che sono il numero che si cerca. Il filo è la tinta della squadra: è
+   identità, come il gagliardetto da scrivania. */
+.m-squadre{margin:0 calc(-1 * var(--fr-pad))}
+.m-squadra{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;
+  padding:var(--fr-riga-y) var(--fr-pad);border-bottom:1px solid var(--fr-filo-t);
+  box-shadow:inset 4px 0 0 var(--tinta, transparent);
+}
+.m-squadra:last-child{border-bottom:0}
+.m-squadra.mia{background:var(--fr-marchio-velo)}
+.m-io{margin-left:7px;padding:0 5px;border:1px solid var(--fr-marchio);border-radius:2px;font-size:var(--fr-t-mini);font-weight:var(--fr-peso-medio);color:var(--fr-ink)}
+.m-allenatore{margin-top:3px;font-size:var(--fr-t-piccolo)}
+.m-select{
+  min-height:var(--fr-tocco);max-width:100%;padding:0 8px;font-size:16px;
+  border:1px solid var(--fr-filo);border-radius:var(--fr-r);background:var(--fr-pan);color:var(--fr-ink);
+}
+.m-slot{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px;font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.m-slot > span{display:inline-flex;align-items:baseline;gap:3px}
+.m-slot > span.pieno{color:var(--fr-ink)}
+.m-crediti{display:grid;justify-items:end;text-align:right;gap:1px}
+.m-crediti > b{font-size:var(--fr-t-grande);line-height:1}
+
+/* ── Lega e dati: i file ── */
+/* Stessa riga di sempre (CaricaDati.tsx), disposta a griglia: il nome sulla
+   prima riga accanto al pallino, sotto lo stato per intero e i pulsanti. Da
+   scrivania il nome largo 224px lasciava allo stato una colonna di tre
+   parole per riga. */
+@media (max-width:899.98px){
+  .cd-riga{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;row-gap:6px}
+  .cd-riga > .cd-nome{width:auto}
+  .cd-riga > .cd-stato, .cd-riga > .cd-azioni{grid-column:2}
+}
