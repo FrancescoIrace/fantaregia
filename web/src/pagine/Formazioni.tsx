@@ -7,7 +7,7 @@ import {
 } from '../domain/formazione.ts'
 import { moduloPreferito, salvaModuloPreferito, salvaTitolariFissi, titolariFissi } from '../viste/preferenze-formazione.ts'
 import type { Giocatore, Ruolo } from '../domain/tipi.ts'
-import type { RigheLega } from '../data/componi.ts'
+import { miaSquadraDi, type RigheLega } from '../data/componi.ts'
 import { salvaFormazioni } from '../data/lega.ts'
 import { ABBR, appetCol, dataBreve, deltaCol, fmCol, segno } from '../viste/colori.ts'
 import { Delta, FixStrip, OutBadge, RigBadge, TitDot } from '../viste/segni.tsx'
@@ -90,7 +90,9 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
 
   return (
     <div>
-      {!righe.preferenze?.mia_squadra && (
+      {/* vale anche la squadra di cui si è allenatore: a chi l'ha ricevuta
+          dall'admin questo avviso diceva di sceglierla, e ce l'aveva già */}
+      {!miaSquadraDi(righe, utenteId) && (
         <div className="mb-4">
           <Avviso>
             Non hai ancora scelto la tua squadra: fallo in <Link to={`/lega/${legaId}`} className="font-semibold underline">Panoramica</Link>.

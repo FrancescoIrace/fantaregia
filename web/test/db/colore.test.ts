@@ -46,6 +46,18 @@ describe('imposta_colore', () => {
     expect(await colori()).toEqual(['#3E7BD6', '#2AA79B', null])
   })
 
+  it('chi è allenatore della squadra la colora anche senza la scelta privata', async () => {
+    /* il caso vero: l'admin assegna la squadra a un membro, che quindi non ha
+       nessun mia_squadra salvato. Prima imposta_colore guardava solo la
+       preferenza, e quel membro non poteva colorare la propria squadra. */
+    await come(ADMIN, 'select public.imposta_allenatore($1, $2, $3)', [lega, sq[2], ALTRO])
+    const [p] = await come<{ n: number }>(ALTRO, 'select count(*)::int as n from public.preferenze where utente_id = $1', [ALTRO])
+    expect(p.n).toBe(0)
+    await imposta(ALTRO, sq[2], '#7A5BD6')
+    expect((await colori())[2]).toBe('#7A5BD6')
+    await imposta(ADMIN, sq[2], null)      // i test dopo questo si aspettano la terza squadra senza colore
+  })
+
   it('un lettore non può aggirare la funzione scrivendo sulla tabella', async () => {
     // le policy di squadre lasciano scrivere solo admin e banditori: l'update tocca zero righe
     await come(MIO, 'update public.squadre set colore = $1 where id = $2', ['#000000', sq[1]])
