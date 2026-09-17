@@ -27,7 +27,7 @@ function dati<T>(r: Risposta<T>, cosa: string): T {
    nemmeno il colore — e la Panoramica dice cosa manca invece di
    nasconderlo. Ogni altro errore resta un errore. */
 const COLONNE_SQUADRE = 'id, nome, posizione, lega_idx'
-const colonnaAssente = (r: Risposta<RigaSquadra[]>) =>
+const colonnaAssente = (r: Risposta<unknown>) =>
   !!r.error && (r.error.code === '42703' || /does not exist/i.test(r.error.message))
 
 export async function leggiSquadre(chiedi: (colonne: string) => PromiseLike<Risposta<RigaSquadra[]>>) {
@@ -49,6 +49,17 @@ export async function leggiSquadre(chiedi: (colonne: string) => PromiseLike<Risp
   }
 }
 
+/* Gli indisponibili, con la nota se il database ce l'ha: la colonna arriva
+   con la migrazione nota_indisponibili, e senza si legge come prima invece
+   di non aprire la lega. */
+const COLONNE_INDISPONIBILI = 'giocatore_id, motivo, da_giornata, segnato_il'
+export async function leggiIndisponibili(chiedi: (colonne: string) => PromiseLike<Risposta<RigaIndisponibile[]>>) {
+  const conNota = await chiedi(`${COLONNE_INDISPONIBILI}, nota`)
+  if (!colonnaAssente(conNota)) return { indisponibili: dati(conNota, 'indisponibili'), notaMancante: false }
+  const senza = await chiedi(COLONNE_INDISPONIBILI)
+  return { indisponibili: dati(senza, 'indisponibili'), notaMancante: true }
+}
+
 export async function caricaRighe(legaId: string, utenteId: string): Promise<RigheLega> {
   const [lega, sq, assegnazioni, log, movimenti, indisponibili, annullate, voti, dataset, preferenze] = await Promise.all([
     supabase.from('leghe').select('*').eq('id', legaId).maybeSingle(),
@@ -58,7 +69,7 @@ export async function caricaRighe(legaId: string, utenteId: string): Promise<Rig
     supabase.from('log_asta').select('giocatore_id, squadra_id, prezzo, registrata_il').eq('lega_id', legaId)
       .order('registrata_il', { ascending: false }).limit(500),
     supabase.from('movimenti').select('id, giornata, tipo, voci, agg, rimborso, costo, registrato_il').eq('lega_id', legaId),
-    supabase.from('indisponibili').select('giocatore_id, motivo, da_giornata, segnato_il').eq('lega_id', legaId),
+    leggiIndisponibili(colonne => supabase.from('indisponibili').select(colonne).eq('lega_id', legaId) as unknown as PromiseLike<Risposta<RigaIndisponibile[]>>),
     supabase.from('squalifiche_annullate').select('giocatore_id, giornata').eq('lega_id', legaId),
     supabase.from('voti_giornata').select('giornata, voti').eq('lega_id', legaId),
     supabase.from('dataset').select('tipo, dati, meta').eq('lega_id', legaId),
@@ -74,7 +85,8 @@ export async function caricaRighe(legaId: string, utenteId: string): Promise<Rig
     assegnazioni: dati<RigaAssegnazione[]>(assegnazioni, 'assegnazioni'),
     log: dati<RigaLog[]>(log, 'registro d\'asta'),
     movimenti: dati<RigaMovimento[]>(movimenti, 'movimenti'),
-    indisponibili: dati<RigaIndisponibile[]>(indisponibili, 'indisponibili'),
+    indisponibili: indisponibili.indisponibili,
+    notaMancante: indisponibili.notaMancante,
     squalificheAnnullate: dati<RigaSqualificaAnnullata[]>(annullate, 'squalifiche annullate'),
     voti: dati<RigaVoti[]>(voti, 'voti di giornata'),
     dataset: dati<RigaDataset[]>(dataset, 'file della lega'),
@@ -144,6 +156,25 @@ export async function segnaIndisponibile(legaId: string, giocatoreId: number, mo
     { onConflict: 'lega_id,giocatore_id' },
   )
   if (error) throw new Error(error.message)
+}
+/** Il file degli indisponibili, confermato: chi entra o cambia nota in una
+    scrittura sola, chi rientra in un'altra. Senza la colonna della nota
+    (migrazione non applicata) si salva tutto il resto. */
+export async function importaIndisponibili(legaId: string, fuori: { giocatore_id: number; motivo: string; nota: string; da_giornata: number }[],
+  rientrati: number[], conNota: boolean) {
+  if (fuori.length) {
+    const ora = new Date().toISOString()
+    const { error } = await supabase.from('indisponibili').upsert(
+      fuori.map(f => ({ lega_id: legaId, giocatore_id: f.giocatore_id, motivo: f.motivo, da_giornata: f.da_giornata, segnato_il: ora,
+        ...(conNota ? { nota: f.nota || null } : {}) })),
+      { onConflict: 'lega_id,giocatore_id' },
+    )
+    if (error) throw new Error(error.message)
+  }
+  if (rientrati.length) {
+    const { error } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).in('giocatore_id', rientrati)
+    if (error) throw new Error(error.message)
+  }
 }
 export async function togliIndisponibile(legaId: string, giocatoreId: number) {
   const { error } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).eq('giocatore_id', giocatoreId)

@@ -1,7 +1,11 @@
 import { useState, type ReactNode } from 'react'
 import type { Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
-import { annullaSqualifica, impostaSqualifiche, segnaIndisponibile, togliIndisponibile } from '../data/lega.ts'
+import { annullaSqualifica, importaIndisponibili, impostaSqualifiche, segnaIndisponibile, togliIndisponibile } from '../data/lega.ts'
+import {
+  daApplicare, etichettaMotivo, leggiFileIndisponibili, proponi, scegliOmonimo, type Proposta,
+} from '../domain/indisponibili.ts'
+import { righeDaFile } from '../lib/fogli.ts'
 import { TitDot } from '../viste/segni.tsx'
 import { Avviso, Bottone, Card } from '../ui.tsx'
 
@@ -13,15 +17,17 @@ function ordineSalvato(): Ordine {
 }
 const RO: Record<string, number> = { P: 0, D: 1, C: 2, A: 3 }
 
-interface Riga { pid: number; p: Giocatore | null; tipo: 'inf' | 'squal'; da: number; ts: number; motivo?: string; n?: number; g?: number }
+interface Riga { pid: number; p: Giocatore | null; tipo: 'inf' | 'squal'; da: number; ts: number; motivo?: string; nota?: string; n?: number; g?: number }
 
 /* ══ Infermeria ══════════════════════════════════════════════════════
    renderInfermeria() dell'app a file singolo. Gli infortuni sono l'unica
    cosa che nessun file dà: si segnano a mano e cadono da soli appena il
    giocatore ricompare nei voti. Le squalifiche da cartellino le ricava il
    motore; il rosso resta a mano, perché le giornate le dà il giudice.  */
-export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }: {
+export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, notaMancante = false }: {
   legaId: string; motore: Motore; puoScrivere: boolean; ricarica: () => void
+  /** il database non ha ancora la colonna della nota: il file si carica, le note no */
+  notaMancante?: boolean
 }) {
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('')
@@ -42,8 +48,8 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
   // una riga sola per due cose diverse: l'infortunio comincia quando lo segni, la squalifica quando scatta
   let righe: Riga[] = [
     ...manuali.map(pid => {
-      const inf = (m.infoOut(pid) || {}) as { motivo?: string; da?: number; ts?: number }
-      return { pid: +pid, p: nomeDi(+pid), tipo: 'inf' as const, da: inf.da || 0, ts: inf.ts || 0, motivo: inf.motivo }
+      const inf = (m.infoOut(pid) || {}) as { motivo?: string; da?: number; ts?: number; nota?: string }
+      return { pid: +pid, p: nomeDi(+pid), tipo: 'inf' as const, da: inf.da || 0, ts: inf.ts || 0, motivo: inf.motivo, nota: inf.nota }
     }),
     ...sq.map(s => ({ pid: s.pid, p: nomeDi(s.pid), tipo: 'squal' as const, da: s.g, ts: 0, n: s.n, g: s.g })),
   ]
@@ -97,6 +103,12 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
         ) : <p className="hint">Gli infortunati li segnano admin e banditori.</p>}
       </Card>
 
+      <Card titolo="Carica un file di indisponibili" azioni={<span className="hint">csv o xlsx · nome, stato, nota</span>}>
+        {puoScrivere
+          ? <CaricaIndisponibili legaId={legaId} m={m} g={g} notaMancante={notaMancante} ricarica={ricarica} onEsito={setEsito} />
+          : <p className="hint">Il file lo caricano admin e banditori.</p>}
+      </Card>
+
       <Card titolo="Chi non puoi schierare" azioni={<span className="hint">{totPrima ? <><b className="fr-num">{totPrima}</b> fuori</> : 'nessuno fuori'} · prossima giornata la <b className="fr-num">{g}ª</b></span>}>
         {totPrima >= 2 && (
           <div className="infbar">
@@ -119,10 +131,10 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
           )
           const quante = x.da ? Math.max(0, g - x.da) : 0
           return (
-            <RigaInf key={`i${x.pid}`} p={x.p} pid={x.pid} tag="inf"
+            <RigaInf key={`i${x.pid}`} p={x.p} pid={x.pid} tag="inf" nota={x.nota}
               azione={puoScrivere && <Bottone piccolo disabled={invio}
                 onClick={() => void agisci(() => togliIndisponibile(legaId, x.pid), 'Rientrato fra i disponibili')}>È tornato</Bottone>}>
-              {x.motivo === 'espulsione' ? 'espulso' : 'infortunato'}
+              {etichettaMotivo(x.motivo)}
               {x.da ? <> · fuori dalla <b className="fr-num">{x.da}ª</b>{quante ? <i> ({quante} giornat{quante === 1 ? 'a' : 'e'})</i> : <i> (da questa)</i>}</> : null}
             </RigaInf>
           )
@@ -183,14 +195,151 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica }:
   )
 }
 
-function RigaInf({ p, pid, tag, azione, children }: { p: Giocatore | null; pid: number; tag: string; azione?: ReactNode; children: ReactNode }) {
+function RigaInf({ p, pid, tag, nota, azione, children }: { p: Giocatore | null; pid: number; tag: string; nota?: string; azione?: ReactNode; children: ReactNode }) {
   return (
     <div className="infrow">
       {p && <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />}
       <span className="ruolo-lettera">{p ? p.r : '?'}</span>
-      <span className="infn"><b>{p ? p.n : `#${pid}`}</b> <span className="pteam">{p?.s || ''}</span></span>
+      <span className="infn"><b>{p ? p.n : `#${pid}`}</b> <span className="pteam">{p?.s || ''}</span>
+        {nota && <span className="infnota" title={nota}>{nota}</span>}</span>
       <span className={`inftag ${tag}`}>{children}</span>
       {azione || <span />}
+    </div>
+  )
+}
+
+/* ══ Il file degli indisponibili ═════════════════════════════════════
+   Un csv o un xlsx con nome, stato e nota — quello che prepara ogni giorno
+   la routine che cerca infortuni e squalifiche. Si carica, si guarda la
+   proposta divisa per quello che succederà, e solo allora si conferma.
+   Quello che non torna resta lì con la sua riga: un nome che non c'è, due
+   giocatori con lo stesso nome (si sceglie qui), uno stato che non si capisce. */
+function CaricaIndisponibili({ legaId, m, g, notaMancante, ricarica, onEsito }: {
+  legaId: string; m: Motore; g: number; notaMancante: boolean; ricarica: () => void
+  onEsito: (e: { tipo: 'ok' | 'errore'; testo: string } | null) => void
+}) {
+  const [file, setFile] = useState<string | null>(null)
+  const [proposta, setProposta] = useState<Proposta | null>(null)
+  const [invio, setInvio] = useState(false)
+
+  // il listone, più chi è in rosa ma non c'è più: anche loro si infortunano
+  const giocatori = [...m.PL, ...Object.keys(m.S.assign).map(pid => m.giocatoreDi(pid)).filter((p): p is Giocatore => !!p && !m.byId.has(p.id))]
+  const fuoriOra = (pid: number) => {
+    if (!m.S.out?.[pid]) return null
+    const v = (m.infoOut(pid) || {}) as { motivo?: string; nota?: string }
+    return { motivo: v.motivo, nota: v.nota }
+  }
+
+  async function leggi(f: File) {
+    onEsito(null); setProposta(null)
+    try {
+      const voci = leggiFileIndisponibili(await righeDaFile(f, false))
+      if (!voci.length) throw new Error('nel file non c\'è nessuna riga con un nome')
+      setFile(f.name)
+      setProposta(proponi(voci, giocatori, fuoriOra))
+    } catch (e) { onEsito({ tipo: 'errore', testo: `${f.name}: ${(e as Error).message}` }) }
+  }
+
+  async function applica() {
+    if (!proposta) return
+    setInvio(true)
+    try {
+      const fuori = [
+        ...proposta.entrano.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: g })),
+        // chi era già fuori tiene la giornata da cui lo è
+        ...proposta.aggiornati.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: (m.infoOut(x.pid) as { da?: number } | null)?.da || g })),
+      ]
+      await importaIndisponibili(legaId, fuori, proposta.rientrano.map(x => x.pid), !notaMancante)
+      const parti = [
+        proposta.entrano.length && `${proposta.entrano.length} in infermeria`,
+        proposta.aggiornati.length && `${proposta.aggiornati.length} aggiornati`,
+        proposta.rientrano.length && `${proposta.rientrano.length} rientrati`,
+      ].filter(Boolean)
+      onEsito({ tipo: 'ok', testo: `${file}: ${parti.join(', ')}.${notaMancante ? ' Le note non sono state salvate: manca la migrazione.' : ''}` })
+      setProposta(null); setFile(null); ricarica()
+    } catch (e) { onEsito({ tipo: 'errore', testo: (e as Error).message }) }
+    setInvio(false)
+  }
+
+  if (!proposta) return (
+    <>
+      <p className="hint mb-[9px]">Una riga per giocatore: <b>nome</b>, <b>stato</b> (infortunio, squalifica, espulsione, indisponibile, oppure
+        rientrato) e una <b>nota</b> facoltativa. Prima di scrivere qualcosa ti faccio vedere chi entra, chi cambia e chi non ho riconosciuto.</p>
+      <label className="fr-bottone inline-flex cursor-pointer items-center rounded-[7px] border border-line-strong bg-surface px-3.5 py-1.5 text-[13.5px] font-medium hover:border-accent hover:text-accent">
+        Scegli il file
+        <input type="file" className="hidden" accept=".csv,.txt,.xlsx,.xls"
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void leggi(f) }} />
+      </label>
+    </>
+  )
+  return <AnteprimaIndisponibili proposta={proposta} file={file} notaMancante={notaMancante} invio={invio}
+    onScegli={(riga, p) => setProposta(scegliOmonimo(proposta, riga, p, fuoriOra))}
+    onApplica={() => void applica()} onAnnulla={() => { setProposta(null); setFile(null) }} />
+}
+
+/** La proposta, divisa per quello che succederà. Esportata per i test di resa. */
+export function AnteprimaIndisponibili({ proposta: pr, file, notaMancante, invio, onScegli, onApplica, onAnnulla }: {
+  proposta: Proposta; file: string | null; notaMancante: boolean; invio: boolean
+  onScegli: (riga: number, p: Giocatore) => void; onApplica: () => void; onAnnulla: () => void
+}) {
+  const n = daApplicare(pr)
+  const gruppo = (titolo: string, quanti: number, figli: ReactNode, classe = '') => quanti > 0 && (
+    <div className={`indgruppo ${classe}`}>
+      <p className="indtitolo">{titolo} <b className="fr-num">{quanti}</b></p>
+      {figli}
+    </div>
+  )
+  const riga = (p: Giocatore, testo: ReactNode, chiave: string | number) => (
+    <div key={chiave} className="indriga">
+      <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />
+      <span className="indnome"><b>{p.n}</b> <span className="pteam">{p.s}</span></span>
+      <span className="indcosa">{testo}</span>
+    </div>
+  )
+  return (
+    <div className="space-y-3">
+      <p className="hint">{file ? <><b>{file}</b> · </> : null}{n ? `${n} ${n === 1 ? 'cambiamento' : 'cambiamenti'} da applicare` : 'niente da applicare'}</p>
+      {notaMancante && (pr.entrano.some(x => x.nota) || pr.aggiornati.some(x => x.nota)) && (
+        <Avviso tipo="attenzione">Le note non si possono ancora salvare: manca la migrazione <b>nota_indisponibili</b> (<code>npx supabase db push</code>).
+          I giocatori vanno fuori lo stesso.</Avviso>
+      )}
+
+      {gruppo('Entrano in infermeria', pr.entrano.length, pr.entrano.map(x => riga(x.p,
+        <>{etichettaMotivo(x.motivo)}{x.nota && <i> — {x.nota}</i>}</>, x.pid)))}
+      {gruppo('Già fuori, cambiano motivo o nota', pr.aggiornati.length, pr.aggiornati.map(x => riga(x.p,
+        <>{etichettaMotivo(x.motivo)}{x.nota && <i> — {x.nota}</i>}{x.prima.nota && x.prima.nota !== x.nota && <s className="indprima"> {x.prima.nota}</s>}</>, x.pid)))}
+      {gruppo('Rientrano', pr.rientrano.length, pr.rientrano.map(x => riga(x.p, 'tornano disponibili', x.pid)))}
+
+      {gruppo('Più giocatori con questo nome: scegli chi è', pr.omonimi.length, pr.omonimi.map(v => (
+        <div key={v.riga} className="indriga scelta">
+          <span className="indnome"><b>{v.nome}</b> <span className="pteam">riga {v.riga} · {v.stato}</span></span>
+          <span className="indscegli">
+            {v.candidati.map(p => <Bottone key={p.id} piccolo onClick={() => onScegli(v.riga, p)}>{p.n} · {p.s}</Bottone>)}
+          </span>
+        </div>
+      )), 'da-sistemare')}
+      {gruppo('Non riconosciuti', pr.nonTrovati.length, <>
+        {pr.nonTrovati.map(v => (
+          <div key={v.riga} className="indriga"><span className="indnome"><b>{v.nome}</b> <span className="pteam">riga {v.riga}</span></span>
+            <span className="indcosa">{v.stato}</span></div>
+        ))}
+        <p className="hint">Nessun giocatore del listone con questo nome: se c'è, segnalo a mano con la ricerca qui sopra.</p>
+      </>, 'da-sistemare')}
+      {gruppo('Stato che non capisco', pr.statiIgnoti.length, <>
+        {pr.statiIgnoti.map(v => (
+          <div key={v.riga} className="indriga"><span className="indnome"><b>{v.nome}</b> <span className="pteam">riga {v.riga}</span></span>
+            <span className="indcosa">«{v.stato || 'vuoto'}»</span></div>
+        ))}
+        <p className="hint">Scrivi infortunio, squalifica, espulsione, indisponibile, oppure rientrato. Queste righe non le applico.</p>
+      </>, 'da-sistemare')}
+      {pr.invariati.length > 0 && (
+        <p className="hint">Niente da fare per {pr.invariati.map(x => `${x.p.n} (${x.perche})`).join(', ')}.</p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Bottone variante="primario" disabled={!n || invio} onClick={onApplica}>{invio ? 'Applico…' : `Applica${n ? ` (${n})` : ''}`}</Bottone>
+        <Bottone disabled={invio} onClick={onAnnulla}>Annulla</Bottone>
+      </div>
     </div>
   )
 }

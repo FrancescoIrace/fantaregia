@@ -100,7 +100,7 @@ export interface CalendarioLega {
   ris?: (RisultatoLega | null)[][]
 }
 
-export type VoceOut = 1 | { motivo?: string; da?: number; ts?: number }
+export type VoceOut = 1 | { motivo?: string; da?: number; ts?: number; nota?: string }
 
 /** lo stato condiviso fra tutti i partecipanti (S nell'app a file singolo) */
 export interface StatoLega {
