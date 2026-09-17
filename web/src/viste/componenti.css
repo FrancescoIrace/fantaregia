@@ -518,7 +518,7 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 /* il modulo scelto è marchio, come la scheda attiva: è una scelta, non un valore */
 .m-moduli button[aria-pressed="true"]{border-color:var(--fr-marchio);background:var(--fr-marchio-velo);color:var(--fr-ink)}
-.m-comandi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.m-comandi{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px}
 .m-comandi > button{min-height:var(--fr-tocco);font-size:var(--fr-t-base)}
 .m-preferito{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;margin-top:10px;font-size:var(--fr-t-base)}
 .m-preferito em{display:block;font-style:normal;font-size:var(--fr-t-et);color:var(--fr-fioco)}
