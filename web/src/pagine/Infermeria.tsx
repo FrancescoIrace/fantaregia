@@ -3,8 +3,9 @@ import type { Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
 import { annullaSqualifica, importaIndisponibili, impostaSqualifiche, segnaIndisponibile, togliIndisponibile } from '../data/lega.ts'
 import {
-  daApplicare, etichettaMotivo, leggiFileIndisponibili, proponi, scegliOmonimo, type Proposta,
+  daApplicare, etichettaMotivo, leggiFileIndisponibili, proponi, scegliOmonimo, STATI_VALIDI, type Proposta,
 } from '../domain/indisponibili.ts'
+import type { RigaRientro } from '../data/componi.ts'
 import { righeDaFile } from '../lib/fogli.ts'
 import { TitDot } from '../viste/segni.tsx'
 import { Avviso, Bottone, Card } from '../ui.tsx'
@@ -24,10 +25,12 @@ interface Riga { pid: number; p: Giocatore | null; tipo: 'inf' | 'squal'; da: nu
    cosa che nessun file dà: si segnano a mano e cadono da soli appena il
    giocatore ricompare nei voti. Le squalifiche da cartellino le ricava il
    motore; il rosso resta a mano, perché le giornate le dà il giudice.  */
-export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, notaMancante = false }: {
+export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, notaMancante = false, rientri = [] }: {
   legaId: string; motore: Motore; puoScrivere: boolean; ricarica: () => void
   /** il database non ha ancora la colonna della nota: il file si carica, le note no */
   notaMancante?: boolean
+  /** lo storico dei rientri, dal più recente */
+  rientri?: RigaRientro[]
 }) {
   const [q, setQ] = useState('')
   const [filtro, setFiltro] = useState('')
@@ -103,7 +106,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
         ) : <p className="hint">Gli infortunati li segnano admin e banditori.</p>}
       </Card>
 
-      <Card titolo="Carica un file di indisponibili" azioni={<span className="hint">csv o xlsx · nome, stato, nota</span>}>
+      <Card titolo="Carica un file di indisponibili" azioni={<span className="hint">csv o xlsx · nome;stato;nota</span>}>
         {puoScrivere
           ? <CaricaIndisponibili legaId={legaId} m={m} g={g} notaMancante={notaMancante} ricarica={ricarica} onEsito={setEsito} />
           : <p className="hint">Il file lo caricano admin e banditori.</p>}
@@ -141,6 +144,18 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
         }) : totPrima ? <p className="hint">Nessuno corrisponde a «{filtro}».</p>
           : <p className="hint">Nessuno fuori. Gli infortunati li segni qui sopra; le squalifiche da cartellino le trova l'app da sola quando carichi i voti.</p>}
       </Card>
+
+      {rientri.length > 0 && (
+        <Card titolo="Rientrati di recente" azioni={<span className="hint">con le note di quando sono usciti e rientrati</span>}>
+          {rientri.slice(0, 10).map((r, i) => (
+            <RigaInf key={`${r.giocatore_id}-${r.rientrato_il}-${i}`} p={nomeDi(r.giocatore_id)} pid={r.giocatore_id} tag="rientro" nota={r.nota ?? undefined}>
+              rientrato il {new Date(r.rientrato_il).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+              {r.motivo ? <> · era {etichettaMotivo(r.motivo)}{r.da_giornata ? <> dalla <b className="fr-num">{r.da_giornata}ª</b></> : null}</> : null}
+              {r.nota_uscita && <i> ({r.nota_uscita})</i>}
+            </RigaInf>
+          ))}
+        </Card>
+      )}
 
       <div className="grid gap-[18px] lg:grid-cols-2">
         <Card titolo="Diffidati" azioni={<span className="hint">a un giallo dallo stop</span>}>
@@ -249,13 +264,14 @@ function CaricaIndisponibili({ legaId, m, g, notaMancante, ricarica, onEsito }: 
         // chi era già fuori tiene la giornata da cui lo è
         ...proposta.aggiornati.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: (m.infoOut(x.pid) as { da?: number } | null)?.da || g })),
       ]
-      await importaIndisponibili(legaId, fuori, proposta.rientrano.map(x => x.pid), !notaMancante)
+      const { storico } = await importaIndisponibili(legaId, fuori, proposta.rientrano.map(x => ({ giocatore_id: x.pid, nota: x.nota })), !notaMancante)
       const parti = [
         proposta.entrano.length && `${proposta.entrano.length} in infermeria`,
         proposta.aggiornati.length && `${proposta.aggiornati.length} aggiornati`,
         proposta.rientrano.length && `${proposta.rientrano.length} rientrati`,
       ].filter(Boolean)
-      onEsito({ tipo: 'ok', testo: `${file}: ${parti.join(', ')}.${notaMancante ? ' Le note non sono state salvate: manca la migrazione.' : ''}` })
+      const mancano = [notaMancante && 'le note', !storico && proposta.rientrano.length && 'lo storico dei rientri'].filter(Boolean)
+      onEsito({ tipo: 'ok', testo: `${file}: ${parti.join(', ')}.${mancano.length ? ` Non salvati ${mancano.join(' e ')}: manca la migrazione (npx supabase db push).` : ''}` })
       setProposta(null); setFile(null); ricarica()
     } catch (e) { onEsito({ tipo: 'errore', testo: (e as Error).message }) }
     setInvio(false)
@@ -263,8 +279,9 @@ function CaricaIndisponibili({ legaId, m, g, notaMancante, ricarica, onEsito }: 
 
   if (!proposta) return (
     <>
-      <p className="hint mb-[9px]">Una riga per giocatore: <b>nome</b>, <b>stato</b> (infortunio, squalifica, espulsione, indisponibile, oppure
-        rientrato) e una <b>nota</b> facoltativa. Prima di scrivere qualcosa ti faccio vedere chi entra, chi cambia e chi non ho riconosciuto.</p>
+      <p className="hint mb-[9px]">Una riga per giocatore: <b>nome;stato;nota</b>. Lo <b>stato</b> è uno di tre valori:
+        {' '}<b>infortunio</b> o <b>squalifica</b> lo mettono fuori, <b>rientrato</b> lo rimette disponibile. La <b>nota</b> è facoltativa e resta
+        in Infermeria, anche per i rientri. Prima di scrivere qualcosa ti faccio vedere chi entra, chi rientra e chi non ho riconosciuto.</p>
       <label className="fr-bottone inline-flex cursor-pointer items-center rounded-[7px] border border-line-strong bg-surface px-3.5 py-1.5 text-[13.5px] font-medium hover:border-accent hover:text-accent">
         Scegli il file
         <input type="file" className="hidden" accept=".csv,.txt,.xlsx,.xls"
@@ -308,7 +325,7 @@ export function AnteprimaIndisponibili({ proposta: pr, file, notaMancante, invio
         <>{etichettaMotivo(x.motivo)}{x.nota && <i> — {x.nota}</i>}</>, x.pid)))}
       {gruppo('Già fuori, cambiano motivo o nota', pr.aggiornati.length, pr.aggiornati.map(x => riga(x.p,
         <>{etichettaMotivo(x.motivo)}{x.nota && <i> — {x.nota}</i>}{x.prima.nota && x.prima.nota !== x.nota && <s className="indprima"> {x.prima.nota}</s>}</>, x.pid)))}
-      {gruppo('Rientrano', pr.rientrano.length, pr.rientrano.map(x => riga(x.p, 'tornano disponibili', x.pid)))}
+      {gruppo('Rientrano', pr.rientrano.length, pr.rientrano.map(x => riga(x.p, <>torna disponibile{x.nota && <i> — {x.nota}</i>}</>, x.pid)))}
 
       {gruppo('Più giocatori con questo nome: scegli chi è', pr.omonimi.length, pr.omonimi.map(v => (
         <div key={v.riga} className="indriga scelta">
@@ -318,6 +335,10 @@ export function AnteprimaIndisponibili({ proposta: pr, file, notaMancante, invio
           </span>
         </div>
       )), 'da-sistemare')}
+      {gruppo('«Rientrato», ma non era fuori', pr.nonFuori.length, <>
+        {pr.nonFuori.map(v => riga(v.p, <>riga {v.riga}{v.nota && <i> — {v.nota}</i>}</>, `nf${v.riga}`))}
+        <p className="hint">Non risultano in infermeria: non c'è niente da togliere, e queste righe le ignoro.</p>
+      </>)}
       {gruppo('Non riconosciuti', pr.nonTrovati.length, <>
         {pr.nonTrovati.map(v => (
           <div key={v.riga} className="indriga"><span className="indnome"><b>{v.nome}</b> <span className="pteam">riga {v.riga}</span></span>
@@ -330,7 +351,7 @@ export function AnteprimaIndisponibili({ proposta: pr, file, notaMancante, invio
           <div key={v.riga} className="indriga"><span className="indnome"><b>{v.nome}</b> <span className="pteam">riga {v.riga}</span></span>
             <span className="indcosa">«{v.stato || 'vuoto'}»</span></div>
         ))}
-        <p className="hint">Scrivi infortunio, squalifica, espulsione, indisponibile, oppure rientrato. Queste righe non le applico.</p>
+        <p className="hint">Gli stati validi sono {STATI_VALIDI.join(', ')}. Queste righe non le applico.</p>
       </>, 'da-sistemare')}
       {pr.invariati.length > 0 && (
         <p className="hint">Niente da fare per {pr.invariati.map(x => `${x.p.n} (${x.perche})`).join(', ')}.</p>

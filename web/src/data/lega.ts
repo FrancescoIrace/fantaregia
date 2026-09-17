@@ -9,7 +9,7 @@
    vuote, non un errore. Per questo caricaRighe() controlla che la lega ci sia. */
 import { supabase } from '../lib/supabase.ts'
 import type {
-  RigaAssegnazione, RigaDataset, RigaIndisponibile, RigaLega, RigaLog, RigaMovimento, RigaPreferenze,
+  RigaAssegnazione, RigaDataset, RigaIndisponibile, RigaLega, RigaLog, RigaMovimento, RigaPreferenze, RigaRientro,
   RigaSqualificaAnnullata, RigaSquadra, RigaVoti, RigheLega,
 } from './componi.ts'
 
@@ -60,8 +60,21 @@ export async function leggiIndisponibili(chiedi: (colonne: string) => PromiseLik
   return { indisponibili: dati(senza, 'indisponibili'), notaMancante: true }
 }
 
+/* Una tabella o una funzione che il database non ha ancora: la migrazione non
+   è applicata. Postgres dice «does not exist», PostgREST «could not find». */
+const strutturaAssente = (e: { message: string; code?: string } | null) => !!e && (
+  ['42703', '42P01', '42883', 'PGRST202', 'PGRST204', 'PGRST205'].includes(e.code ?? '') || /does not exist|could not find/i.test(e.message))
+
+/* Lo storico dei rientri, gli ultimi trenta. Senza la migrazione rientri la
+   lega si apre lo stesso, con lo storico vuoto e il segno di cosa manca. */
+export async function leggiRientri(chiedi: () => PromiseLike<Risposta<RigaRientro[]>>) {
+  const r = await chiedi()
+  if (strutturaAssente(r.error)) return { rientri: [] as RigaRientro[], rientriMancante: true }
+  return { rientri: dati(r, 'rientri'), rientriMancante: false }
+}
+
 export async function caricaRighe(legaId: string, utenteId: string): Promise<RigheLega> {
-  const [lega, sq, assegnazioni, log, movimenti, indisponibili, annullate, voti, dataset, preferenze] = await Promise.all([
+  const [lega, sq, assegnazioni, log, movimenti, indisponibili, annullate, voti, dataset, preferenze, rientri] = await Promise.all([
     supabase.from('leghe').select('*').eq('id', legaId).maybeSingle(),
     // con le colonne in una variabile Supabase non conosce la forma delle righe: la si dichiara qui, al confine, come fa dati()
     leggiSquadre(colonne => supabase.from('squadre').select(colonne).eq('lega_id', legaId).order('posizione') as unknown as PromiseLike<Risposta<RigaSquadra[]>>),
@@ -74,6 +87,8 @@ export async function caricaRighe(legaId: string, utenteId: string): Promise<Rig
     supabase.from('voti_giornata').select('giornata, voti').eq('lega_id', legaId),
     supabase.from('dataset').select('tipo, dati, meta').eq('lega_id', legaId),
     supabase.from('preferenze').select('mia_squadra, obiettivi, formazioni').eq('lega_id', legaId).eq('utente_id', utenteId).maybeSingle(),
+    leggiRientri(() => supabase.from('rientri').select('giocatore_id, motivo, da_giornata, nota_uscita, nota, rientrato_il')
+      .eq('lega_id', legaId).order('rientrato_il', { ascending: false }).limit(30) as unknown as PromiseLike<Risposta<RigaRientro[]>>),
   ])
   const l = dati<RigaLega | null>(lega, 'lega')
   if (!l) throw new Error('lega non trovata, o non ne fai parte')
@@ -91,11 +106,13 @@ export async function caricaRighe(legaId: string, utenteId: string): Promise<Rig
     voti: dati<RigaVoti[]>(voti, 'voti di giornata'),
     dataset: dati<RigaDataset[]>(dataset, 'file della lega'),
     preferenze: dati<RigaPreferenze | null>(preferenze, 'preferenze'),
+    rientri: rientri.rientri,
+    rientriMancante: rientri.rientriMancante,
   }
 }
 
 const TABELLE_DI_LEGA = ['squadre', 'assegnazioni', 'log_asta', 'movimenti', 'indisponibili',
-  'squalifiche_annullate', 'voti_giornata', 'dataset', 'preferenze'] as const
+  'squalifiche_annullate', 'voti_giornata', 'dataset', 'preferenze', 'rientri'] as const
 
 /** avvisa a ogni riga cambiata della lega; restituisce la funzione per smettere */
 export function ascoltaLega(legaId: string, cambiato: (tabella: string) => void) {
@@ -157,11 +174,27 @@ export async function segnaIndisponibile(legaId: string, giocatoreId: number, mo
   )
   if (error) throw new Error(error.message)
 }
+/* ── rientrare ──
+   Le tre strade per rientrare — il file (stato «rientrato»), il pulsante
+   «È tornato», i voti di una giornata giocata — passano tutte da qui.
+   rientra() del database sposta le righe nello storico con le note, in una
+   transazione. Senza la migrazione rientri si torna a cancellare e basta:
+   il rientro vale lo stesso, lo storico no, e il risultato lo dice. */
+export async function rientra(legaId: string, voci: { giocatore_id: number; nota?: string | null }[]): Promise<{ storico: boolean }> {
+  if (!voci.length) return { storico: true }
+  const { error } = await supabase.rpc('rientra', { p_lega: legaId, p_voci: voci })
+  if (!error) return { storico: true }
+  if (!strutturaAssente(error)) throw new Error(error.message)
+  const { error: e2 } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).in('giocatore_id', voci.map(v => v.giocatore_id))
+  if (e2) throw new Error(e2.message)
+  return { storico: false }
+}
+
 /** Il file degli indisponibili, confermato: chi entra o cambia nota in una
-    scrittura sola, chi rientra in un'altra. Senza la colonna della nota
-    (migrazione non applicata) si salva tutto il resto. */
+    scrittura sola, chi rientra passa dallo storico. Senza la colonna della
+    nota (migrazione non applicata) si salva tutto il resto. */
 export async function importaIndisponibili(legaId: string, fuori: { giocatore_id: number; motivo: string; nota: string; da_giornata: number }[],
-  rientrati: number[], conNota: boolean) {
+  rientrati: { giocatore_id: number; nota: string }[], conNota: boolean) {
   if (fuori.length) {
     const ora = new Date().toISOString()
     const { error } = await supabase.from('indisponibili').upsert(
@@ -171,14 +204,11 @@ export async function importaIndisponibili(legaId: string, fuori: { giocatore_id
     )
     if (error) throw new Error(error.message)
   }
-  if (rientrati.length) {
-    const { error } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).in('giocatore_id', rientrati)
-    if (error) throw new Error(error.message)
-  }
+  return rientra(legaId, rientrati)
 }
-export async function togliIndisponibile(legaId: string, giocatoreId: number) {
-  const { error } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).eq('giocatore_id', giocatoreId)
-  if (error) throw new Error(error.message)
+/** «È tornato»: un rientro senza nota, che resta comunque nello storico */
+export async function togliIndisponibile(legaId: string, giocatoreId: number, nota?: string) {
+  await rientra(legaId, [{ giocatore_id: giocatoreId, nota }])
 }
 /** la lega non applica questa squalifica: resta annotata e il motore la salta */
 export async function annullaSqualifica(legaId: string, giocatoreId: number, giornata: number) {

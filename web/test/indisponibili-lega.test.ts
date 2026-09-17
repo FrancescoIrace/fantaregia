@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { leggiIndisponibili } from '../src/data/lega.ts'
+import { leggiIndisponibili, leggiRientri } from '../src/data/lega.ts'
 import { componiStato, type RigaIndisponibile, type RigheLega } from '../src/data/componi.ts'
 import Infermeria, { AnteprimaIndisponibili } from '../src/pagine/Infermeria.tsx'
 import { creaMotore } from '../src/domain/motore.ts'
@@ -37,6 +37,22 @@ describe('leggiIndisponibili', () => {
   })
 })
 
+describe('leggiRientri', () => {
+  const r = { giocatore_id: 7, motivo: 'infortunio', da_giornata: 3, nota_uscita: 'bicipite', nota: 'torna', rientrato_il: '2026-09-17T10:00:00Z' }
+  it('lo storico com\'è', async () => {
+    expect(await leggiRientri(async () => ({ data: [r], error: null }))).toEqual({ rientri: [r], rientriMancante: false })
+  })
+  it('senza la migrazione: storico vuoto e il segno di cosa manca, la lega si apre lo stesso', async () => {
+    expect(await leggiRientri(async () => ({ data: null, error: { code: 'PGRST205', message: 'Could not find the table public.rientri' } })))
+      .toEqual({ rientri: [], rientriMancante: true })
+    expect(await leggiRientri(async () => ({ data: null, error: { code: '42P01', message: 'relation "public.rientri" does not exist' } })))
+      .toEqual({ rientri: [], rientriMancante: true })
+  })
+  it('un altro errore resta un errore', async () => {
+    await expect(leggiRientri(async () => ({ data: null, error: { code: '42501', message: 'permission denied' } }))).rejects.toThrow('permission denied')
+  })
+})
+
 describe('la nota arriva al motore', () => {
   it('in S.out, accanto a motivo e giornata', () => {
     const righe = {
@@ -59,7 +75,10 @@ describe('Infermeria', () => {
   const pid = Number(Object.keys(shared.out!)[0])
   const stato = { ...shared, out: { ...shared.out, [pid]: { motivo: 'squalifica', da: 3, ts: 1, nota: 'rosso diretto, tre giornate' } } }
   const m = creaMotore({ players, cal, rig, hist, stato, me: { myTeam: 3 } })
-  const disegna = (puoScrivere: boolean) => renderToString(createElement(Infermeria, { legaId: 'l1', motore: m, puoScrivere, ricarica: () => {} }))
+  const rientri = [{ giocatore_id: m.PL[0].id, motivo: 'infortunio', da_giornata: 3, nota_uscita: 'lesione bicipite femorale',
+    nota: 'torna disponibile dopo la lesione al bicipite femorale', rientrato_il: '2026-09-17T10:00:00Z' }]
+  const disegna = (puoScrivere: boolean, conRientri = false) => renderToString(createElement(Infermeria, {
+    legaId: 'l1', motore: m, puoScrivere, ricarica: () => {}, rientri: conRientri ? rientri : [] }))
 
   it('la scheda per caricare il file c\'è per chi scrive; chi legge sa chi lo fa', () => {
     expect(disegna(true)).toContain('Carica un file di indisponibili')
@@ -74,15 +93,31 @@ describe('Infermeria', () => {
     expect(html).toContain('squalificato')
   })
 
+  it('la card spiega i tre stati del formato', () => {
+    const html = disegna(true)
+    expect(html).toContain('nome;stato;nota')
+    for (const st of ['infortunio', 'squalifica', 'rientrato']) expect(html, st).toContain(`<b>${st}</b>`)
+  })
+
+  it('i rientri restano: nota di uscita e nota di rientro, leggibili in Infermeria', () => {
+    const html = disegna(false, true).replace(/<!-- -->/g, '')    // i segnaposto che React mette fra i pezzi di testo
+    expect(html).toContain('Rientrati di recente')
+    expect(html).toContain('torna disponibile dopo la lesione al bicipite femorale')
+    expect(html).toContain('lesione bicipite femorale')
+    expect(html).toContain('era infortunato')
+    expect(disegna(false)).not.toContain('Rientrati di recente')    // senza storico la card non c'è
+  })
+
   it('l\'anteprima divide il file per quello che succederà, con Applica e il conto', () => {
     // due nomi senza omonimi nel listone d'esempio, così la prova non dipende da chi capita primo
     const unici = m.PL.filter(p => m.PL.filter(x => x.n === p.n).length === 1)
     const [a, b] = [unici[0], unici[1]]
     const nomeA = a.n, nomeB = b.n
     const voci = leggiFileIndisponibili(parseCSV([
-      'nome;stato;nota', `${nomeA};infortunio;adduttore`, `${nomeB};rientrato;`, 'Nessuno Qui;infortunio;', `${nomeA};in dubbio;`,
+      'nome;stato;nota', `${nomeA};infortunio;adduttore`, `${nomeB};rientrato;torna in gruppo`, 'Nessuno Qui;infortunio;',
+      `${nomeA};in dubbio;`, `${unici[2].n};rientrato;`,
     ].join('\n')))
-    const pr = proponi(voci.slice(0, 3), m.PL, id => id === b.id ? { motivo: 'infortunio' } : null)
+    const pr = proponi([...voci.slice(0, 3), voci[4]], m.PL, id => id === b.id ? { motivo: 'infortunio' } : null)
     const conStato = { ...pr, statiIgnoti: [voci[3]] }
     const html = renderToString(createElement(AnteprimaIndisponibili, {
       proposta: conStato, file: 'indisponibili.csv', notaMancante: true, invio: false, onScegli: () => {}, onApplica: () => {}, onAnnulla: () => {},
@@ -90,6 +125,8 @@ describe('Infermeria', () => {
     expect(html).toContain('Entrano in infermeria')
     expect(html).toContain('adduttore')
     expect(html).toContain('Rientrano')
+    expect(html).toContain('torna in gruppo')
+    expect(html).toContain('ma non era fuori')                    // il rientrato di chi non era in infermeria: segnalato, non un errore
     expect(html).toContain('Non riconosciuti')
     expect(html).toContain('Nessuno Qui')
     expect(html).toContain('Stato che non capisco')
