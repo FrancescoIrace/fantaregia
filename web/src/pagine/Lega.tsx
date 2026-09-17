@@ -94,7 +94,7 @@ export default function Lega({ utenteId, email }: { utenteId: string; email?: st
       <Route path="rendimento" element={<Rendimento motore={motore} />} />
       <Route path="titolari" element={<Titolari motore={motore} />} />
       <Route path="calendario" element={<Calendario motore={motore} />} />
-      <Route path="infermeria" element={<Infermeria legaId={id} motore={motore} ricarica={ricarica}
+      <Route path="infermeria" element={<Infermeria legaId={id} motore={motore} ricarica={ricarica} notaMancante={!!righe.notaMancante}
         puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
       <Route path="mercato" element={<Mercato legaId={id} motore={motore} ricarica={ricarica}
         puoScrivere={!!io && io.ruolo !== 'lettore'} />} />

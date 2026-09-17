@@ -711,3 +711,27 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 .g-principale:disabled{cursor:wait;background:var(--fr-filo);color:var(--fr-fioco)}
 /* con la fascia, l'ultima riga della pagina deve restarle sopra */
 .guscio.con-azione .g-corpo{padding-bottom:calc(var(--g-nav-h) + 62px + var(--fr-pad) + env(safe-area-inset-bottom))}
+
+/* ── Infermeria: il file degli indisponibili ── */
+/* La nota sotto il nome: si legge per intero al passaggio del mouse, in riga
+   si taglia per non spingere le colonne. */
+.infn .infnota{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--fr-t-et);color:var(--fr-fioco);font-weight:var(--fr-peso-testo)}
+.indgruppo{border:1px solid var(--fr-filo);border-radius:var(--fr-r);padding:8px 12px}
+/* da sistemare: il tratteggio degli avvisi, non un colore */
+.indgruppo.da-sistemare{border-style:dashed;border-color:var(--fr-fioco)}
+.indtitolo{font-size:var(--fr-t-et);color:var(--fr-fioco);margin-bottom:4px}
+.indtitolo b{color:var(--fr-ink)}
+.indriga{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:10px;align-items:baseline;
+  padding:6px 0 6px 10px;border-top:1px solid var(--fr-filo-t);font-size:var(--fr-t-piccolo)}
+.indriga:first-of-type{border-top:0}
+.indriga > .fr-filo-ruolo{position:absolute;left:0;top:6px;bottom:6px;height:auto}
+.indnome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.indcosa{min-width:0;color:var(--fr-fioco)}
+.indcosa i{font-style:normal}
+.indprima{margin-left:6px;color:var(--fr-spento)}
+.indriga.scelta{grid-template-columns:1fr;padding-left:0}
+.indscegli{display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:899.98px){
+  .indriga{grid-template-columns:1fr;gap:2px}
+}

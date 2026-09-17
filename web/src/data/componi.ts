@@ -37,7 +37,7 @@ export interface RigaMovimento {
   costo: number | null
   registrato_il: string
 }
-export interface RigaIndisponibile { giocatore_id: number; motivo: string | null; da_giornata: number | null; segnato_il: string }
+export interface RigaIndisponibile { giocatore_id: number; motivo: string | null; da_giornata: number | null; segnato_il: string; nota?: string | null }
 export interface RigaSqualificaAnnullata { giocatore_id: number; giornata: number }
 export interface RigaVoti { giornata: number; voti: Record<string, VotoRiga> }
 export type TipoDataset = 'listone' | 'calendario' | 'rigoristi' | 'storico' | 'calendario_lega'
@@ -63,6 +63,8 @@ export interface RigheLega {
   coloreMancante?: boolean
   /** il database non ha ancora squadre.allenatore (migrazione allenatore non applicata) */
   allenatoreMancante?: boolean
+  /** il database non ha ancora indisponibili.nota (migrazione nota_indisponibili non applicata) */
+  notaMancante?: boolean
 }
 
 /** La squadra di chi guarda. Prima la scelta privata, che resta il modo di
@@ -104,6 +106,7 @@ export function componiStato(r: RigheLega): StatoLega {
     const v: Exclude<VoceOut, 1> = { ts: Date.parse(i.segnato_il) }
     if (i.motivo !== null) v.motivo = i.motivo
     if (i.da_giornata !== null) v.da = i.da_giornata
+    if (i.nota) v.nota = i.nota
     out[i.giocatore_id] = v
   }
 
