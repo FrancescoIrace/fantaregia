@@ -16,6 +16,7 @@ import PrevisioneRealta from './PrevisioneRealta.tsx'
 import { useTelefono } from '../viste/telefono.ts'
 import Campo from '../viste/Campo.tsx'
 import { useAzione } from '../viste/barra-azione.ts'
+import { condividiImmagine, creaImmagine, type DatiImmagine } from '../viste/immagine-formazione.ts'
 
 const REPARTI: [Ruolo, string][] = [['A', 'Attacco'], ['C', 'Centrocampo'], ['D', 'Difesa'], ['P', 'Porta']]
 const NOME_REPARTO: Record<Ruolo, string> = { P: 'Porta', D: 'Difesa', C: 'Centrocampo', A: 'Attacco' }
@@ -94,6 +95,29 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
   const ko = xi.filter(p => m.isOut(p.id)).length
   const media = xi.length ? Math.round(xi.reduce((a, p) => a + sc(p), 0) / xi.length) : null
   const mediaPrima = xi.length && g > 1 ? Math.round(xi.reduce((a, p) => a + (scPrima(p) ?? 0), 0) / xi.length) : null
+
+  /* Condividi: la formazione di questa giornata come immagine, con la
+     panchina. Sul telefono apre il pannello di condivisione, altrove scarica. */
+  const [preparo, setPreparo] = useState(false)
+  async function condividi() {
+    const voce = (p: Giocatore) => ({ nome: p.n, ruolo: p.r, punti: m.isOut(p.id) ? null : sc(p), fuori: m.isOut(p.id) })
+    const casella = (id: number | null) => { const p = id ? giocatore(id) : null; return p ? voce(p) : null }
+    const dati: DatiImmagine = {
+      squadra: m.teamName(m.meId()), lega: righe.lega?.nome ?? '', giornata: g, data: dataBreve(m.CAL.dates[g - 1]), modulo: L.mod, media,
+      campo: { P: L.start.P.map(casella), D: L.start.D.map(casella), C: L.start.C.map(casella), A: L.start.A.map(casella) },
+      panchina: L.bench.map(giocatore).filter((p): p is Giocatore => !!p).map(voce),
+    }
+    setPreparo(true)
+    try {
+      const esito = await condividiImmagine(await creaImmagine(dati), `formazione-giornata-${g}.png`, `${dati.squadra} · giornata ${g}`)
+      setStato(esito === 'condivisa' ? 'formazione condivisa' : esito === 'scaricata' ? 'immagine della formazione scaricata' : null)
+    } catch (e) { setStato(`immagine non creata: ${(e as Error).message}`) }
+    setPreparo(false)
+  }
+  const bottoneCondividi = (
+    <Bottone disabled={!xi.length || preparo} title="La formazione e la panchina come immagine, da mandare nel gruppo della lega"
+      onClick={() => void condividi()}>{preparo ? 'Preparo…' : 'Condividi'}</Bottone>
+  )
   const spie = <>
     {mancano ? <span className="tag warn">{mancano} {mancano > 1 ? 'caselle vuote' : 'casella vuota'}</span>
       : L.bench.length ? <span className="tag ok">formazione completa</span> : null}
@@ -148,6 +172,7 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
           <div className="m-comandi">
             <Bottone variante="primario" disabled={!rosa.length} onClick={() => schiera()}>Schiera la migliore</Bottone>
             <Bottone onClick={() => cambia(vuota(L.mod))}>Svuota</Bottone>
+            {bottoneCondividi}
           </div>
           <label className="m-preferito" title="Il modulo da cui partono le giornate che non hai ancora toccato. Cambiare modulo in una giornata non cambia la preferenza.">
             <span>Modulo preferito<em>da cui partono le giornate che non hai toccato</em></span>
@@ -187,6 +212,7 @@ export default function Formazioni({ legaId, utenteId, righe, motore: m, motoreP
         <Bottone variante="primario" disabled={!rosa.length}
           onClick={() => schiera()}>Schiera la migliore</Bottone>
         <Bottone onClick={() => cambia(vuota(L.mod))}>Svuota</Bottone>
+        {bottoneCondividi}
         <span className="ml-auto flex max-w-[40ch] flex-wrap items-center justify-end gap-1.5 text-right">
           {spie}
           {stato && <span className="hint w-full">{stato}</span>}
