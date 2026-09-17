@@ -735,3 +735,6 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 @media (max-width:899.98px){
   .indriga{grid-template-columns:1fr;gap:2px}
 }
+
+/* lo storico dei rientri: una riga d'archivio, grigia, non uno stato da guardare */
+.inftag.rientro{color:var(--fr-fioco)}

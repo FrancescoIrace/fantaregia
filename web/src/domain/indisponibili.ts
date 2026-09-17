@@ -52,33 +52,24 @@ export function leggiFileIndisponibili(righe: unknown[][]): VoceFile[] {
 
 /* ── capire lo stato ── */
 
-/* Parole, non frasi: basta che la parola chiave compaia. «Infortunio
-   muscolare», «squalificato per un turno», «rientrato in gruppo». */
+/* Tre valori, e solo quelli: «infortunio» e «squalifica» mettono fuori,
+   «rientrato» rimette disponibile. Maiuscole, accenti e spazi non contano.
+   Qualunque altra cosa non si indovina: finisce fra gli stati che non si
+   capiscono, con la sua riga, e non si applica. Scelta di Francesco
+   (17/09/2026): la routine scrive solo questi tre, e una regola stretta si
+   controlla meglio di un elenco di sinonimi. */
 type Stato = { tipo: 'fuori'; motivo: Motivo } | { tipo: 'rientro' }
-const PAROLE: readonly (readonly [string, Stato])[] = [
-  // prima i «non»: «non disponibile» contiene «disponibile», «indisponibile» pure
-  ...['nondisponibil', 'indisponibil', 'nonconvocat'].map(k => [k, { tipo: 'fuori', motivo: 'indisponibile' }] as const),
-  ...['rientrat', 'rientro', 'disponibil', 'recuperat', 'guarit', 'tornat', 'arruolabil'].map(k => [k, { tipo: 'rientro' }] as const),
-  ...['espuls', 'rosso'].map(k => [k, { tipo: 'fuori', motivo: 'espulsione' }] as const),
-  ...['squalific', 'sospes'].map(k => [k, { tipo: 'fuori', motivo: 'squalifica' }] as const),
-  ...['infortun', 'lesion', 'frattur', 'distorsion', 'stiram', 'risentiment', 'operat', 'contrattur', 'affaticament']
-    .map(k => [k, { tipo: 'fuori', motivo: 'infortunio' }] as const),
-  ...['fuori', 'malatti', 'influenz', 'febbre', 'personali'].map(k => [k, { tipo: 'fuori', motivo: 'indisponibile' }] as const),
-]
+const STATI: Record<string, Stato> = {
+  infortunio: { tipo: 'fuori', motivo: 'infortunio' },
+  squalifica: { tipo: 'fuori', motivo: 'squalifica' },
+  rientrato: { tipo: 'rientro' },
+}
+/** i valori che il file può avere nella colonna stato, per l'interfaccia */
+export const STATI_VALIDI = Object.keys(STATI)
 
-/** Fuori con un motivo, rientrato, o null se lo stato non si capisce.
-    Vince la parola chiave che compare PER PRIMA: «rientrato dall'infortunio»
-    è un rientro, «infortunio, rientro previsto dopo la sosta» è fuori. A
-    parità di posizione vince l'ordine qui sopra, cioè i «non». */
+/** fuori con un motivo, rientrato, o null se lo stato non è uno dei tre */
 export function capisciStato(stato: string): Stato | null {
-  const s = piega(stato)
-  if (!s) return null
-  let meglio: { pos: number; esito: Stato } | null = null
-  for (const [k, esito] of PAROLE) {
-    const pos = s.indexOf(k)
-    if (pos >= 0 && (!meglio || pos < meglio.pos)) meglio = { pos, esito }
-  }
-  return meglio ? meglio.esito : null
+  return STATI[piega(stato)] ?? null
 }
 
 /* ── riconoscere i nomi ── */
@@ -134,12 +125,14 @@ export function riconosci(nome: string, ix: ReturnType<typeof indiceGiocatori>):
 
 export interface Entra { pid: number; p: Giocatore; motivo: Motivo; nota: string; riga: number }
 export interface Aggiorna extends Entra { prima: { motivo?: string; nota?: string } }
-export interface Rientra { pid: number; p: Giocatore; riga: number }
+export interface Rientra { pid: number; p: Giocatore; nota: string; riga: number }
 export interface Proposta {
   entrano: Entra[]
   aggiornati: Aggiorna[]
   rientrano: Rientra[]
-  /** già tutto uguale, o «rientrato» per chi non era fuori: niente da fare */
+  /** «rientrato» per chi non era fuori: non c'è niente da togliere, si segnala e basta */
+  nonFuori: (VoceFile & { p: Giocatore })[]
+  /** già fuori con lo stesso motivo e la stessa nota: niente da fare */
   invariati: { p: Giocatore; riga: number; perche: string }[]
   nonTrovati: VoceFile[]
   omonimi: (VoceFile & { candidati: Giocatore[] })[]
@@ -148,7 +141,7 @@ export interface Proposta {
 
 export function proponi(voci: VoceFile[], giocatori: Giocatore[], fuoriOra: (pid: number) => { motivo?: string; nota?: string } | null): Proposta {
   const ix = indiceGiocatori(giocatori)
-  const pr: Proposta = { entrano: [], aggiornati: [], rientrano: [], invariati: [], nonTrovati: [], omonimi: [], statiIgnoti: [] }
+  const pr: Proposta = { entrano: [], aggiornati: [], rientrano: [], nonFuori: [], invariati: [], nonTrovati: [], omonimi: [], statiIgnoti: [] }
   const visti = new Map<number, number>()      // un giocatore scritto due volte: vale l'ultima riga
   for (const v of voci) {
     const stato = capisciStato(v.stato)
@@ -159,7 +152,7 @@ export function proponi(voci: VoceFile[], giocatori: Giocatore[], fuoriOra: (pid
     const p = e.p
     if (visti.has(p.id)) togli(pr, p.id)
     visti.set(p.id, v.riga)
-    aggiungi(pr, p, stato, v.nota, v.riga, fuoriOra(p.id))
+    aggiungi(pr, p, stato, v, fuoriOra(p.id))
   }
   return pr
 }
@@ -169,9 +162,9 @@ export function scegliOmonimo(pr: Proposta, riga: number, p: Giocatore, fuoriOra
   const v = pr.omonimi.find(x => x.riga === riga)
   if (!v) return pr
   const nuova: Proposta = { ...pr, entrano: [...pr.entrano], aggiornati: [...pr.aggiornati], rientrano: [...pr.rientrano],
-    invariati: [...pr.invariati], omonimi: pr.omonimi.filter(x => x.riga !== riga) }
+    nonFuori: [...pr.nonFuori], invariati: [...pr.invariati], omonimi: pr.omonimi.filter(x => x.riga !== riga) }
   togli(nuova, p.id)
-  aggiungi(nuova, p, capisciStato(v.stato)!, v.nota, v.riga, fuoriOra(p.id))
+  aggiungi(nuova, p, capisciStato(v.stato)!, v, fuoriOra(p.id))
   return nuova
 }
 
@@ -179,19 +172,19 @@ function togli(pr: Proposta, pid: number) {
   pr.entrano = pr.entrano.filter(x => x.pid !== pid)
   pr.aggiornati = pr.aggiornati.filter(x => x.pid !== pid)
   pr.rientrano = pr.rientrano.filter(x => x.pid !== pid)
+  pr.nonFuori = pr.nonFuori.filter(x => x.p.id !== pid)
   pr.invariati = pr.invariati.filter(x => x.p.id !== pid)
 }
 
-function aggiungi(pr: Proposta, p: Giocatore, stato: NonNullable<ReturnType<typeof capisciStato>>, nota: string, riga: number,
-  ora: { motivo?: string; nota?: string } | null) {
+function aggiungi(pr: Proposta, p: Giocatore, stato: Stato, v: VoceFile, ora: { motivo?: string; nota?: string } | null) {
   if (stato.tipo === 'rientro') {
-    if (ora) pr.rientrano.push({ pid: p.id, p, riga })
-    else pr.invariati.push({ p, riga, perche: 'già disponibile' })
+    if (ora) pr.rientrano.push({ pid: p.id, p, nota: v.nota, riga: v.riga })
+    else pr.nonFuori.push({ ...v, p })
     return
   }
-  const voce = { pid: p.id, p, motivo: stato.motivo, nota, riga }
+  const voce = { pid: p.id, p, motivo: stato.motivo, nota: v.nota, riga: v.riga }
   if (!ora) pr.entrano.push(voce)
-  else if ((ora.motivo ?? '') === stato.motivo && (ora.nota ?? '') === nota) pr.invariati.push({ p, riga, perche: 'già fuori, con la stessa nota' })
+  else if ((ora.motivo ?? '') === stato.motivo && (ora.nota ?? '') === v.nota) pr.invariati.push({ p, riga: v.riga, perche: 'già fuori, con la stessa nota' })
   else pr.aggiornati.push({ ...voce, prima: ora })
 }
 

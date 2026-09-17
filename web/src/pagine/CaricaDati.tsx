@@ -248,7 +248,7 @@ function FileVoti({ legaId, righe, motore, esito }: { legaId: string; righe: Rig
     try {
       if (!giornate.length) throw new Error(note.join(' · ') || 'nessuna giornata da caricare')
       const eff = effettoVoti(ingressoMotore(righe), Object.fromEntries(giornate.map(x => [x.g, x.voti])))
-      await salvaVoti(legaId, giornate, foglio, eff.rientri.map(r => r.pid))
+      await salvaVoti(legaId, giornate, foglio, eff.rientri.map(r => ({ giocatore_id: r.pid, nota: `ha giocato la ${r.g}ª giornata` })))
       esito({ tipo: 'ok', testo: (
         <div className="space-y-1">
           <div>Caricate dal foglio <b>{foglio}</b>:</div>

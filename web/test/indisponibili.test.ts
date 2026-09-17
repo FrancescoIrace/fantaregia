@@ -2,7 +2,7 @@
    niente database: la scrittura sta in data/lega.ts. */
 import { describe, expect, it } from 'vitest'
 import {
-  capisciStato, daApplicare, etichettaMotivo, indiceGiocatori, leggiFileIndisponibili, piega, proponi, riconosci, scegliOmonimo,
+  capisciStato, daApplicare, etichettaMotivo, indiceGiocatori, leggiFileIndisponibili, piega, proponi, riconosci, scegliOmonimo, STATI_VALIDI,
 } from '../src/domain/indisponibili.ts'
 import { parseCSV } from '../src/domain/importa.ts'
 import type { Giocatore } from '../src/domain/tipi.ts'
@@ -36,23 +36,23 @@ describe('leggere il file', () => {
 })
 
 describe('capire lo stato', () => {
-  it.each([
-    ['infortunio', 'fuori', 'infortunio'], ['Infortunato', 'fuori', 'infortunio'], ['lesione muscolare', 'fuori', 'infortunio'],
-    ['squalificato', 'fuori', 'squalifica'], ['espulso', 'fuori', 'espulsione'], ['influenza', 'fuori', 'indisponibile'],
-    ['non disponibile', 'fuori', 'indisponibile'], ['indisponibile', 'fuori', 'indisponibile'], ['non convocato', 'fuori', 'indisponibile'],
-    ['infortunio, rientro previsto dopo la sosta', 'fuori', 'infortunio'],
-  ])('«%s» è %s (%s)', (stato, tipo, motivo) => {
-    expect(capisciStato(stato)).toEqual({ tipo, motivo })
+  it('tre valori: infortunio e squalifica mettono fuori, rientrato rimette disponibile', () => {
+    expect(capisciStato('infortunio')).toEqual({ tipo: 'fuori', motivo: 'infortunio' })
+    expect(capisciStato('squalifica')).toEqual({ tipo: 'fuori', motivo: 'squalifica' })
+    expect(capisciStato('rientrato')).toEqual({ tipo: 'rientro' })
+    expect(STATI_VALIDI).toEqual(['infortunio', 'squalifica', 'rientrato'])
   })
 
-  it.each(['rientrato', 'disponibile', 'recuperato', 'rientrato dall\'infortunio', 'tornato in gruppo'])('«%s» è un rientro', stato => {
-    expect(capisciStato(stato)).toEqual({ tipo: 'rientro' })
+  it('maiuscole, spazi e accenti non contano', () => {
+    expect(capisciStato('RIENTRATO')).toEqual({ tipo: 'rientro' })
+    expect(capisciStato('  Infortunio ')).toEqual({ tipo: 'fuori', motivo: 'infortunio' })
+    expect(capisciStato('Squalificà')).toEqual({ tipo: 'fuori', motivo: 'squalifica' })   // l'accento non conta
   })
 
-  it('uno stato che non si capisce resta da guardare, non si indovina', () => {
-    expect(capisciStato('in dubbio')).toBeNull()
-    expect(capisciStato('')).toBeNull()
-  })
+  it.each(['infortunato', 'squalificato', 'espulsione', 'disponibile', 'rientrato dall\'infortunio', 'in dubbio', ''])(
+    '«%s» non è uno dei tre: non si indovina', stato => {
+      expect(capisciStato(stato)).toBeNull()
+    })
 })
 
 describe('riconoscere i nomi', () => {
@@ -89,35 +89,37 @@ describe('la proposta', () => {
   const ora = (pid: number) => fuori[pid] ?? null
   const voci = leggiFileIndisponibili(parseCSV([
     'nome;stato;nota',
-    'Calhanoglu;infortunio;adduttore',       // entra
-    'Leão;squalificato;',                     // già fuori così: invariato
-    'Theo Hernandez;infortunio;nuova nota',   // già fuori: cambia la nota
-    'Martinez L.;rientrato;',                 // non era fuori: niente
-    'Rossi;infortunio;',                      // omonimi
-    'Maradona;infortunio;',                   // non trovato
-    'Josep Martinez;in dubbio;',              // stato che non si capisce
+    'Calhanoglu;infortunio;adduttore',                       // entra
+    'Leão;squalifica;',                                       // già fuori così: invariato
+    'Theo Hernandez;rientrato;torna dopo il bicipite femorale', // era fuori: rientra, con la nota
+    'Martinez L.;rientrato;',                                 // non era fuori: si segnala e basta
+    'Rossi;infortunio;',                                      // omonimi
+    'Maradona;infortunio;',                                   // non trovato
+    'Josep Martinez;espulsione;',                             // non è uno dei tre stati
   ].join('\n')))
   const pr = proponi(voci, LISTONE, ora)
 
-  it('divide il file in chi entra, chi cambia, chi resta com\'è e quello che non torna', () => {
+  it('divide il file in chi entra, chi rientra, chi resta com\'è e quello che non torna', () => {
     expect(pr.entrano.map(x => [x.pid, x.motivo, x.nota])).toEqual([[1, 'infortunio', 'adduttore']])
-    expect(pr.aggiornati.map(x => [x.pid, x.nota, x.prima.nota])).toEqual([[5, 'nuova nota', 'vecchia']])
-    expect(pr.invariati.map(x => x.p.id).sort()).toEqual([2, 4])
-    expect(pr.rientrano).toEqual([])
+    expect(pr.rientrano.map(x => [x.pid, x.nota])).toEqual([[5, 'torna dopo il bicipite femorale']])
+    expect(pr.invariati.map(x => x.p.id)).toEqual([4])
+    expect(pr.nonFuori.map(x => [x.p.id, x.riga])).toEqual([[2, 5]])
+    expect(pr.aggiornati).toEqual([])
     expect(pr.omonimi.map(x => x.nome)).toEqual(['Rossi'])
     expect(pr.nonTrovati.map(x => x.nome)).toEqual(['Maradona'])
     expect(pr.statiIgnoti.map(x => [x.nome, x.riga])).toEqual([['Josep Martinez', 8]])
+    // si applicano solo l'entrata e il rientro: il «rientrato» di chi non era fuori non è un errore e non scrive niente
     expect(daApplicare(pr)).toBe(2)
   })
 
-  it('chi è fuori e il file dà rientrato esce dall\'infermeria', () => {
-    const p = proponi(leggiFileIndisponibili([['Leão', 'rientrato', '']]), LISTONE, ora)
-    expect(p.rientrano.map(x => x.pid)).toEqual([4])
+  it('già fuori con un\'altra nota: si aggiorna, non si duplica', () => {
+    const p = proponi(leggiFileIndisponibili([['Theo Hernandez', 'infortunio', 'nuova nota']]), LISTONE, ora)
+    expect(p.aggiornati.map(x => [x.pid, x.nota, x.prima.nota])).toEqual([[5, 'nuova nota', 'vecchia']])
   })
 
   it('lo stesso giocatore due volte: vale l\'ultima riga', () => {
-    const p = proponi(leggiFileIndisponibili([['Calhanoglu', 'infortunio', 'prima'], ['Calhanoglu', 'influenza', 'dopo']]), LISTONE, ora)
-    expect(p.entrano.map(x => [x.motivo, x.nota])).toEqual([['indisponibile', 'dopo']])
+    const p = proponi(leggiFileIndisponibili([['Calhanoglu', 'infortunio', 'prima'], ['Calhanoglu', 'squalifica', 'dopo']]), LISTONE, ora)
+    expect(p.entrano.map(x => [x.motivo, x.nota])).toEqual([['squalifica', 'dopo']])
   })
 
   it('scegliendo fra gli omonimi la voce entra nella proposta come le altre', () => {

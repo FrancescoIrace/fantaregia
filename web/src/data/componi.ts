@@ -38,6 +38,11 @@ export interface RigaMovimento {
   registrato_il: string
 }
 export interface RigaIndisponibile { giocatore_id: number; motivo: string | null; da_giornata: number | null; segnato_il: string; nota?: string | null }
+/** una riga dello storico dei rientri (migrazione rientri) */
+export interface RigaRientro {
+  giocatore_id: number; motivo: string | null; da_giornata: number | null
+  nota_uscita: string | null; nota: string | null; rientrato_il: string
+}
 export interface RigaSqualificaAnnullata { giocatore_id: number; giornata: number }
 export interface RigaVoti { giornata: number; voti: Record<string, VotoRiga> }
 export type TipoDataset = 'listone' | 'calendario' | 'rigoristi' | 'storico' | 'calendario_lega'
@@ -65,6 +70,10 @@ export interface RigheLega {
   allenatoreMancante?: boolean
   /** il database non ha ancora indisponibili.nota (migrazione nota_indisponibili non applicata) */
   notaMancante?: boolean
+  /** lo storico dei rientri, dal più recente; fuori dal motore, lo legge solo Infermeria */
+  rientri?: RigaRientro[]
+  /** il database non ha ancora la tabella rientri (migrazione rientri non applicata) */
+  rientriMancante?: boolean
 }
 
 /** La squadra di chi guarda. Prima la scelta privata, che resta il modo di

@@ -7,6 +7,7 @@
    chi li ha scaricati con il proprio account. L'unica fonte automatica è il
    calendario di openfootball, che è un dataset aperto di fatti.       */
 import { supabase } from '../lib/supabase.ts'
+import { rientra } from './lega.ts'
 import { creaMotore, ROLES, type IngressoMotore, type Motore } from '../domain/motore.ts'
 import { calendarioDaOpenfootball, type PartitaAperta } from '../domain/importa.ts'
 import type { SquadraAsta } from '../domain/calendario-lega.ts'
@@ -91,7 +92,8 @@ export function effettoVoti(ingresso: IngressoMotore, nuove: Record<number, Reco
   }
 }
 
-export async function salvaVoti(legaId: string, giornate: { g: number; voti: Record<string, VotoRiga> }[], foglio: string, rientri: number[]) {
+export async function salvaVoti(legaId: string, giornate: { g: number; voti: Record<string, VotoRiga> }[], foglio: string,
+  rientri: { giocatore_id: number; nota: string }[]) {
   const { error } = await supabase.from('voti_giornata').upsert(
     giornate.map(x => ({ lega_id: legaId, giornata: x.g, voti: x.voti, foglio, caricata_il: new Date().toISOString() })),
     { onConflict: 'lega_id,giornata' },
@@ -100,8 +102,10 @@ export async function salvaVoti(legaId: string, giornate: { g: number; voti: Rec
   // il foglio scelto resta come preferenza della lega, come votiMeta.sheet
   await supabase.from('leghe').update({ voti_meta: { sheet: foglio } }).eq('id', legaId)
   if (rientri.length) {
-    const { error: e2 } = await supabase.from('indisponibili').delete().eq('lega_id', legaId).in('giocatore_id', rientri)
-    if (e2) throw new Error(`voti salvati, ma non sono riuscito a togliere i rientrati dall'infermeria: ${e2.message}`)
+    // chi ha rigiocato rientra, e resta nello storico con la giornata in cui è tornato in campo
+    try { await rientra(legaId, rientri) } catch (e2) {
+      throw new Error(`voti salvati, ma non sono riuscito a togliere i rientrati dall'infermeria: ${(e2 as Error).message}`, { cause: e2 })
+    }
   }
 }
 
