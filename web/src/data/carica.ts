@@ -23,6 +23,12 @@ export async function salvaDataset(legaId: string, tipo: TipoDataset, dati: unkn
 }
 
 /* ── calendario da openfootball ── */
+/* La stagione di oggi, nella forma che conosce urlOpenfootball(): da agosto
+   in poi è quella che comincia, prima è quella che sta finendo. */
+export function stagioneCorrente(oggi = new Date()) {
+  const inizio = oggi.getMonth() >= 7 ? oggi.getFullYear() : oggi.getFullYear() - 1   // getMonth(): 0 = gennaio, 7 = agosto
+  return `${inizio}/${String((inizio + 1) % 100).padStart(2, '0')}`
+}
 export function urlOpenfootball(stagione: string) {
   const [a, b] = stagione.split('/')            // «2026/27» → 2026-27
   return `https://raw.githubusercontent.com/openfootball/football.json/master/${a}-${b}/it.1.json`
