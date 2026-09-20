@@ -9,10 +9,11 @@
 import { supabase } from '../lib/supabase.ts'
 import { rientra } from './lega.ts'
 import { creaMotore, ROLES, type IngressoMotore, type Motore } from '../domain/motore.ts'
-import { calendarioDaOpenfootball, type PartitaAperta } from '../domain/importa.ts'
+import { calendarioDaOpenfootball, righeInGiocatori, unisciRimasti, type PartitaAperta } from '../domain/importa.ts'
+import { righeDaFile } from '../lib/fogli.ts'
 import type { SquadraAsta } from '../domain/calendario-lega.ts'
 import type { CalendarioLega, VotoRiga } from '../domain/tipi.ts'
-import type { TipoDataset } from './componi.ts'
+import type { RigheLega, TipoDataset } from './componi.ts'
 
 export async function salvaDataset(legaId: string, tipo: TipoDataset, dati: unknown, meta: Record<string, unknown> = {}) {
   const { error } = await supabase.from('dataset').upsert(
@@ -20,6 +21,20 @@ export async function salvaDataset(legaId: string, tipo: TipoDataset, dati: unkn
     { onConflict: 'lega_id,tipo' },
   )
   if (error) throw new Error(error.message)
+}
+
+/* ── listone ── */
+/* Leggere il listone e salvarlo: lo fanno «Carica dati» e la schermata di
+   avvio, e due strade divergerebbero. Torna anche i club, che servono subito
+   dopo per il calendario: il motore li conoscerà solo dopo ricarica(), e
+   aspettarlo sarebbe una corsa. */
+export async function caricaListone(legaId: string, f: File, righe: RigheLega, calendario: string[]) {
+  const nuovo = righeInGiocatori(await righeDaFile(f))
+  if (!nuovo.length) throw new Error('In questo file non ci sono giocatori: serve il listone con nome, ruolo, squadra e quotazione.')
+  const { players, rimasti } = unisciRimasti(nuovo, righe.assegnazioni.map(a => a.snap))
+  await salvaDataset(legaId, 'listone', players, { name: f.name, when: Date.now(), count: players.length })
+  const club = [...new Set(nuovo.map(p => p[4]))]
+  return { giocatori: nuovo.length, rimasti, club, fuori: calendario.length ? club.filter(t => !calendario.includes(t)) : [] }
 }
 
 /* ── calendario da openfootball ── */

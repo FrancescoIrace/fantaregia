@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import type { Motore } from '../domain/motore.ts'
 import {
-  calendarioDaRighe, giornataDaTitolo, leggiVoti, parseCSV, righeInGiocatori, storicoDaRighe, unisciRimasti,
+  calendarioDaRighe, giornataDaTitolo, leggiVoti, parseCSV, storicoDaRighe,
 } from '../domain/importa.ts'
 import type { Rigoristi, VotoRiga } from '../domain/tipi.ts'
 import { parseCalLega, riallinea } from '../domain/calendario-lega.ts'
 import { ingressoMotore, type RigheLega } from '../data/componi.ts'
 import { leggiPagina } from '../data/importa-app.ts'
 import {
-  effettoVoti, salvaCalendarioLega, salvaDataset, salvaVoti, scaricaCalendario, squadreAsta, togliGiornata,
+  caricaListone, effettoVoti, salvaCalendarioLega, salvaDataset, salvaVoti, scaricaCalendario, squadreAsta, togliGiornata,
 } from '../data/carica.ts'
 import { apriCartella, righeDaFile } from '../lib/fogli.ts'
 import { Avviso, Bottone, Card, Suggerimento } from '../ui.tsx'
@@ -130,11 +130,8 @@ function FilePagina({ legaId, esito }: { legaId: string; esito: (e: Esito) => vo
 
 function FileListone({ legaId, righe, calendario, esito }: { legaId: string; righe: RigheLega; calendario: string[]; esito: (e: Esito) => void }) {
   return <FileSemplice etichetta="xlsx o csv" accetta=".xlsx,.xls,.csv,.txt" esito={esito} carica={async f => {
-    const nuovo = righeInGiocatori(await righeDaFile(f))
-    const { players, rimasti } = unisciRimasti(nuovo, righe.assegnazioni.map(a => a.snap))
-    await salvaDataset(legaId, 'listone', players, { name: f.name, when: Date.now(), count: players.length })
-    const fuori = calendario.length ? [...new Set(nuovo.map(p => p[4]))].filter(t => !calendario.includes(t)) : []
-    return `${nuovo.length} giocatori` + (rimasti ? `; ${rimasti} già in rosa non sono più in lista e restano segnati a parte` : '')
+    const { giocatori, rimasti, fuori } = await caricaListone(legaId, f, righe, calendario)
+    return `${giocatori} giocatori` + (rimasti ? `; ${rimasti} già in rosa non sono più in lista e restano segnati a parte` : '')
       + (fuori.length ? `; attenzione: ${fuori.join(', ')} non ${fuori.length > 1 ? 'compaiono' : 'compare'} nel calendario` : '')
   }} />
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentProps } from 'react'
 import { Link, NavLink, Route, Routes, useParams } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
@@ -7,6 +7,7 @@ import { ingressoFinoA, miaSquadraDi, type RigheLega } from '../data/componi.ts'
 import { salvaAllenatore } from '../data/lega.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Card, Suggerimento } from '../ui.tsx'
+import Avvio from './Avvio.tsx'
 import CaricaDati from './CaricaDati.tsx'
 import RoseUfficiali from './RoseUfficiali.tsx'
 import Formazioni from './Formazioni.tsx'
@@ -37,6 +38,8 @@ export default function Lega({ utenteId, email }: { utenteId: string; email?: st
   const [membri, setMembri] = useState<Membro[]>([])
   // sotto i 900px la lega si mette il guscio del telefono; sopra resta com'era
   const telefono = useTelefono()
+  // «lo faccio dopo» dura finché resti nella lega, non solo finché resti sulla pagina
+  const [saltaAvvio, setSaltaAvvio] = useState(false)
   // null: nessuna scelta su questo dispositivo, decide modoAuto() sui dati
   const [modoScelto, setModoScelto] = useState<Modo | null>(() => modoSalvato(id))
 
@@ -81,7 +84,8 @@ export default function Lega({ utenteId, email }: { utenteId: string; email?: st
      intorno — la testata e il modo di passare da una pagina all'altra. */
   const rotte = (
     <Routes>
-      <Route index element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
+      <Route index element={<Casa id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io}
+        saltato={saltaAvvio} onSalta={() => setSaltaAvvio(true)} />} />
       <Route path="listone" element={<Listone legaId={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica}
         puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
       <Route path="asta" element={<Asta legaId={id} motore={motore} ricarica={ricarica}
@@ -145,6 +149,20 @@ export default function Lega({ utenteId, email }: { utenteId: string; email?: st
 
 /* Il tabellone delle squadre calcolato dal motore sui dati veri, la
    squadra di chi guarda, i file della lega, chi c'è. */
+/* La casa della lega: la Panoramica, o la schermata di avvio se non c'è
+   ancora niente dentro. «Vuota» si guarda al montaggio e non si riguarda:
+   salvando il listone il realtime aggiorna il motore, e la Panoramica
+   comparirebbe da sotto i piedi prima che l'avvio abbia detto com'è andata.
+   Tornandoci dopo, invece, il montaggio è nuovo e la risposta è cambiata. */
+function Casa({ saltato, onSalta, ...p }: ComponentProps<typeof Panoramica> & { saltato: boolean; onSalta: () => void }) {
+  const [vuota] = useState(() => !p.motore.PL.length)
+  if (vuota && !saltato) return (
+    <Avvio legaId={p.id} righe={p.righe} puoScrivere={!!p.io && p.io.ruolo !== 'lettore'}
+      onEntra={() => { onSalta(); p.ricarica() }} onSalta={onSalta} />
+  )
+  return <Panoramica {...p} />
+}
+
 function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
   id: string; utenteId: string; righe: RigheLega; motore: Motore; ricarica: () => void; membri: Membro[]; io: Membro | undefined
 }) {
