@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
-import { parseRoseLega, type FileRose, type Motore, type RigaConfronto } from '../domain/motore.ts'
-import { parseCSV } from '../domain/importa.ts'
+import { type FileRose, type Motore, type RigaConfronto } from '../domain/motore.ts'
 import { allineaRose, registraScambio, registraSvincolo, salvaRoseMeta, type RigaAllinea } from '../data/lega.ts'
-import { apriCartella } from '../lib/fogli.ts'
+import { leggiFileRose } from '../data/carica.ts'
 import { Avviso, Bottone, Card } from '../ui.tsx'
 
 const ETICHETTA: Record<string, string> = {
@@ -36,13 +35,7 @@ export default function RoseUfficiali({ legaId, motore: m, ricarica }: {
     if (!f) return
     setEsito(null); setTutto(false)
     try {
-      let righe: unknown[][]
-      if (/\.csv$/i.test(f.name)) righe = parseCSV(await f.text())
-      else {
-        const c = await apriCartella(f)
-        righe = c.righe(c.fogli.find(n => /rose/i.test(n)) ?? c.fogli[0], false)
-      }
-      const letto = parseRoseLega(righe)
+      const letto = await leggiFileRose(f)
       setFile(letto); setNomeFile(f.name)
       const piene = letto.squadre.filter(s => s.gio.length).length
       const cmpOra = m.confrontoRose(letto)

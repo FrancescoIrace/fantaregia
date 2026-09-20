@@ -154,3 +154,52 @@ describe('creare la lega', () => {
     expect(box.textContent).toContain('2026/27')
   })
 })
+
+/* Il file delle rose della lega: chi ha già fatto l'asta non riscrive dieci
+   nomi a mano. Il foglio vero è xlsx e lo apre SheetJS dalla CDN; qui la
+   stessa lettura passa per il csv, che parseRoseLega tratta identico. */
+const ROSE = [
+  'IL PERDENTE CLUB;costo;;SPINGERE;costo;;KING KEY;costo',
+  'Punta Dieci;116;;Centro Dodici;95;;Difensore Undici;36',
+  'Centro Dodici;54;;Punta Dieci;36;;Punta Dieci;33',
+  'totale;170;;totale;131;;totale;69',
+].join('\n')
+
+const rose = () => box.querySelector<HTMLInputElement>('input[aria-label="File delle rose della lega"]')!
+const portaRose = async (testo = ROSE, nome = 'fantaignor-rosters-1789813178698.csv') => {
+  const f = new File([testo], nome, { type: 'text/csv' })
+  Object.defineProperty(rose(), 'files', { value: [f], configurable: true })
+  await act(async () => { rose().dispatchEvent(new Event('change', { bubbles: true })) })
+}
+
+describe('chi ha già fatto l\'asta', () => {
+  it('dal file prende i nomi delle squadre, uno per riga, e dice cosa ha letto', async () => {
+    await portaRose()
+    expect(nomi()).toEqual(['IL PERDENTE CLUB', 'SPINGERE', 'KING KEY'])
+    expect(box.textContent).toContain('3 squadre')
+    expect(box.textContent).toContain('6 giocatori')
+    expect(box.textContent).toContain('3 nomi scritti su 3')
+  })
+
+  it('i nomi restano modificabili: il file propone, non decide', async () => {
+    await portaRose()
+    scrivi(righe()[0], 'Il Perdente Club')
+    expect(nomi()[0]).toBe('Il Perdente Club')
+  })
+
+  it('e si crea con quei nomi, in quell\'ordine', async () => {
+    const rpc = vi.spyOn(supabase, 'rpc').mockResolvedValue({ data: 'lega-1', error: null } as never)
+    await portaRose()
+    scrivi(perEtichetta('Nome'), 'Lega dei Sabati')
+    await act(async () => { crea().click() })
+    expect((rpc.mock.calls[0][1] as { p_squadre: string[] }).p_squadre)
+      .toEqual(['IL PERDENTE CLUB', 'SPINGERE', 'KING KEY'])
+  })
+
+  it('un file che non è quello delle rose lo dice, e non tocca le righe già scritte', async () => {
+    scrivi(righe()[0], 'Scritta a mano')
+    await portaRose('nome;squadra\nPunta Dieci;Alfa', 'listone.csv')
+    expect(box.textContent).toContain('Non sono riuscito a leggere il file')
+    expect(nomi()[0]).toBe('Scritta a mano')
+  })
+})

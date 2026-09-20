@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type 
 import { Link, useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { leggiFileApp, preparaImport, type PacchettoImport, type Riepilogo } from '../data/importa-app.ts'
-import { stagioneCorrente } from '../data/carica.ts'
+import { leggiFileRose, stagioneCorrente } from '../data/carica.ts'
+import type { FileRose } from '../domain/motore.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Campo, Card, Suggerimento } from '../ui.tsx'
 
@@ -125,6 +126,9 @@ export function CreaLega() {
   const [budget, setBudget] = useState('500')
   const [errore, setErrore] = useState<string | null>(null)
   const [invio, setInvio] = useState(false)
+  // chi ha già fatto l'asta porta il file delle rose: i nomi stanno lì dentro
+  const [rose, setRose] = useState<{ file: FileRose; nomeFile: string } | null>(null)
+  const [erroreRose, setErroreRose] = useState<string | null>(null)
   const campi = useRef<(HTMLInputElement | null)[]>([])
   const aFuoco = useRef<number | null>(null)
 
@@ -188,6 +192,24 @@ export function CreaLega() {
     aFuoco.current = i + arrivati.length - 1
   }
 
+  /* Il file delle rose della lega dà i nomi delle squadre già scritti: chi ha
+     fatto l'asta li ha lì, e riscriverli a mano è lavoro per niente. Restano
+     modificabili, e il file viaggia fino all'avvio, dove dopo il listone
+     diventa l'asta già fatta. */
+  async function scegliRose(f: File | undefined) {
+    if (!f) return
+    setErroreRose(null)
+    try {
+      const file = await leggiFileRose(f)
+      setRose({ file, nomeFile: f.name })
+      setSquadre(file.squadre.map(x => x.nome))
+      setErrore(null)
+    } catch (e) {
+      setRose(null)
+      setErroreRose(`Non sono riuscito a leggere il file: ${(e as Error).message}`)
+    }
+  }
+
   async function crea(e: FormEvent) {
     e.preventDefault()
     if (nomi.length < MINIME) return setErrore('Servono almeno due squadre con un nome.')
@@ -199,7 +221,7 @@ export function CreaLega() {
     })
     setInvio(false)
     if (error) return setErrore(error.message)
-    vai(`/lega/${data as string}`)
+    vai(`/lega/${data as string}`, { state: rose ? { rose: rose.file, nomeFileRose: rose.nomeFile } : undefined })
   }
 
   const etichetta = 'mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase'
@@ -207,6 +229,26 @@ export function CreaLega() {
   return (
     <Card titolo="Crea una lega nuova">
       <form onSubmit={crea} className="space-y-3">
+        <div className="rounded-lg border border-dashed border-line-strong p-3">
+          <span className={etichetta}>Hai già fatto l'asta?</span>
+          <p className="mb-2 text-[11px] text-muted">
+            Porta il file delle rose della lega — quello con una colonna <b>costo</b> per squadra, xlsx o csv — e i nomi
+            delle squadre li prendo da lì. I giocatori con i prezzi pagati si assegnano subito dopo, con il listone.
+          </p>
+          <input type="file" accept=".xlsx,.xls,.csv,.txt" aria-label="File delle rose della lega"
+            onChange={e => void scegliRose(e.target.files?.[0])}
+            className="block w-full text-sm file:mr-3 file:rounded-[7px] file:border file:border-line-strong file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-medium" />
+          {erroreRose && <div className="mt-2"><Avviso tipo="errore">{erroreRose}</Avviso></div>}
+          {rose && (
+            <div className="mt-2">
+              <Avviso tipo="ok">
+                Dal file: <b className="fr-num">{rose.file.squadre.length}</b> squadre,{' '}
+                <b className="fr-num">{rose.file.squadre.reduce((n, x) => n + x.gio.length, 0)}</b> giocatori.
+                I nomi sono qui sotto, correggili se vuoi.
+              </Avviso>
+            </div>
+          )}
+        </div>
         <Campo etichetta="Nome" required value={nome} onChange={e => setNome(e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
           <Campo etichetta="Stagione" required value={stagione} placeholder="2026/27" onChange={e => setStagione(e.target.value)} />

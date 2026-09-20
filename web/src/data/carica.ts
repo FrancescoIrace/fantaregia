@@ -8,9 +8,9 @@
    calendario di openfootball, che è un dataset aperto di fatti.       */
 import { supabase } from '../lib/supabase.ts'
 import { rientra } from './lega.ts'
-import { creaMotore, ROLES, type IngressoMotore, type Motore } from '../domain/motore.ts'
-import { calendarioDaOpenfootball, righeInGiocatori, unisciRimasti, type PartitaAperta } from '../domain/importa.ts'
-import { righeDaFile } from '../lib/fogli.ts'
+import { creaMotore, parseRoseLega, ROLES, type FileRose, type IngressoMotore, type Motore } from '../domain/motore.ts'
+import { calendarioDaOpenfootball, parseCSV, righeInGiocatori, unisciRimasti, type PartitaAperta } from '../domain/importa.ts'
+import { apriCartella, righeDaFile } from '../lib/fogli.ts'
 import type { SquadraAsta } from '../domain/calendario-lega.ts'
 import type { CalendarioLega, VotoRiga } from '../domain/tipi.ts'
 import type { RigheLega, TipoDataset } from './componi.ts'
@@ -34,7 +34,20 @@ export async function caricaListone(legaId: string, f: File, righe: RigheLega, c
   const { players, rimasti } = unisciRimasti(nuovo, righe.assegnazioni.map(a => a.snap))
   await salvaDataset(legaId, 'listone', players, { name: f.name, when: Date.now(), count: players.length })
   const club = [...new Set(nuovo.map(p => p[4]))]
-  return { giocatori: nuovo.length, rimasti, club, fuori: calendario.length ? club.filter(t => !calendario.includes(t)) : [] }
+  return { giocatori: nuovo.length, rimasti, club, players, fuori: calendario.length ? club.filter(t => !calendario.includes(t)) : [] }
+}
+
+/* Il file delle rose che la lega pubblica dopo l'asta (xlsx dal foglio
+   «rose», o csv): lo leggono «Rose ufficiali» e la creazione di una lega,
+   che da lì prende i nomi delle squadre invece di farli riscrivere a mano. */
+export async function leggiFileRose(f: File): Promise<FileRose> {
+  let righe: unknown[][]
+  if (/\.csv$/i.test(f.name)) righe = parseCSV(await f.text())
+  else {
+    const c = await apriCartella(f)
+    righe = c.righe(c.fogli.find(n => /rose/i.test(n)) ?? c.fogli[0], false)
+  }
+  return parseRoseLega(righe)
 }
 
 /* ── calendario da openfootball ── */
