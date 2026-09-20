@@ -8,8 +8,12 @@
 
    Chi non può scrivere non carica niente: vede che la lega non è pronta. */
 import { useState } from 'react'
+import { useLocation } from 'react-router'
 import { caricaListone, salvaDataset, scaricaCalendario } from '../data/carica.ts'
-import type { RigheLega } from '../data/componi.ts'
+import { allineaRose, salvaRoseMeta, type RigaAllinea } from '../data/lega.ts'
+import { creaMotore, type FileRose } from '../domain/motore.ts'
+import { ingressoMotore, type RigheLega } from '../data/componi.ts'
+import type { Calendario } from '../domain/tipi.ts'
 import { Avviso, Bottone, Card, Suggerimento } from '../ui.tsx'
 
 type Esito = { tipo: 'ok' | 'attenzione' | 'errore'; testo: string }
@@ -18,19 +22,24 @@ export default function Avvio({ legaId, righe, puoScrivere, onEntra, onSalta }: 
   legaId: string; righe: RigheLega; puoScrivere: boolean; onEntra: () => void; onSalta: () => void
 }) {
   const stagione = righe.lega.stagione
-  const [fase, setFase] = useState<'attesa' | 'listone' | 'calendario' | 'fatto'>('attesa')
+  /* Le rose arrivano dalla creazione, dove hanno già dato i nomi alle
+     squadre: qui, con il listone dentro, diventano l'asta già fatta. */
+  const viaggio = useLocation().state as { rose?: FileRose; nomeFileRose?: string } | null
+  const rose = viaggio?.rose ?? null
+  const [fase, setFase] = useState<'attesa' | 'listone' | 'calendario' | 'rose' | 'fatto'>('attesa')
   const [listone, setListone] = useState<Esito | null>(null)
   const [calendario, setCalendario] = useState<Esito | null>(null)
+  const [asta, setAsta] = useState<Esito | null>(null)
 
   async function scegli(f: File | undefined) {
     if (!f) return
-    setFase('listone'); setListone(null); setCalendario(null)
-    let club: string[]
+    setFase('listone'); setListone(null); setCalendario(null); setAsta(null)
+    let club: string[], players: Parameters<typeof creaMotore>[0]['players']
     try {
       /* niente calendario con cui confrontare i club: non c'è ancora, ed è
          proprio quello che stiamo per scaricare */
       const esito = await caricaListone(legaId, f, righe, [])
-      club = esito.club
+      club = esito.club; players = esito.players
       setListone({
         tipo: 'ok',
         testo: `${esito.giocatori} giocatori, ${esito.club.length} squadre di serie A`
@@ -43,8 +52,10 @@ export default function Avvio({ legaId, righe, puoScrivere, onEntra, onSalta }: 
     }
 
     setFase('calendario')
+    let calendarioScaricato: Calendario | undefined
     try {
       const { cal, ignote } = await scaricaCalendario(stagione, club)
+      calendarioScaricato = cal
       await salvaDataset(legaId, 'calendario', cal, { fonte: 'openfootball', when: Date.now() })
       setCalendario(ignote.length
         ? {
@@ -58,6 +69,38 @@ export default function Avvio({ legaId, righe, puoScrivere, onEntra, onSalta }: 
         tipo: 'errore',
         testo: `${(e as Error).message}. La lega si usa lo stesso: il calendario si carica anche da un csv, da «Lega e dati».`,
       })
+    }
+
+    /* Le assegnazioni le scrive allinea_rose() in una transazione sola, la
+       stessa strada di «Rose ufficiali». Il motore serve solo ad abbinare i
+       nomi — quello del listone appena letto, perché quello della pagina
+       conoscerà i giocatori solo dopo ricarica(). */
+    if (rose) {
+      setFase('rose')
+      try {
+        const m = creaMotore({ ...ingressoMotore(righe), players, cal: calendarioScaricato })
+        const cmp = m.confrontoRose(rose)
+        const daMettere: RigaAllinea[] = cmp.righe
+          .filter(r => r.pid && r.stato === 'solofile')
+          .map(r => ({
+            stato: r.stato, pid: r.pid!, squadra: r.tid, prezzo: r.cr,
+            snap: r.p ? { id: r.p.id, r: r.p.r, n: r.p.n, s: r.p.s, q: r.p.q } : null,
+          }))
+        const fatto = await allineaRose(legaId, daMettere)
+        await salvaRoseMeta(legaId, {
+          nome: viaggio?.nomeFileRose ?? 'rose della lega', when: Date.now(),
+          squadre: rose.squadre.length, diverse: cmp.diverse,
+        }).catch(() => {})
+        const guai = [
+          cmp.conta.ignoto && `${cmp.conta.ignoto} nom${cmp.conta.ignoto === 1 ? 'e' : 'i'} del file non ${cmp.conta.ignoto === 1 ? 'corrisponde' : 'corrispondono'} a nessun giocatore del listone`,
+          cmp.senza.length && `${cmp.senza.join(', ')} non si abbina a nessuna squadra della lega`,
+        ].filter(Boolean)
+        setAsta(guai.length
+          ? { tipo: 'attenzione', testo: `${fatto.messi} giocatori assegnati. Però ${guai.join('; ')}: si sistema da «Rose ufficiali», in Lega e dati.` }
+          : { tipo: 'ok', testo: `${fatto.messi} giocatori assegnati ai prezzi pagati: l'asta è già dentro.` })
+      } catch (e) {
+        setAsta({ tipo: 'errore', testo: `${(e as Error).message}. Le rose si caricano anche dopo, da «Rose ufficiali».` })
+      }
     }
     setFase('fatto')
   }
@@ -74,7 +117,7 @@ export default function Avvio({ legaId, righe, puoScrivere, onEntra, onSalta }: 
     </Card>
   )
 
-  const lavora = fase === 'listone' || fase === 'calendario'
+  const lavora = fase === 'listone' || fase === 'calendario' || fase === 'rose'
   return (
     <Card titolo="Cominciamo dal listone">
       <div className="space-y-4">
@@ -84,6 +127,14 @@ export default function Avvio({ legaId, righe, puoScrivere, onEntra, onSalta }: 
           calendario di serie A {stagione} si scarica da solo da openfootball, che è un dataset aperto.
         </Suggerimento>
 
+        {rose && (
+          <Avviso tipo="ok">
+            Il file delle rose è arrivato con te: <b className="fr-num">{rose.squadre.length}</b> squadre,{' '}
+            <b className="fr-num">{rose.squadre.reduce((n, x) => n + x.gio.length, 0)}</b> giocatori. Appena c'è il listone
+            li assegno ai prezzi pagati, e l'asta è già dentro.
+          </Avviso>
+        )}
+
         <div>
           <span className="mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase">1 · Listone</span>
           <input type="file" accept=".xlsx,.xls,.csv,.txt" disabled={lavora} onChange={e => void scegli(e.target.files?.[0])}
@@ -92,12 +143,21 @@ export default function Avvio({ legaId, righe, puoScrivere, onEntra, onSalta }: 
           {listone && <div className="mt-2"><Avviso tipo={listone.tipo}>{listone.testo}</Avviso></div>}
         </div>
 
-        {(fase === 'calendario' || fase === 'fatto') && (
+        {fase !== 'attesa' && fase !== 'listone' && (
           <div>
             <span className="mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase">2 · Calendario di serie A</span>
             {fase === 'calendario'
               ? <p className="text-sm text-muted">Scarico il calendario {stagione}…</p>
               : calendario && <Avviso tipo={calendario.tipo}>{calendario.testo}</Avviso>}
+          </div>
+        )}
+
+        {rose && (fase === 'rose' || fase === 'fatto') && (
+          <div>
+            <span className="mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase">3 · Rose dell'asta</span>
+            {fase === 'rose'
+              ? <p className="text-sm text-muted">Assegno i giocatori…</p>
+              : asta && <Avviso tipo={asta.tipo}>{asta.testo}</Avviso>}
           </div>
         )}
 
