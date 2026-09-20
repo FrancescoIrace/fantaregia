@@ -2,7 +2,7 @@
    perde restano, e i voti nuovi aggiornano l'infermeria (rientri) e fanno
    scattare le squalifiche confrontando prima e dopo. */
 import { describe, expect, it } from 'vitest'
-import { effettoVoti } from '../src/data/carica.ts'
+import { effettoVoti, stagioneCorrente, urlOpenfootball } from '../src/data/carica.ts'
 import { unisciRimasti } from '../src/domain/importa.ts'
 import type { GiocatoreGrezzo, StatoLega, VotoRiga } from '../src/domain/tipi.ts'
 
@@ -34,5 +34,24 @@ describe('effetti di un caricamento', () => {
     // ricaricare la stessa giornata non «rifà» la squalifica: c'era già prima
     const di5 = { ...stats, 5: { 10: riga(), 11: riga(1), 12: riga() } }
     expect(effettoVoti({ players, stato: { ...stato, stats: di5 } }, { 5: di5[5] }).squalifiche).toEqual([])
+  })
+})
+
+/* La stagione di oggi: il calendario di serie A ora si scarica da solo, e
+   sbagliare l'anno non lo direbbe nessuno. Il taglio è ad agosto, quando
+   comincia il campionato. */
+describe('la stagione di oggi', () => {
+  it.each([
+    ['2026-09-20', '2026/27'],   // a campionato cominciato
+    ['2026-08-01', '2026/27'],   // il primo giorno del taglio
+    ['2026-07-31', '2025/26'],   // il giorno prima: finisce ancora quella vecchia
+    ['2027-01-15', '2026/27'],   // a gennaio siamo nel girone di ritorno, non in una stagione nuova
+    ['2027-08-15', '2027/28'],
+  ])('il %s è la %s', (giorno, attesa) => {
+    expect(stagioneCorrente(new Date(giorno + 'T12:00:00'))).toBe(attesa)
+  })
+
+  it('la scrive nella forma che urlOpenfootball sa tradurre', () => {
+    expect(urlOpenfootball(stagioneCorrente(new Date('2026-09-20T12:00:00')))).toContain('/2026-27/')
   })
 })

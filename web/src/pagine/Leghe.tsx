@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { leggiFileApp, preparaImport, type PacchettoImport, type Riepilogo } from '../data/importa-app.ts'
+import { stagioneCorrente } from '../data/carica.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Campo, Card, Suggerimento } from '../ui.tsx'
 
@@ -109,37 +110,157 @@ function ImportaLega() {
   )
 }
 
-function CreaLega() {
+/* Il pannello delle squadre: una riga per squadra invece di una textarea con i
+   punti a capo. «Quante siete?» genera le righe, Invio apre la successiva e un
+   elenco incollato si spalma; i doppioni si vedono mentre scrivi, perché il
+   database li rifiuta e conviene saperlo prima di premere «Crea». */
+const MINIME = 2
+const MASSIME = 30
+
+export function CreaLega() {
   const vai = useNavigate()
   const [nome, setNome] = useState('')
-  const [squadre, setSquadre] = useState('')
+  const [squadre, setSquadre] = useState<string[]>(() => Array<string>(8).fill(''))
+  const [stagione, setStagione] = useState(() => stagioneCorrente())
   const [budget, setBudget] = useState('500')
   const [errore, setErrore] = useState<string | null>(null)
   const [invio, setInvio] = useState(false)
+  const campi = useRef<(HTMLInputElement | null)[]>([])
+  const aFuoco = useRef<number | null>(null)
+
+  // una riga appena nata non c'è ancora quando la si chiede: il fuoco si sposta dopo il disegno
+  useEffect(() => {
+    const i = aFuoco.current
+    if (i === null) return
+    aFuoco.current = null
+    campi.current[i]?.focus()
+  })
+
+  const nomi = squadre.map(s => s.trim()).filter(Boolean)
+  const quante = new Map<string, number>()
+  for (const n of nomi) quante.set(n.toLowerCase(), (quante.get(n.toLowerCase()) ?? 0) + 1)
+  const doppia = (v: string) => (quante.get(v.trim().toLowerCase()) ?? 0) > 1
+  // il nome ripetuto si dice come lo si è scritto la prima volta, non nella forma che lo ha reso doppio
+  const doppioni = nomi.filter((n, i) => doppia(n) && nomi.findIndex(x => x.toLowerCase() === n.toLowerCase()) === i)
+
+  const scrivi = (i: number, v: string) => setSquadre(s => s.map((x, j) => (j === i ? v : x)))
+
+  /* Alzando il numero nascono righe vuote; abbassandolo se ne tolgono solo di
+     vuote in fondo — una riga con un nome dentro si cancella con la sua ✕. */
+  function quanteSiete(n: number) {
+    setSquadre(s => {
+      if (n > s.length) return [...s, ...Array<string>(Math.min(n, MASSIME) - s.length).fill('')]
+      let fine = s.length
+      while (fine > n && fine > MINIME && !s[fine - 1].trim()) fine--
+      return s.slice(0, fine)
+    })
+  }
+
+  function aggiungi(dopo = squadre.length - 1) {
+    if (squadre.length >= MASSIME) return
+    setSquadre(s => [...s.slice(0, dopo + 1), '', ...s.slice(dopo + 1)])
+    aFuoco.current = dopo + 1
+  }
+
+  const togli = (i: number) =>
+    setSquadre(s => (s.length <= MINIME ? s.map((x, j) => (j === i ? '' : x)) : s.filter((_, j) => j !== i)))
+
+  function tasto(i: number, e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()                                       // dentro un form Invio manderebbe tutto
+    if (i + 1 < squadre.length && !squadre[i + 1].trim()) campi.current[i + 1]?.focus()
+    else aggiungi(i)
+  }
+
+  /* Chi ha i nomi in chat o in un foglio li incolla tutti insieme: è l'unica
+     cosa che la textarea faceva bene, e qui si spalmano sulle righe. */
+  function incolla(i: number, e: ClipboardEvent<HTMLInputElement>) {
+    const testo = e.clipboardData.getData('text')
+    if (!/[\n\r\t]/.test(testo)) return                      // un nome solo: incolla come sempre
+    e.preventDefault()
+    const arrivati = testo.split(/[\n\r\t]+/).map(x => x.trim()).filter(Boolean).slice(0, MASSIME - i)
+    if (!arrivati.length) return
+    setSquadre(s => {
+      const nuove = [...s]
+      arrivati.forEach((n, k) => { nuove[i + k] = n })
+      return nuove
+    })
+    aFuoco.current = i + arrivati.length - 1
+  }
 
   async function crea(e: FormEvent) {
     e.preventDefault()
-    const elenco = squadre.split('\n').map(s => s.trim()).filter(Boolean)
-    if (elenco.length < 2) return setErrore('Servono almeno due squadre, una per riga.')
+    if (nomi.length < MINIME) return setErrore('Servono almeno due squadre con un nome.')
+    if (doppioni.length) return setErrore(`Due squadre si chiamano «${doppioni[0]}»: dai a ognuna un nome diverso.`)
+    if (!/^\d{4}\/\d{2}$/.test(stagione.trim())) return setErrore('La stagione si scrive come 2026/27.')
     setInvio(true); setErrore(null)
-    const { data, error } = await supabase.rpc('crea_lega', { p_nome: nome.trim(), p_squadre: elenco, p_budget: parseInt(budget) || 500 })
+    const { data, error } = await supabase.rpc('crea_lega', {
+      p_nome: nome.trim(), p_squadre: nomi, p_budget: parseInt(budget) || 500, p_stagione: stagione.trim(),
+    })
     setInvio(false)
     if (error) return setErrore(error.message)
     vai(`/lega/${data as string}`)
   }
 
+  const etichetta = 'mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase'
+  const campo = 'w-full rounded-[7px] border bg-surface px-2.5 py-1.5 text-sm focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none'
   return (
     <Card titolo="Crea una lega nuova">
       <form onSubmit={crea} className="space-y-3">
         <Campo etichetta="Nome" required value={nome} onChange={e => setNome(e.target.value)} />
-        <label className="block">
-          <span className="mb-1 block text-[11px] font-semibold tracking-wider text-muted uppercase">Squadre, una per riga</span>
-          <textarea rows={5} value={squadre} onChange={e => setSquadre(e.target.value)}
-            className="w-full rounded-[7px] border border-line-strong bg-surface px-2.5 py-1.5 text-sm focus:border-accent focus:outline-none" />
-        </label>
-        <Campo etichetta="Crediti per squadra" type="number" min={1} value={budget} onChange={e => setBudget(e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <Campo etichetta="Stagione" required value={stagione} placeholder="2026/27" onChange={e => setStagione(e.target.value)} />
+          <Campo etichetta="Crediti per squadra" type="number" min={1} value={budget} onChange={e => setBudget(e.target.value)} />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-end justify-between gap-3">
+            <label className="block">
+              <span className={etichetta}>Quante siete?</span>
+              <input type="number" min={MINIME} max={MASSIME} value={squadre.length} aria-label="Quante squadre"
+                onChange={e => quanteSiete(parseInt(e.target.value) || MINIME)}
+                className={`${campo} fr-num w-20 border-line-strong`} />
+            </label>
+            <span className="pb-1.5 text-xs text-muted">
+              <b className="fr-num text-ink">{nomi.length}</b>
+              {nomi.length === 1 ? ' nome scritto su ' : ' nomi scritti su '}
+              <b className="fr-num text-ink">{squadre.length}</b>
+            </span>
+          </div>
+
+          <ul className="space-y-1.5">
+            {squadre.map((sq, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="fr-num w-5 shrink-0 text-right text-[11px] text-muted">{i + 1}</span>
+                <input value={sq} placeholder={`Squadra ${i + 1}`} aria-label={`Squadra ${i + 1}`}
+                  ref={el => { campi.current[i] = el }}
+                  onChange={e => scrivi(i, e.target.value)}
+                  onKeyDown={e => tasto(i, e)}
+                  onPaste={e => incolla(i, e)}
+                  className={`${campo} ${doppia(sq) ? 'border-dashed border-warn' : 'border-line-strong'}`} />
+                <button type="button" onClick={() => togli(i)} title="Togli questa squadra" aria-label={`Togli la squadra ${i + 1}`}
+                  className="x fr-bottone shrink-0 rounded-[7px] border border-line-strong px-2 py-1.5 text-sm text-muted">✕</button>
+              </li>
+            ))}
+          </ul>
+
+          <Bottone type="button" onClick={() => aggiungi()} disabled={squadre.length >= MASSIME} className="w-full">
+            + aggiungi squadra
+          </Bottone>
+          <p className="text-[11px] text-muted">Invio apre la riga dopo; un elenco incollato riempie più righe insieme.</p>
+        </div>
+
+        {doppioni.length > 0 && (
+          <Avviso tipo="attenzione">
+            {doppioni.length === 1
+              ? `Due squadre si chiamano «${doppioni[0]}». `
+              : `Questi nomi sono ripetuti: ${doppioni.map(d => `«${d}»`).join(', ')}. `}
+            Servono nomi diversi: la lega distingue le squadre solo da lì.
+          </Avviso>
+        )}
         {errore && <Avviso tipo="errore">{errore}</Avviso>}
-        <Bottone variante="primario" type="submit" disabled={invio || !nome.trim()} className="w-full">{invio ? 'Creo…' : 'Crea'}</Bottone>
+        <Bottone variante="primario" type="submit" className="w-full"
+          disabled={invio || !nome.trim() || nomi.length < MINIME || doppioni.length > 0}>{invio ? 'Creo…' : 'Crea'}</Bottone>
       </form>
     </Card>
   )
