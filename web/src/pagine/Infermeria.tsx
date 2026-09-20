@@ -3,7 +3,8 @@ import type { Motore } from '../domain/motore.ts'
 import type { Giocatore } from '../domain/tipi.ts'
 import { annullaSqualifica, importaIndisponibili, impostaSqualifiche, segnaIndisponibile, togliIndisponibile } from '../data/lega.ts'
 import {
-  daApplicare, etichettaMotivo, leggiFileIndisponibili, proponi, scegliOmonimo, STATI_VALIDI, type Proposta,
+  contestoLega, daApplicare, etichettaMotivo, leggiFileIndisponibili, proponi, riassuntoProposta, scegliOmonimo, STATI_VALIDI, vociDaScrivere,
+  type Proposta,
 } from '../domain/indisponibili.ts'
 import type { RigaRientro } from '../data/componi.ts'
 import { righeDaFile } from '../lib/fogli.ts'
@@ -237,13 +238,7 @@ function CaricaIndisponibili({ legaId, m, g, notaMancante, ricarica, onEsito }: 
   const [proposta, setProposta] = useState<Proposta | null>(null)
   const [invio, setInvio] = useState(false)
 
-  // il listone, più chi è in rosa ma non c'è più: anche loro si infortunano
-  const giocatori = [...m.PL, ...Object.keys(m.S.assign).map(pid => m.giocatoreDi(pid)).filter((p): p is Giocatore => !!p && !m.byId.has(p.id))]
-  const fuoriOra = (pid: number) => {
-    if (!m.S.out?.[pid]) return null
-    const v = (m.infoOut(pid) || {}) as { motivo?: string; nota?: string }
-    return { motivo: v.motivo, nota: v.nota }
-  }
+  const { giocatori, fuoriOra } = contestoLega(m)
 
   async function leggi(f: File) {
     onEsito(null); setProposta(null)
@@ -259,17 +254,9 @@ function CaricaIndisponibili({ legaId, m, g, notaMancante, ricarica, onEsito }: 
     if (!proposta) return
     setInvio(true)
     try {
-      const fuori = [
-        ...proposta.entrano.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: g })),
-        // chi era già fuori tiene la giornata da cui lo è
-        ...proposta.aggiornati.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: (m.infoOut(x.pid) as { da?: number } | null)?.da || g })),
-      ]
-      const { storico } = await importaIndisponibili(legaId, fuori, proposta.rientrano.map(x => ({ giocatore_id: x.pid, nota: x.nota })), !notaMancante)
-      const parti = [
-        proposta.entrano.length && `${proposta.entrano.length} in infermeria`,
-        proposta.aggiornati.length && `${proposta.aggiornati.length} aggiornati`,
-        proposta.rientrano.length && `${proposta.rientrano.length} rientrati`,
-      ].filter(Boolean)
+      const { fuori, rientrati } = vociDaScrivere(proposta, m, g)
+      const { storico } = await importaIndisponibili(legaId, fuori, rientrati, !notaMancante)
+      const parti = riassuntoProposta(proposta)
       const mancano = [notaMancante && 'le note', !storico && proposta.rientrano.length && 'lo storico dei rientri'].filter(Boolean)
       onEsito({ tipo: 'ok', testo: `${file}: ${parti.join(', ')}.${mancano.length ? ` Non salvati ${mancano.join(' e ')}: manca la migrazione (npx supabase db push).` : ''}` })
       setProposta(null); setFile(null); ricarica()
