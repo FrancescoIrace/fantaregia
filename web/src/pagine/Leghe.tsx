@@ -6,6 +6,7 @@ import { leggiFileRose, stagioneCorrente } from '../data/carica.ts'
 import type { FileRose } from '../domain/motore.ts'
 import { NOME_RUOLO, type RuoloMembro } from '../data/ruoli.ts'
 import { Avviso, Bottone, Campo, Card, Suggerimento } from '../ui.tsx'
+import InfortuniLeghe from './InfortuniLeghe.tsx'
 
 interface MiaLega { ruolo: RuoloMembro; lega: { id: string; nome: string; stagione: string } | null }
 
@@ -20,6 +21,9 @@ export default function Leghe({ utenteId }: { utenteId: string }) {
         else setLeghe(((data ?? []) as unknown as MiaLega[]).filter(x => x.lega))
       })
   }, [utenteId])
+
+  // dove puoi scrivere già oggi: admin e banditori, come per le policy del database
+  const gestite = (leghe ?? []).filter(x => x.ruolo !== 'lettore').map(x => ({ id: x.lega!.id, nome: x.lega!.nome }))
 
   return (
     <div className="space-y-6">
@@ -41,6 +45,8 @@ export default function Leghe({ utenteId }: { utenteId: string }) {
           </ul>
         )}
       </Card>
+      {/* con una lega sola basta la scheda Infermeria; il pannello serve quando il file va su più leghe */}
+      {gestite.length >= 2 && <InfortuniLeghe utenteId={utenteId} leghe={gestite} />}
       <div className="grid gap-6 lg:grid-cols-3">
         <ImportaLega />
         <CreaLega />

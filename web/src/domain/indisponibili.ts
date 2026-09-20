@@ -13,6 +13,7 @@
    normNome() del motore, che le lettere accentate le butta via invece di
    togliere l'accento — «Çalhanoğlu» diventava «alhanolu» e non combaciava
    con «Calhanoglu» — e che resta com'è per non toccare il port 1:1.     */
+import type { Motore } from './motore.ts'
 import type { Giocatore } from './tipi.ts'
 
 /** il motivo che si salva: lo stesso vocabolario di segnaIndisponibile() */
@@ -197,4 +198,50 @@ export function etichettaMotivo(motivo: string | undefined) {
   if (motivo === 'squalifica') return 'squalificato'
   if (motivo === 'indisponibile') return 'indisponibile'
   return 'infortunato'
+}
+
+/* ── una proposta per lega ──
+   La scheda Infermeria la fa per la lega in cui sei, il pannello di tutte le
+   tue leghe per ognuna: le tre parti che servono a tutti e due stanno qui,
+   così non nascono due modi di leggere una lega che poi divergono. */
+
+/** il listone, più chi è in rosa ma non c'è più — si infortunano anche loro — e chi è già fuori */
+export function contestoLega(m: Motore) {
+  const giocatori = [...m.PL, ...Object.keys(m.S.assign).map(pid => m.giocatoreDi(pid)).filter((p): p is Giocatore => !!p && !m.byId.has(p.id))]
+  const fuoriOra = (pid: number) => {
+    if (!m.S.out?.[pid]) return null
+    const v = (m.infoOut(pid) || {}) as { motivo?: string; nota?: string }
+    return { motivo: v.motivo, nota: v.nota }
+  }
+  return { giocatori, fuoriOra }
+}
+
+/** cosa si scrive nel database per applicare la proposta; g è la prossima giornata di quella lega */
+export function vociDaScrivere(pr: Proposta, m: Motore, g: number) {
+  const fuori = [
+    ...pr.entrano.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: g })),
+    // chi era già fuori tiene la giornata da cui lo è
+    ...pr.aggiornati.map(x => ({ giocatore_id: x.pid, motivo: x.motivo, nota: x.nota, da_giornata: (m.infoOut(x.pid) as { da?: number } | null)?.da || g })),
+  ]
+  const rientrati = pr.rientrano.map(x => ({ giocatore_id: x.pid, nota: x.nota }))
+  return { fuori, rientrati }
+}
+
+/** le parti dell'esito: «3 in infermeria», «1 aggiornati», «2 rientrati» */
+export function riassuntoProposta(pr: Proposta) {
+  return [
+    pr.entrano.length && `${pr.entrano.length} in infermeria`,
+    pr.aggiornati.length && `${pr.aggiornati.length} aggiornati`,
+    pr.rientrano.length && `${pr.rientrano.length} rientrati`,
+  ].filter(Boolean) as string[]
+}
+
+/** quello che resta da sistemare a mano: non si applica, ma non si perde in silenzio */
+export function segnalazioni(pr: Proposta) {
+  const n = (k: number, uno: string, molti: string) => k === 1 ? `1 ${uno}` : `${k} ${molti}`
+  return [
+    pr.omonimi.length && n(pr.omonimi.length, 'omonimo da scegliere', 'omonimi da scegliere'),
+    pr.nonTrovati.length && n(pr.nonTrovati.length, 'nome non riconosciuto', 'nomi non riconosciuti'),
+    pr.statiIgnoti.length && n(pr.statiIgnoti.length, 'stato che non capisco', 'stati che non capisco'),
+  ].filter(Boolean) as string[]
 }
