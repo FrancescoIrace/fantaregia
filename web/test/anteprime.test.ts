@@ -107,7 +107,7 @@ describe.skipIf(!USCITA)('anteprime delle viste', () => {
       'oggi-asta': createElement(Oggi, { legaId: 'l1', motore: m, modo: 'asta', puoScrivere: true, righe: preferenze({}) }),
       asta: createElement(Asta, { ...base, motore: m }),
       listone: createElement(Listone, { ...base, righe: preferenze({}), motore: m, telefono }),
-      rose: createElement(Rose, { ...base, motore: m }),
+      rose: createElement(Rose, { ...base, motore: m, telefono }),
       formazioni: createElement(Formazioni, {
         legaId: 'l1', utenteId: 'u1', motore: m, motorePrima, telefono,
         righe: preferenze({ [g]: m.formazioneAutomatica(g, '3-4-3') }),
@@ -115,7 +115,7 @@ describe.skipIf(!USCITA)('anteprime delle viste', () => {
       lega: createElement(Scontri, { ...base, motore: m, motorePrima, telefono }),
       rendimento: createElement(Rendimento, { motore: m }),
       titolari: createElement(Titolari, { motore: m }),
-      calendario: createElement(Calendario, { motore: m }),
+      calendario: createElement(Calendario, { motore: m, telefono }),
       infermeria: createElement(Infermeria, { ...base, motore: m }),
       mercato: createElement(Mercato, { ...base, motore: m }),
       squadre: createElement(SquadreLega, {

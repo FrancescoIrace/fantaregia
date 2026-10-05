@@ -7,12 +7,17 @@ import { scaricaCartella } from '../lib/fogli.ts'
 import { OutBadge, RigBadge } from '../viste/segni.tsx'
 import { Avviso, Bottone, Card } from '../ui.tsx'
 import Scheda from './Scheda.tsx'
+import { useTelefono } from '../viste/telefono.ts'
 
 const votoCol = (v: number) => v >= 70 ? 'var(--ok)' : v >= 55 ? 'var(--warn)' : 'var(--crit)'
 const CHIAVE_CHIUSE = 'fantaregia:rose-chiuse'
-/* quali rose sono chiuse è una preferenza di chi guarda, su questo dispositivo */
-function chiuseSalvate(): Record<string, 1> {
-  try { return JSON.parse(localStorage.getItem(CHIAVE_CHIUSE) || '{}') as Record<string, 1> } catch { return {} }
+/* Sul telefono si parte al contrario: aperta solo la propria, le altre si
+   aprono a mano. Dieci rose aperte sono trecento righe da scorrere. La
+   memoria è separata, così da scrivania resta tutto com'era. */
+const CHIAVE_APERTE_TELEFONO = 'fantaregia:rose-aperte-telefono'
+/* quali rose sono chiuse (o aperte, sul telefono) è una preferenza di chi guarda, su questo dispositivo */
+function salvate(chiave: string): Record<string, 1> {
+  try { return JSON.parse(localStorage.getItem(chiave) || '{}') as Record<string, 1> } catch { return {} }
 }
 
 /* ══ Rose ════════════════════════════════════════════════════════════
@@ -21,11 +26,17 @@ function chiuseSalvate(): Record<string, 1> {
    da sola quelle con un riscontro. Il voto non viene da un modello
    linguistico: nasce dagli stessi indici usati in asta, e sotto ogni rosa
    c'è il dettaglio voce per voce.                                      */
-export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
+export default function Rose({ legaId, motore: m, puoScrivere, ricarica, telefono: forzato }: {
   legaId: string; motore: Motore; puoScrivere: boolean; ricarica: () => void
+  /** per i test di resa, che girano fuori dal browser: altrimenti decide la larghezza */
+  telefono?: boolean
 }) {
+  const larghezza = useTelefono()
+  const telefono = forzato ?? larghezza
   const [q, setQ] = useState('')
-  const [chiuse, setChiuse] = useState<Record<string, 1>>(chiuseSalvate)
+  const [chiuse, setChiuse] = useState<Record<string, 1>>(() => salvate(CHIAVE_CHIUSE))
+  // sul telefono: le rose aperte a mano; «false» vuol dire chiusa anche se è la propria
+  const [aperteTel, setAperteTel] = useState<Record<string, 1 | 0>>(() => salvate(CHIAVE_APERTE_TELEFONO))
   const [aperto, setAperto] = useState<number | null>(null)
   const [esito, setEsito] = useState<string | null>(null)
   const finestra = { from: m.giornataOggi(), span: 5 }
@@ -34,7 +45,18 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
     setChiuse(nuove)
     try { localStorage.setItem(CHIAVE_CHIUSE, JSON.stringify(nuove)) } catch { /* senza memoria locale vale per questa visita */ }
   }
-  const tutte = (aperte: boolean) => salvaChiuse(aperte ? {} : Object.fromEntries(m.S.teams.map(t => [t.id, 1 as const])))
+  const salvaAperteTel = (nuove: Record<string, 1 | 0>) => {
+    setAperteTel(nuove)
+    try { localStorage.setItem(CHIAVE_APERTE_TELEFONO, JSON.stringify(nuove)) } catch { /* vale per questa visita */ }
+  }
+  const tutte = (aperte: boolean) => telefono
+    ? salvaAperteTel(Object.fromEntries(m.S.teams.map(t => [t.id, aperte ? 1 as const : 0 as const])))
+    : salvaChiuse(aperte ? {} : Object.fromEntries(m.S.teams.map(t => [t.id, 1 as const])))
+  const apertaDi = (tid: number) => telefono ? (aperteTel[tid] ?? (m.isMine(tid) ? 1 : 0)) === 1 : !chiuse[tid]
+  const cambiaAperta = (tid: number, aperta: boolean) => {
+    if (telefono) { salvaAperteTel({ ...aperteTel, [tid]: aperta ? 1 : 0 }); return }
+    const nuove = { ...chiuse }; if (aperta) delete nuove[tid]; else nuove[tid] = 1; salvaChiuse(nuove)
+  }
 
   const cerca = q.trim().toLowerCase()
   const trova = (n: string, s: string) => n.toLowerCase().includes(cerca) || s.toLowerCase().includes(cerca)
@@ -65,7 +87,7 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
           <div className="empty">L'asta non è ancora cominciata: qui comparirà il riepilogo con il giudizio di ogni rosa.</div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {telefono ? <RiepilogoTelefono m={m} giudizi={giudizi} /> : <div className="overflow-x-auto">
               <table className="list riep">
                 <thead><tr>
                   <th className="w-[34px]">#</th><th>Squadra</th>
@@ -98,7 +120,7 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
                   })}
                 </tbody>
               </table>
-            </div>
+            </div>}
             <p className="hint mt-2.5">Il voto non viene da un modello linguistico, ma dagli stessi indici che hai usato in asta: undici tipo 40,
               profondità 15, prezzi pagati 20, titolari veri 15, rigoristi 5, rischi 5. Sotto ogni rosa c'è il dettaglio, voce per voce.</p>
           </>
@@ -150,10 +172,10 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
             )
           })
           if (cerca && !match) return null
-          const aperta = cerca ? true : !chiuse[t.id]
+          const aperta = cerca ? true : apertaDi(t.id)
           return (
             <details key={t.id} className="rosecard card" open={aperta}
-              onToggle={e => { if (cerca) return; const nuove = { ...chiuse }; if ((e.target as HTMLDetailsElement).open) delete nuove[t.id]; else nuove[t.id] = 1; salvaChiuse(nuove) }}
+              onToggle={e => { if (cerca) return; const ora = (e.target as HTMLDetailsElement).open; if (ora !== aperta) cambiaAperta(t.id, ora) }}
               style={m.isMine(t.id) ? { borderColor: 'var(--accent)' } : undefined}>
               <summary className="rosehead">
                 <span className="tw" aria-hidden="true">▸</span>
@@ -194,6 +216,33 @@ export default function Rose({ legaId, motore: m, puoScrivere, ricarica }: {
         <Scheda m={m} id={aperto} legaId={legaId} puoScrivere={puoScrivere} finestra={finestra}
           obiettivo={undefined} onObiettivo={() => {}} onChiudi={() => setAperto(null)} ricarica={ricarica} />
       )}
+    </div>
+  )
+}
+
+/* Il riepilogo sul telefono: una riga per squadra al posto della tabella a
+   nove colonne. A destra il voto, che è il numero che si cerca; sotto il
+   nome spesa, resto e quanto ha pagato rispetto alla media. Undici e
+   titolari restano nel giudizio, dentro la rosa. */
+function RiepilogoTelefono({ m, giudizi }: { m: Motore; giudizi: ReturnType<Motore['giudizi']> }) {
+  return (
+    <div className="m-gruppo m-in-card">
+      {giudizi.map((x, i) => {
+        const st = m.stats(x.t.id), g = x.g, d = 1 / g.resa - 1
+        return (
+          <div key={x.t.id} className={`m-riga riep${m.isMine(x.t.id) ? ' mia' : ''}`}>
+            <span className="m-pos fr-num">{i + 1}</span>
+            <div className="m-testo">
+              <p className="m-nome">{x.t.name}</p>
+              <p className="m-meta">
+                spesi {st.spent} · restano {st.left} ·{' '}
+                <span style={{ color: d <= -0.05 ? 'var(--ok)' : d >= 0.05 ? 'var(--crit)' : undefined }}>{d >= 0 ? '+' : '−'}{Math.abs(Math.round(d * 100))}%</span> sulla media
+              </p>
+            </div>
+            <b className="m-num grande fr-num" style={{ color: votoCol(g.voto) }}>{g.voto}</b>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -35,6 +35,17 @@ describe('Calendario', () => {
     expect(conta(html, 'calscore fr-num')).toBe(cal.teams.length)
   })
 
+  it('sul telefono: una riga per squadra con le partite sotto, il resto in due cassetti chiusi', () => {
+    const html = renderToString(createElement(Calendario, { motore: m, telefono: true }))
+    expect(html).not.toContain('caltab')                          // niente tabella che scorre di lato
+    expect(conta(html, 'm-riga cal')).toBe(m.CAL.teams.length)
+    expect(conta(html, 'fixstrip')).toBe(m.CAL.teams.length)
+    expect(conta(html, 'm-voce')).toBe(2)
+    expect(html).toContain('Come sta andando davvero')
+    expect(html).not.toContain('forcegrid')                       // le forze stanno nel cassetto, chiuso
+    expect(html).not.toContain('class="modal')
+  })
+
   it('senza calendario dice dove prenderlo', () => {
     const vuoto = creaMotore({ players, stato: shared })
     expect(renderToString(createElement(Calendario, { motore: vuoto }))).toContain('openfootball')

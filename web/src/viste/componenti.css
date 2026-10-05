@@ -533,6 +533,15 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 .o-bottone:active{background:var(--fr-marchio-velo)}
 .o-bottone svg{width:24px;height:24px;stroke:var(--fr-marchio);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
+/* ── Calendario e Rose: le tabelle diventate righe ── */
+/* posizione, nome con quello che serve sotto, il numero a destra */
+.m-riga.cal, .m-riga.riep{grid-template-columns:22px minmax(0,1fr) auto}
+/* le partite sotto il nome vanno a capo se la finestra è lunga, mai di lato */
+.m-riga.cal .fixstrip{flex-wrap:wrap;margin-top:4px}
+/* una lista dentro una Card (p-4) o un cassetto (.psec, 18px) arriva ai suoi bordi */
+.m-in-card{margin:0 -1rem;border-bottom:0}
+.m-in-cassetto{margin:8px -18px 0}
+
 /* ── Lega e dati: le squadre ── */
 /* Una riga per squadra al posto della tabella da 640px. A sinistra chi è
    (nome, allenatore, slot per reparto), a destra i crediti che restano,
