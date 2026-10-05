@@ -28,7 +28,12 @@ import type { Motore } from '../domain/motore.ts'
    la casa della lega (dentro ci sono carica dati e rose ufficiali).
    Sul telefono è la prima voce del cassetto, staccata, col nome che
    dice cosa contiene — «Lega e dati». Da scrivania la scheda continua a
-   chiamarsi «Panoramica», perché sopra i 900px non cambia niente.    */
+   chiamarsi «Panoramica», perché sopra i 900px non cambia niente.
+
+   Sul telefono la rotta index è «Oggi», la dashboard: le poche cose che
+   servono adesso e un bottone per ogni pagina. La Panoramica lì vive su
+   `dati`, una rotta che esiste anche da scrivania (porta alla stessa
+   Panoramica), così un link copiato dal telefono funziona ovunque.    */
 export type Modo = 'asta' | 'stagione'
 export type Scheda = 'asta' | 'listone' | 'titolari' | 'rose' | 'calendario'
   | 'rendimento' | 'formazioni' | 'scontri' | 'infermeria' | 'mercato'
@@ -52,7 +57,9 @@ export const SCHEDE: Record<Scheda, VoceScheda> = {
 }
 
 /** La rotta index, che non entra in nessuno dei due ordini. */
-export const PANORAMICA = { testo: 'Lega e dati', spiega: 'squadre, crediti, file da caricare, membri, inviti' }
+export const PANORAMICA = { path: 'dati', testo: 'Lega e dati', spiega: 'squadre, crediti, file da caricare, membri, inviti' }
+/** La dashboard del telefono, sulla rotta index: la prima voce della barra. */
+export const OGGI = { testo: 'Oggi', spiega: 'la giornata in breve, e un bottone per ogni pagina' }
 
 export const ORDINE: Record<Modo, Scheda[]> = {
   asta:     ['asta', 'listone', 'titolari', 'rose', 'calendario', 'rendimento', 'formazioni', 'scontri', 'infermeria', 'mercato'],
@@ -61,6 +68,9 @@ export const ORDINE: Record<Modo, Scheda[]> = {
   stagione: ['scontri', 'formazioni', 'infermeria', 'titolari', 'mercato', 'rendimento', 'calendario', 'listone', 'rose', 'asta'],
 }
 export const PRIME = 4   // quante voci sono "quelle del momento"
+/* Sul telefono la prima casella della barra è «Oggi»: delle pagine del
+   momento ne entrano tre, la quarta scende nel cassetto. */
+export const PRIME_TELEFONO = PRIME - 1
 
 /* alla prima apertura decide da sola: se l'asta non è finita, è modalità
    asta. Stesso conto di modoAsta() nell'originale. */

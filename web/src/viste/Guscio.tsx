@@ -5,41 +5,22 @@
    il più lontano possibile dal pollice). Al loro posto:
 
    - una testata sola, alta ~50px, con chi sei e dove sei;
-   - una barra in basso a cinque caselle — le prime quattro della
-     modalità corrente più «Altro» — fissa, appoggiata al bordo;
+   - una barra in basso a cinque caselle — «Oggi», le prime tre della
+     modalità corrente e «Altro» — fissa, appoggiata al bordo;
    - un cassetto solo, che si apre dal menu in testata e da «Altro», e
      contiene tutto il resto.
 
    Niente sparisce: quello che non entra in barra sta nel cassetto, che
    ha lo spazio per spiegare ogni voce. L'ordine non lo decide questo
-   file — lo legge da ORDINE e PRIME di modo.ts, che restano l'unica
+   file — lo legge da ORDINE e PRIME_TELEFONO di modo.ts, che restano l'unica
    sorgente anche per le schede da scrivania.                          */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
-import { ORDINE, PANORAMICA, PRIME, SCHEDE, type Modo, type Scheda } from './modo.ts'
+import { OGGI, ORDINE, PANORAMICA, PRIME_TELEFONO, SCHEDE, type Modo } from './modo.ts'
+import { ICONE, ICONA_ESCI, ICONA_LEGHE, ICONA_LUNA, ICONA_MENU, ICONA_OGGI, ICONA_PANORAMICA } from './icone.ts'
 import { scegliTema, temaSalvato, type Tema } from './tema.ts'
 import SceltaTema from './SceltaTema.tsx'
 import { ContestoAzione, type Azione } from './barra-azione.ts'
-
-/* Un disegno per voce: in barra l'icona è quello che si riconosce prima
-   della parola. Sono tratti, non riempimenti, così seguono il colore. */
-const ICONE: Record<Scheda, string> = {
-  scontri:    'M4 6h16v14H4zM4 10h16M9 3v4M15 3v4M8 15h3',
-  formazioni: 'M9 4l3 2 3-2 4 3-2 3v8H7v-8L5 7z',
-  infermeria: 'M12 8v8M8 12h8M5 5h14v14H5z',
-  titolari:   'M12 3a4 4 0 100 8 4 4 0 000-8zM4 21a8 8 0 0116 0',
-  asta:       'M5 19h9M8 4l6 6M11 3l4 4-5 5-4-4zM13 11l5 5',
-  listone:    'M4 7h16M4 12h16M4 17h10',
-  rose:       'M4 6h16v12H4zM4 10h16M10 10v8',
-  calendario: 'M4 6h16v14H4zM4 10h16M9 3v4M15 3v4',
-  rendimento: 'M3 17l5-6 4 3 5-7 4 4',
-  mercato:    'M4 8h12l-3-3M20 16H8l3 3',
-}
-const ICONA_PANORAMICA = 'M4 13h7V4H4zM13 20h7v-9h-7zM4 20h7v-4H4zM13 8h7V4h-7z'
-const ICONA_LUNA = 'M20 14a8 8 0 01-10-10 8 8 0 1010 10z'
-const ICONA_MENU = 'M4 7h16M4 12h16M4 17h16'
-const ICONA_LEGHE = 'M4 6h16M4 12h16M4 18h10'
-const ICONA_ESCI = 'M10 17l5-5-5-5M15 12H3M13 4h6v16h-6'
 
 const Icona = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>
@@ -64,10 +45,10 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
   const chiudi = () => setCassetto(false)
   const { pathname } = useLocation()
   const vai = useNavigate()
-  /* «/lega/<id>/<pagina>», o «/lega/<id>» per la Panoramica */
+  /* «/lega/<id>/<pagina>», o «/lega/<id>» per Oggi */
   const attiva = pathname.split('/')[3] ?? ''
-  const inBarra = ORDINE[modo].slice(0, PRIME)
-  const altre = ORDINE[modo].slice(PRIME)
+  const inBarra = ORDINE[modo].slice(0, PRIME_TELEFONO)
+  const altre = ORDINE[modo].slice(PRIME_TELEFONO)
 
   /* Il cassetto si chiude perché hai toccato una voce, non perché il path
      è cambiato: chiuderlo guardando l'indirizzo vorrebbe dire far ridisegnare
@@ -111,15 +92,19 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
       )}
 
       <nav className="g-nav" aria-label="Le pagine della lega">
+        {/* la casa: la giornata in breve, e da lì ogni pagina */}
+        <NavLink to={`/lega/${legaId}`} end className={({ isActive }) => `g-vai${isActive ? ' on' : ''}`}>
+          <Icona d={ICONA_OGGI} />{OGGI.testo}
+        </NavLink>
         {inBarra.map(k => (
           <NavLink key={k} to={`/lega/${legaId}/${SCHEDE[k].path}`}
             className={({ isActive }) => `g-vai${isActive ? ' on' : ''}`}>
             <Icona d={ICONE[k]} />{SCHEDE[k].testo}
           </NavLink>
         ))}
-        {/* «Altro» è acceso quando quello che guardi non è in barra: la
-            Panoramica, o una delle pagine di seconda fila. */}
-        <button type="button" className={`g-vai${inBarra.some(k => SCHEDE[k].path === attiva) ? '' : ' on'}`}
+        {/* «Altro» è acceso quando quello che guardi non è in barra: Lega e
+            dati, o una delle pagine di seconda fila. */}
+        <button type="button" className={`g-vai${attiva === '' || inBarra.some(k => SCHEDE[k].path === attiva) ? '' : ' on'}`}
           aria-expanded={cassetto} onClick={() => setCassetto(true)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="6" cy="12" r="1.3" /><circle cx="12" cy="12" r="1.3" /><circle cx="18" cy="12" r="1.3" />
@@ -138,10 +123,10 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
               <button type="button" className="g-chiudi" onClick={chiudi}>chiudi</button>
             </div>
 
-            {/* La Panoramica non sta in nessuno dei due ordini: è la casa
-                della lega, e qui è la prima voce, staccata. Il nome dice
-                cosa c'è dentro, che è come la si cerca. */}
-            <Link to={`/lega/${legaId}`} className="g-voce primaria" onClick={chiudi}>
+            {/* La Panoramica non sta in nessuno dei due ordini: qui è la
+                prima voce, staccata. Il nome dice cosa c'è dentro, che è
+                come la si cerca. */}
+            <Link to={`/lega/${legaId}/${PANORAMICA.path}`} className="g-voce primaria" onClick={chiudi}>
               <Icona d={ICONA_PANORAMICA} />
               <span>{PANORAMICA.testo}<em>{PANORAMICA.spiega}</em></span>
               <span className="g-freccia">›</span>
@@ -153,17 +138,17 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
                 nome per esteso e dice cosa fa. */}
             <button type="button" className="g-interruttore" role="switch" aria-checked={modo === 'asta'}
               onClick={() => {
-                /* cambiando modalità si arriva sulla sua prima pagina: accendere
-                   l'asta vuol dire voler chiamare, spegnerla voler vedere la giornata */
+                /* cambiando modalità si torna a Oggi, che cambia con lei: con
+                   l'asta accesa dice crediti e posti, spenta la giornata */
                 const nuovo: Modo = modo === 'asta' ? 'stagione' : 'asta'
                 onModo(nuovo); chiudi()
-                void vai(`/lega/${legaId}/${SCHEDE[ORDINE[nuovo][0]].path}`)
+                void vai(`/lega/${legaId}`)
               }}>
               <span>
                 <b>Modalità asta</b>
                 <em>{modo === 'asta'
-                  ? 'accesa: in barra ci sono le pagine per comprare'
-                  : 'spenta: in barra ci sono le pagine della stagione'}</em>
+                  ? 'accesa: Oggi e la barra servono a comprare'
+                  : 'spenta: Oggi e la barra servono alla stagione'}</em>
               </span>
               <span className="g-leva" data-on={modo === 'asta'} />
             </button>
