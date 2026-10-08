@@ -10,10 +10,15 @@ const ordina = (a: Giocatore, b: Giocatore) => ('PDCA'.indexOf(a.r) - 'PDCA'.ind
 /* ══ Titolari e rigoristi ════════════════════════════════════════════
    renderTitolari() dell'app a file singolo: per ogni squadra chi gioca,
    chi è in ballottaggio, chi parte dietro, e chi è fuori. «dal campo»
-   vuol dire che il livello viene dai voti veri e non più dalle quotazioni. */
+   vuol dire che il livello viene dai voti veri e non più dalle quotazioni.
+   Venti squadre aperte sono seicento righe: si parte tutte chiuse, con in
+   testa quanti titolari e quanti fuori, e si apre quella che serve. La
+   ricerca apre da sola le squadre in cui trova qualcosa.              */
 export default function Titolari({ motore: m }: { motore: Motore }) {
   const [q, setQ] = useState('')
   const [soloRig, setSoloRig] = useState(false)
+  // le squadre aperte a mano, per questa visita
+  const [aperte, setAperte] = useState<Record<string, 1>>({})
   const cerca = q.trim().toLowerCase()
 
   const schede = [...new Set(m.PL.map(p => p.s))].sort().map(t => {
@@ -32,9 +37,21 @@ export default function Titolari({ motore: m }: { motore: Motore }) {
         <span className="qz fr-num">{p.q}</span>
       </div>
     )
+    const aperta = !!cerca || !!aperte[t]
+    const titolari = dentro.filter(p => m.titStato(p).liv === 1).length
     return (
-      <div key={t} className="rounded-card border border-line bg-surface shadow-card">
-        <div className="tithead"><h3>{t}</h3><span className="hint mono">{rosa.length} in lista</span></div>
+      <details key={t} className="titcard rounded-card border border-line bg-surface shadow-card" open={aperta}
+        onToggle={e => {
+          if (cerca) return
+          const ora = (e.target as HTMLDetailsElement).open
+          if (ora === aperta) return
+          const nuove = { ...aperte }; if (ora) nuove[t] = 1; else delete nuove[t]; setAperte(nuove)
+        }}>
+        <summary className="tithead">
+          <span className="tw" aria-hidden="true">▸</span>
+          <h3>{t}</h3>
+          <span className="hint mono">{cerca ? `${rosa.length} ${rosa.length === 1 ? 'trovato' : 'trovati'}` : <>{titolari} tit{fuori.length > 0 && <> · {fuori.length} fuori</>}</>}</span>
+        </summary>
         {rig.length > 0 && (
           <div className="rigrow">
             <span className="font-semibold text-muted">Rigori:</span>
@@ -53,7 +70,7 @@ export default function Titolari({ motore: m }: { motore: Motore }) {
           )
         })}
         {fuori.length > 0 && <div className="titsec"><div className="sh">indisponibili · {fuori.length}</div>{fuori.map(riga)}</div>}
-      </div>
+      </details>
     )
   }).filter(Boolean)
 

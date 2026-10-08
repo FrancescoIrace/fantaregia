@@ -273,10 +273,10 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
    sotto i 900px, e chi lo decide è `useTelefono()` in viste/telefono.ts.
    Quando queste classi esistono nel documento, siamo già sul telefono.
 
-   La pagina scorre e basta: la testata si appiccica in cima, la barra è
-   fissa in fondo, e in mezzo non c'è nessun contenitore che scorre per
-   conto suo. Gli scroll annidati sul telefono fanno perdere il segno. */
-.guscio{--g-nav-h:58px;display:flex;flex-direction:column;min-height:100dvh}
+   La pagina scorre e basta: la testata si appiccica in cima, e in mezzo
+   non c'è nessun contenitore che scorre per conto suo. Gli scroll
+   annidati sul telefono fanno perdere il segno. */
+.guscio{display:flex;flex-direction:column;min-height:100dvh}
 
 /* ── la testata: una riga sola ── */
 .g-testata{
@@ -304,31 +304,15 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   border:0;background:none;border-radius:var(--fr-r);color:var(--fr-fioco);cursor:pointer;
 }
 .g-tondo:hover{color:var(--fr-ink)}
+/* a filo del bordo: la freccia sta dove il pollice la cerca */
+.g-indietro{margin-left:-6px;color:var(--fr-ink)}
 .g-tondo svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── il corpo ── */
-/* In fondo ci va lo spazio della barra fissa, altrimenti l'ultima riga di
-   ogni pagina resta sotto e non si tocca più. */
 .g-corpo{
   flex:1;min-width:0;
-  padding:var(--fr-pad) var(--fr-riga-x) calc(var(--g-nav-h) + var(--fr-pad) + env(safe-area-inset-bottom));
+  padding:var(--fr-pad) var(--fr-riga-x) calc(var(--fr-pad) + env(safe-area-inset-bottom));
 }
-
-/* ── la barra in basso ── */
-.g-nav{
-  position:fixed;left:0;right:0;bottom:0;z-index:45;
-  display:grid;grid-template-columns:repeat(5,1fr);
-  background:var(--fr-pan);border-top:1px solid var(--fr-filo);
-  padding-bottom:env(safe-area-inset-bottom);
-}
-.g-vai{
-  display:grid;justify-items:center;align-content:center;gap:3px;
-  min-height:var(--g-nav-h);padding:7px 2px 8px;border:0;background:none;cursor:pointer;
-  font-size:var(--fr-t-mini);line-height:1.15;text-align:center;text-decoration:none;color:var(--fr-spento);
-}
-.g-vai svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-/* la scheda attiva è marchio: è identità, non un valore */
-.g-vai.on{color:var(--fr-marchio)}
 
 /* ── il cassetto ── */
 /* Sale dal basso come la scheda giocatore e «Chi schierare», e riusa la
@@ -762,14 +746,14 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 
 /* ── la barra azione ── */
-/* Sopra la navigazione, appoggiata a lei: l'azione principale della pagina
+/* Appoggiata al bordo in basso: l'azione principale della pagina
    a portata di pollice, con a sinistra quello che serve sapere prima di
    toccarla. C'è solo se la pagina ne ha una (viste/barra-azione.ts). */
 .g-azione{
   position:fixed;left:0;right:0;z-index:44;
-  bottom:calc(var(--g-nav-h) + env(safe-area-inset-bottom));
+  bottom:0;
   display:flex;align-items:center;gap:var(--fr-gap);
-  padding:8px var(--fr-riga-x);background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+  padding:8px var(--fr-riga-x) calc(8px + env(safe-area-inset-bottom));background:var(--fr-pan);border-top:1px solid var(--fr-filo);
 }
 .g-azione-testo{flex:1;min-width:0}
 .g-azione-testo b{display:block;font-weight:var(--fr-peso-forte);font-size:var(--fr-t-piccolo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -782,13 +766,9 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 .g-principale:disabled{cursor:wait;background:var(--fr-filo);color:var(--fr-fioco)}
 /* con la fascia, l'ultima riga della pagina deve restarle sopra */
-.guscio.con-azione .g-corpo{padding-bottom:calc(var(--g-nav-h) + 62px + var(--fr-pad) + env(safe-area-inset-bottom))}
+.guscio.con-azione .g-corpo{padding-bottom:calc(62px + var(--fr-pad) + env(safe-area-inset-bottom))}
 
 /* ── Infermeria: il file degli indisponibili ── */
-/* La nota sotto il nome: si legge per intero al passaggio del mouse, in riga
-   si taglia per non spingere le colonne. */
-.infn .infnota{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:var(--fr-t-et);color:var(--fr-fioco);font-weight:var(--fr-peso-testo)}
 .indgruppo{border:1px solid var(--fr-filo);border-radius:var(--fr-r);padding:8px 12px}
 /* da sistemare: il tratteggio degli avvisi, non un colore */
 .indgruppo.da-sistemare{border-style:dashed;border-color:var(--fr-fioco)}
@@ -808,5 +788,46 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   .indriga{grid-template-columns:1fr;gap:2px}
 }
 
+/* ── Infermeria: la riga ──
+   Sopra nome e stato, sotto di chi è e il dettaglio, poi la nota; la
+   lettera del ruolo e l'azione prendono tutta l'altezza. Lo stato ha una
+   colonna sua, così le etichette si incolonnano e si scorre guardando
+   solo quelle. */
+.infrow{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;
+  grid-template-areas:"r nome stato az" "r info info az" "r nota nota az";
+  column-gap:10px;row-gap:3px;align-items:center;padding:9px 2px 9px 10px;
+}
+.infrow > .ruolo-lettera{grid-area:r;align-self:start;margin-top:1px}
+.infn{grid-area:nome;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--fr-t-base);font-weight:var(--fr-peso-forte);line-height:var(--fr-interlinea-stretta)}
+/* il dettaglio va a capo invece di tagliarsi: «dalla 4ª · 7 gi…» non si legge */
+.infinfo{grid-area:info;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;row-gap:1px;
+  font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.infinfo > *{white-space:nowrap}
+.infinfo .pteam{font-size:inherit;color:inherit}
+.infinfo .infcosa{min-width:0}
+.infinfo .infcosa b{color:var(--fr-ink)}
+.infinfo > :not(:last-child)::after{content:'\00B7';margin-left:6px;color:var(--fr-spento)}
+.infchi{max-width:40%;overflow:hidden;text-overflow:ellipsis}
+/* la tua: è identità, quindi marchio */
+.infmia{color:var(--fr-marchio);font-weight:var(--fr-peso-num);text-transform:uppercase;font-size:var(--fr-t-mini);letter-spacing:.04em}
+.infrow.mia .infn{color:var(--fr-marchio)}
+/* la nota: per intero al passaggio del mouse, in riga si taglia */
+.infrow .infnota{grid-area:nota;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--fr-t-et);color:var(--fr-spento);font-style:italic}
+.infaz{grid-area:az}
+.infaz:empty{display:none}
+
+/* lo stato: pieno per chi non può giocare, solo bordo per chi rischia o
+   va deciso, grigio per l'archivio */
+.inftag{
+  grid-area:stato;justify-self:end;white-space:nowrap;
+  padding:2px 8px;border-radius:20px;border:1px solid transparent;
+  font-size:var(--fr-t-mini);font-weight:var(--fr-peso-num);letter-spacing:.04em;text-transform:uppercase;
+}
+.inftag.inf, .inftag.squal{background:var(--fr-giu-velo);color:var(--fr-giu);border-color:var(--fr-giu)}
+.inftag.rosso{color:var(--fr-giu);border-color:var(--fr-giu);border-style:dashed}
+.inftag.diff{color:var(--fr-marchio);border-color:var(--fr-marchio)}
 /* lo storico dei rientri: una riga d'archivio, grigia, non uno stato da guardare */
-.inftag.rientro{color:var(--fr-fioco)}
+.inftag.rientro{color:var(--fr-fioco);border-color:var(--fr-filo)}

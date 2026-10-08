@@ -72,4 +72,15 @@ describe('Infermeria', () => {
     const spente = creaMotore({ players, cal, rig, hist, stato: { ...shared, squalOn: false }, me: { myTeam: 3 } })
     expect(conta(infermeria(true, spente), 'inftag squal')).toBe(0)
   })
+
+  it('la lista dei fuori va a pagine da dieci, con avanti e indietro', () => {
+    const tanti = creaMotore({ players, cal, rig, hist, me: { myTeam: 3 },
+      stato: { ...shared, squalOn: false, out: Object.fromEntries(m.PL.slice(0, 25).map(p => [p.id, { motivo: 'infortunio', da: 1, ts: 0 }])) } })
+    const html = infermeria(true, tanti)
+    expect(conta(html, 'inftag inf')).toBe(10)
+    expect(html).toContain('class="infpagine"')
+    expect(html).toMatch(/1<!-- -->–<!-- -->10<!-- --> di <!-- -->25/)
+    // con pochi fuori, niente pagine
+    expect(infermeria(true)).not.toContain('Pagina successiva')
+  })
 })

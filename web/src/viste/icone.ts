@@ -1,6 +1,6 @@
 /* ══ I disegni delle pagine ══════════════════════════════════════════
-   Un tracciato per pagina, condiviso fra la barra del telefono, il suo
-   cassetto e i bottoni della dashboard «Oggi»: la stessa pagina si
+   Un tracciato per pagina, condiviso fra il cassetto del telefono e i
+   bottoni della dashboard «Oggi»: la stessa pagina si
    riconosce dallo stesso segno ovunque la si tocchi. Sono tratti, non
    riempimenti, così seguono il colore di chi li contiene.            */
 import type { Scheda } from './modo.ts'
@@ -20,6 +20,7 @@ export const ICONE: Record<Scheda, string> = {
 export const ICONA_OGGI = 'M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5'
 export const ICONA_PANORAMICA = 'M4 13h7V4H4zM13 20h7v-9h-7zM4 20h7v-4H4zM13 8h7V4h-7z'
 export const ICONA_LUNA = 'M20 14a8 8 0 01-10-10 8 8 0 1010 10z'
+export const ICONA_INDIETRO = 'M15 5l-7 7 7 7'
 export const ICONA_MENU = 'M4 7h16M4 12h16M4 17h16'
 export const ICONA_LEGHE = 'M4 6h16M4 12h16M4 18h10'
 export const ICONA_ESCI = 'M10 17l5-5-5-5M15 12H3M13 4h6v16h-6'

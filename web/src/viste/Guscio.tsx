@@ -4,20 +4,21 @@
    scorre di lato: su 390px erano ~150px di cromatura, con la navigazione
    il più lontano possibile dal pollice). Al loro posto:
 
-   - una testata sola, alta ~50px, con chi sei e dove sei;
-   - una barra in basso a cinque caselle — «Oggi», le prime tre della
-     modalità corrente e «Altro» — fissa, appoggiata al bordo;
-   - un cassetto solo, che si apre dal menu in testata e da «Altro», e
-     contiene tutto il resto.
+   - una testata sola, alta ~50px, con chi sei e dove sei, e fuori da
+     Oggi un tasto per tornare indietro di un passo: non tutti i telefoni
+     hanno il gesto o il tasto fisso per farlo;
+   - un cassetto solo, che si apre dal menu in testata e contiene ogni
+     pagina, Oggi per prima.
 
-   Niente sparisce: quello che non entra in barra sta nel cassetto, che
-   ha lo spazio per spiegare ogni voce. L'ordine non lo decide questo
-   file — lo legge da ORDINE e PRIME_TELEFONO di modo.ts, che restano l'unica
-   sorgente anche per le schede da scrivania.                          */
+   Una barra in basso non c'è più: Oggi ha già un bottone per ogni
+   pagina, e la barra ripeteva le stesse cinque voci rubando spazio in
+   fondo. Il cassetto ha lo spazio per spiegare ogni voce. L'ordine non
+   lo decide questo file — lo legge da ORDINE di modo.ts, che resta
+   l'unica sorgente anche per le schede da scrivania.                  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router'
-import { OGGI, ORDINE, PANORAMICA, PRIME_TELEFONO, SCHEDE, type Modo } from './modo.ts'
-import { ICONE, ICONA_ESCI, ICONA_LEGHE, ICONA_LUNA, ICONA_MENU, ICONA_OGGI, ICONA_PANORAMICA } from './icone.ts'
+import { OGGI, ORDINE, PANORAMICA, SCHEDE, type Modo } from './modo.ts'
+import { ICONE, ICONA_ESCI, ICONA_INDIETRO, ICONA_LEGHE, ICONA_LUNA, ICONA_MENU, ICONA_OGGI, ICONA_PANORAMICA } from './icone.ts'
 import { scegliTema, temaSalvato, type Tema } from './tema.ts'
 import SceltaTema from './SceltaTema.tsx'
 import { ContestoAzione, type Azione } from './barra-azione.ts'
@@ -43,12 +44,14 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
   // l'azione principale della pagina aperta, se ne ha una (viste/barra-azione.ts)
   const [azione, setAzione] = useState<Azione | null>(null)
   const chiudi = () => setCassetto(false)
-  const { pathname } = useLocation()
   const vai = useNavigate()
-  /* «/lega/<id>/<pagina>», o «/lega/<id>» per Oggi */
-  const attiva = pathname.split('/')[3] ?? ''
-  const inBarra = ORDINE[modo].slice(0, PRIME_TELEFONO)
-  const altre = ORDINE[modo].slice(PRIME_TELEFONO)
+  const { pathname, key } = useLocation()
+  const casa = `/lega/${legaId}`
+  const aCasa = pathname.replace(/\/$/, '') === casa
+  /* Un passo indietro nella cronologia; se la pagina è stata aperta da un
+     link o ricaricata, dietro non c'è niente dell'app (la chiave della
+     prima voce è «default»): si torna a Oggi invece di uscire. */
+  const indietro = () => { if (key === 'default') void vai(casa); else void vai(-1) }
 
   /* Il cassetto si chiude perché hai toccato una voce, non perché il path
      è cambiato: chiuderlo guardando l'indirizzo vorrebbe dire far ridisegnare
@@ -66,6 +69,11 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
     <div className={`guscio${azione ? ' con-azione' : ''}`}>
       <header className="g-testata">
         <div className="g-riga">
+          {!aCasa && (
+            <button type="button" className="g-tondo g-indietro" aria-label="Indietro" onClick={indietro}>
+              <Icona d={ICONA_INDIETRO} />
+            </button>
+          )}
           {squadra?.colore && <span className="gagliardetto g-gagl" style={{ ['--tinta' as string]: squadra.colore }} />}
           <div className="g-chi">
             <p className="g-nome">{nomeLega}</p>
@@ -91,46 +99,31 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
         </div>
       )}
 
-      <nav className="g-nav" aria-label="Le pagine della lega">
-        {/* la casa: la giornata in breve, e da lì ogni pagina */}
-        <NavLink to={`/lega/${legaId}`} end className={({ isActive }) => `g-vai${isActive ? ' on' : ''}`}>
-          <Icona d={ICONA_OGGI} />{OGGI.testo}
-        </NavLink>
-        {inBarra.map(k => (
-          <NavLink key={k} to={`/lega/${legaId}/${SCHEDE[k].path}`}
-            className={({ isActive }) => `g-vai${isActive ? ' on' : ''}`}>
-            <Icona d={ICONE[k]} />{SCHEDE[k].testo}
-          </NavLink>
-        ))}
-        {/* «Altro» è acceso quando quello che guardi non è in barra: Lega e
-            dati, o una delle pagine di seconda fila. */}
-        <button type="button" className={`g-vai${attiva === '' || inBarra.some(k => SCHEDE[k].path === attiva) ? '' : ' on'}`}
-          aria-expanded={cassetto} onClick={() => setCassetto(true)}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="6" cy="12" r="1.3" /><circle cx="12" cy="12" r="1.3" /><circle cx="18" cy="12" r="1.3" />
-          </svg>
-          Altro
-        </button>
-      </nav>
-
       {cassetto && (
         <>
           <div className="g-velo" onClick={chiudi} />
-          <aside className="g-cassetto" role="dialog" aria-modal="true" aria-label="Altro">
+          <aside className="g-cassetto" role="dialog" aria-modal="true" aria-label="Menu della lega">
             <div className="g-maniglia" />
             <div className="g-cassetto-t">
-              <h2>Altro</h2>
+              <h2>Menu</h2>
               <button type="button" className="g-chiudi" onClick={chiudi}>chiudi</button>
             </div>
 
-            {/* La Panoramica non sta in nessuno dei due ordini: qui è la
-                prima voce, staccata. Il nome dice cosa c'è dentro, che è
-                come la si cerca. */}
-            <Link to={`/lega/${legaId}/${PANORAMICA.path}`} className="g-voce primaria" onClick={chiudi}>
+            {/* Oggi e la Panoramica non stanno in nessuno dei due ordini: qui
+                sono le prime voci, staccate. Il nome dice cosa c'è dentro,
+                che è come le si cerca. */}
+            <NavLink to={`/lega/${legaId}`} end onClick={chiudi}
+              className={({ isActive }) => `g-voce primaria${isActive ? ' on' : ''}`}>
+              <Icona d={ICONA_OGGI} />
+              <span>{OGGI.testo}<em>{OGGI.spiega}</em></span>
+              <span className="g-freccia">›</span>
+            </NavLink>
+            <NavLink to={`/lega/${legaId}/${PANORAMICA.path}`} onClick={chiudi}
+              className={({ isActive }) => `g-voce primaria${isActive ? ' on' : ''}`}>
               <Icona d={ICONA_PANORAMICA} />
               <span>{PANORAMICA.testo}<em>{PANORAMICA.spiega}</em></span>
               <span className="g-freccia">›</span>
-            </Link>
+            </NavLink>
 
             {/* Da scrivania l'interruttore sta in testata, e sotto i 620px
                 perdeva l'etichetta (.modo .mlab{display:none}): restava una
@@ -147,16 +140,16 @@ export default function Guscio({ legaId, nomeLega, squadra, modo, onModo, email,
               <span>
                 <b>Modalità asta</b>
                 <em>{modo === 'asta'
-                  ? 'accesa: Oggi e la barra servono a comprare'
-                  : 'spenta: Oggi e la barra servono alla stagione'}</em>
+                  ? 'accesa: Oggi e il menu servono a comprare'
+                  : 'spenta: Oggi e il menu servono alla stagione'}</em>
               </span>
               <span className="g-leva" data-on={modo === 'asta'} />
             </button>
 
             <p className="g-gruppo-t">
-              {modo === 'asta' ? 'Le altre pagine, la stagione compresa' : 'Le altre pagine, asta compresa'}
+              {modo === 'asta' ? 'Le pagine, la stagione compresa' : 'Le pagine, asta compresa'}
             </p>
-            {altre.map(k => (
+            {ORDINE[modo].map(k => (
               <NavLink key={k} to={`/lega/${legaId}/${SCHEDE[k].path}`} onClick={chiudi}
                 className={({ isActive }) => `g-voce${isActive ? ' on' : ''}`}>
                 <Icona d={ICONE[k]} />
