@@ -17,8 +17,8 @@ const cal = calendarioDaRighe(parseCSV(readFileSync(ESEMPI + 'calendario-esempio
 const { rig, hist, shared } = costruisciLega(players, cal)
 const m = creaMotore({ players, cal, rig, hist, stato: shared, me: { myTeam: 3 } })
 const conta = (html: string, classe: string) => (html.match(new RegExp(`class="${classe}[" ]`, 'g')) ?? []).length
-const disegna = (motore = m, puoScrivere = true) => renderToString(createElement(Rose, {
-  legaId: 'l1', motore, puoScrivere, ricarica: () => {},
+const disegna = (motore = m, puoScrivere = true, telefono?: boolean) => renderToString(createElement(Rose, {
+  legaId: 'l1', motore, puoScrivere, ricarica: () => {}, telefono,
 }))
 
 describe('Rose', () => {
@@ -64,5 +64,15 @@ describe('righe da esportare', () => {
     const righe = righeRiepilogo(m)
     expect(righe).toHaveLength(m.S.teams.length + 1)
     for (const r of righe.slice(1)) expect(Number(r[1]) + Number(r[2])).toBe(m.S.budget)
+  })
+
+  it('sul telefono il riepilogo è una riga per squadra, e di partenza è aperta solo la propria rosa', () => {
+    const html = disegna(m, true, true)
+    expect(html).not.toContain('class="list riep"')               // niente tabella a nove colonne
+    expect(conta(html, 'm-riga riep')).toBe(m.giudizi().length)
+    expect((html.match(/class="m-riga riep mia"/g) ?? []).length).toBe(1)
+    expect((html.match(/<details[^>]*open/g) ?? []).length).toBe(1)
+    // da scrivania restano tutte aperte
+    expect((disegna().match(/<details[^>]*open/g) ?? []).length).toBe(m.S.teams.length)
   })
 })

@@ -56,4 +56,11 @@ describe('viste di stagione', () => {
     expect(renderToString(createElement(Rendimento, { motore: vuoto }))).toContain('Nessuna giornata caricata')
     expect(renderToString(createElement(Titolari, { motore: vuoto }))).toContain('Il listone non è caricato')
   })
+
+  it('Titolari: le squadre partono chiuse, con titolari e fuori in testa', () => {
+    const html = renderToString(createElement(Titolari, { motore: m }))
+    expect(conta(html, 'titcard rounded-card')).toBe(new Set(m.PL.map(p => p.s)).size)
+    expect(html).not.toMatch(/<details[^>]*open/)
+    expect(html).toMatch(/\d+<!-- --> tit/)
+  })
 })

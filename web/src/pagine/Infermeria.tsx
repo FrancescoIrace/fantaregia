@@ -18,6 +18,9 @@ function ordineSalvato(): Ordine {
   try { const v = localStorage.getItem(CHIAVE_ORDINE); return v === 'da' || v === 'nome' ? v : 'ruolo' } catch { return 'ruolo' }
 }
 const RO: Record<string, number> = { P: 0, D: 1, C: 2, A: 3 }
+/* le liste lunghe vanno a pagine: a metà stagione fra infortunati,
+   squalificati e diffidati sono decine di righe una sotto l'altra */
+const PER_PAGINA = 10
 
 interface Riga { pid: number; p: Giocatore | null; tipo: 'inf' | 'squal'; da: number; ts: number; motivo?: string; nota?: string; n?: number; g?: number }
 
@@ -38,13 +41,15 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
   const [ordine, setOrdine] = useState<Ordine>(ordineSalvato)
   const [esito, setEsito] = useState<{ tipo: 'ok' | 'errore'; testo: string } | null>(null)
   const [invio, setInvio] = useState(false)
+  const [pagFuori, setPagFuori] = useState(0)
+  const [pagDiff, setPagDiff] = useState(0)
 
   async function agisci(fare: () => Promise<void>, ok: string) {
     setInvio(true)
     try { await fare(); setEsito({ tipo: 'ok', testo: ok }); ricarica() } catch (e) { setEsito({ tipo: 'errore', testo: (e as Error).message }) }
     setInvio(false)
   }
-  const scegliOrdine = (o: Ordine) => { setOrdine(o); try { localStorage.setItem(CHIAVE_ORDINE, o) } catch { /* senza memoria locale resta per questa visita */ } }
+  const scegliOrdine = (o: Ordine) => { setOrdine(o); setPagFuori(0); try { localStorage.setItem(CHIAVE_ORDINE, o) } catch { /* senza memoria locale resta per questa visita */ } }
 
   const g = m.nextG(), sq = m.squalifiche(), mio = m.meId()
   const nomeDi = (pid: number) => m.giocatoreDi(pid) ?? m.byId.get(pid) ?? null
@@ -116,7 +121,7 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
       <Card titolo="Chi non puoi schierare" azioni={<span className="hint">{totPrima ? <><b className="fr-num">{totPrima}</b> fuori</> : 'nessuno fuori'} · prossima giornata la <b className="fr-num">{g}ª</b></span>}>
         {totPrima >= 2 && (
           <div className="infbar">
-            <input type="text" value={filtro} onChange={e => setFiltro(e.target.value)} placeholder="Filtra la lista…" autoComplete="off"
+            <input type="text" value={filtro} onChange={e => { setFiltro(e.target.value); setPagFuori(0) }} placeholder="Filtra la lista…" autoComplete="off"
               className="rounded-[7px] border border-line-strong bg-surface px-2.5 py-1.5 text-sm" />
             <div className="roleseg">
               {([['ruolo', 'Ruolo'], ['da', 'Da quando'], ['nome', 'Nome']] as const).map(([k, lab]) => (
@@ -125,32 +130,31 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
             </div>
           </div>
         )}
-        {righe.length ? righe.map(x => {
+        {righe.length ? <Paginata pagina={pagFuori} onPagina={setPagFuori} voci={righe} mostra={x => {
           if (x.tipo === 'squal') return (
-            <RigaInf key={`s${x.pid}-${x.g}`} p={x.p} pid={x.pid} tag="squal"
+            <RigaInf key={`s${x.pid}-${x.g}`} m={m} p={x.p} pid={x.pid} tag="squal" stato="squalificato"
               azione={puoScrivere && <Bottone piccolo disabled={invio} title="La tua lega non applica questa squalifica"
                 onClick={() => void agisci(() => annullaSqualifica(legaId, x.pid, x.g!), 'Squalifica annullata')}>Annulla</Bottone>}>
-              squalificato · salta la <b className="fr-num">{x.g}ª</b> <i>({x.n}ª ammonizione)</i>
+              salta la <b className="fr-num">{x.g}ª</b> · {x.n}ª ammonizione
             </RigaInf>
           )
           const quante = x.da ? Math.max(0, g - x.da) : 0
           return (
-            <RigaInf key={`i${x.pid}`} p={x.p} pid={x.pid} tag="inf" nota={x.nota}
+            <RigaInf key={`i${x.pid}`} m={m} p={x.p} pid={x.pid} tag="inf" stato={etichettaMotivo(x.motivo)} nota={x.nota}
               azione={puoScrivere && <Bottone piccolo disabled={invio}
                 onClick={() => void agisci(() => togliIndisponibile(legaId, x.pid), 'Rientrato fra i disponibili')}>È tornato</Bottone>}>
-              {etichettaMotivo(x.motivo)}
-              {x.da ? <> · fuori dalla <b className="fr-num">{x.da}ª</b>{quante ? <i> ({quante} giornat{quante === 1 ? 'a' : 'e'})</i> : <i> (da questa)</i>}</> : null}
+              {x.da ? <>dalla <b className="fr-num">{x.da}ª</b>{quante ? <> · {quante} giornat{quante === 1 ? 'a' : 'e'}</> : ' · da questa'}</> : null}
             </RigaInf>
           )
-        }) : totPrima ? <p className="hint">Nessuno corrisponde a «{filtro}».</p>
+        }} /> : totPrima ? <p className="hint">Nessuno corrisponde a «{filtro}».</p>
           : <p className="hint">Nessuno fuori. Gli infortunati li segni qui sopra; le squalifiche da cartellino le trova l'app da sola quando carichi i voti.</p>}
       </Card>
 
       {rientri.length > 0 && (
         <Card titolo="Rientrati di recente" azioni={<span className="hint">con le note di quando sono usciti e rientrati</span>}>
           {rientri.slice(0, 10).map((r, i) => (
-            <RigaInf key={`${r.giocatore_id}-${r.rientrato_il}-${i}`} p={nomeDi(r.giocatore_id)} pid={r.giocatore_id} tag="rientro" nota={r.nota ?? undefined}>
-              rientrato il {new Date(r.rientrato_il).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+            <RigaInf key={`${r.giocatore_id}-${r.rientrato_il}-${i}`} m={m} p={nomeDi(r.giocatore_id)} pid={r.giocatore_id} tag="rientro" stato="rientrato" nota={r.nota ?? undefined}>
+              il {new Date(r.rientrato_il).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
               {r.motivo ? <> · era {etichettaMotivo(r.motivo)}{r.da_giornata ? <> dalla <b className="fr-num">{r.da_giornata}ª</b></> : null}</> : null}
               {r.nota_uscita && <i> ({r.nota_uscita})</i>}
             </RigaInf>
@@ -160,18 +164,18 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
 
       <div className="grid gap-[18px] lg:grid-cols-2">
         <Card titolo="Diffidati" azioni={<span className="hint">a un giallo dallo stop</span>}>
-          {diffidati.length ? diffidati.map(x => (
-            <RigaInf key={x.pid} p={nomeDi(x.pid)} pid={x.pid} tag="diff"><b className="fr-num">{x.amm}</b> ammonizioni — al prossimo giallo salta</RigaInf>
-          )) : <p className="hint">Nessuno in diffida. Si diventa diffidati alla 4ª ammonizione, poi all'8ª, 12ª, 15ª, 17ª.</p>}
+          {diffidati.length ? <Paginata pagina={pagDiff} onPagina={setPagDiff} voci={diffidati} mostra={x => (
+            <RigaInf key={x.pid} m={m} p={nomeDi(x.pid)} pid={x.pid} tag="diff" stato="diffidato"><b className="fr-num">{x.amm}</b> ammonizioni · al prossimo giallo salta</RigaInf>
+          )} /> : <p className="hint">Nessuno in diffida. Si diventa diffidati alla 4ª ammonizione, poi all'8ª, 12ª, 15ª, 17ª.</p>}
         </Card>
         <Card titolo="Da controllare" azioni={<span className="hint">espulsi: le giornate le dà il giudice</span>}>
           {rossi.length ? (
             <>
               {rossi.map(x => (
-                <RigaInf key={x.pid} p={nomeDi(x.pid)} pid={x.pid} tag="rosso"
+                <RigaInf key={x.pid} m={m} p={nomeDi(x.pid)} pid={x.pid} tag="rosso" stato="espulso"
                   azione={puoScrivere && !m.isOut(x.pid) && <Bottone piccolo disabled={invio}
                     onClick={() => void agisci(() => segnaIndisponibile(legaId, x.pid, 'espulsione', g), 'Messo fuori')}>Mettilo fuori</Bottone>}>
-                  espulso alla <b className="fr-num">{x.g}ª</b>
+                  alla <b className="fr-num">{x.g}ª</b> · giornate da decidere
                 </RigaInf>
               ))}
               <p className="hint mt-[9px]">Quante giornate lo decide il giudice sportivo il martedì: nessun file lo dice, quindi decidi tu. Se lo metti fuori
@@ -211,15 +215,47 @@ export default function Infermeria({ legaId, motore: m, puoScrivere, ricarica, n
   )
 }
 
-function RigaInf({ p, pid, tag, nota, azione, children }: { p: Giocatore | null; pid: number; tag: string; nota?: string; azione?: ReactNode; children: ReactNode }) {
+/** Una lista a pagine da PER_PAGINA; sotto, avanti e indietro solo se le pagine sono più d'una. */
+function Paginata<T>({ voci, pagina, onPagina, mostra }: { voci: T[]; pagina: number; onPagina: (p: number) => void; mostra: (v: T) => ReactNode }) {
+  const pagine = Math.ceil(voci.length / PER_PAGINA)
+  // la lista si accorcia (uno è tornato, un filtro): non si resta su una pagina che non c'è più
+  const p = Math.min(pagina, pagine - 1)
+  const da = p * PER_PAGINA
   return (
-    <div className="infrow">
+    <>
+      {voci.slice(da, da + PER_PAGINA).map(mostra)}
+      {pagine > 1 && (
+        <div className="infpagine">
+          <Bottone piccolo disabled={p === 0} onClick={() => onPagina(p - 1)} aria-label="Pagina precedente">‹ Indietro</Bottone>
+          <span className="hint fr-num">{da + 1}–{Math.min(da + PER_PAGINA, voci.length)} di {voci.length}</span>
+          <Bottone piccolo disabled={p === pagine - 1} onClick={() => onPagina(p + 1)} aria-label="Pagina successiva">Avanti ›</Bottone>
+        </div>
+      )}
+    </>
+  )
+}
+
+/* Una riga si legge in tre colpi d'occhio: chi (il nome, grande), perché
+   (lo stato, un'etichetta sempre nella stessa colonna, così si scorre la
+   lista guardando solo quella) e di chi è (la fantasquadra; la tua si
+   accende). Il dettaglio e la nota stanno sotto, più piccoli.          */
+function RigaInf({ m, p, pid, tag, stato, nota, azione, children }: {
+  m: Motore; p: Giocatore | null; pid: number; tag: string; stato: string; nota?: string; azione?: ReactNode; children: ReactNode
+}) {
+  const a = m.S.assign[pid], mia = !!a && a.team === m.meId()
+  return (
+    <div className={`infrow${mia ? ' mia' : ''}`}>
       {p && <span className="fr-filo-ruolo" data-ruolo={p.r} aria-hidden="true" />}
       <span className="ruolo-lettera">{p ? p.r : '?'}</span>
-      <span className="infn"><b>{p ? p.n : `#${pid}`}</b> <span className="pteam">{p?.s || ''}</span>
-        {nota && <span className="infnota" title={nota}>{nota}</span>}</span>
-      <span className={`inftag ${tag}`}>{children}</span>
-      {azione || <span />}
+      <b className="infn">{p ? p.n : `#${pid}`}</b>
+      <span className={`inftag ${tag}`}>{stato}</span>
+      <span className="infinfo">
+        {mia ? <span className="infmia">tua</span> : a ? <span className="infchi">{m.teamName(a.team)}</span> : null}
+        {p?.s && <span className="pteam">{p.s}</span>}
+        {children != null && <span className="infcosa">{children}</span>}
+      </span>
+      {nota && <span className="infnota" title={nota}>{nota}</span>}
+      <span className="infaz">{azione}</span>
     </div>
   )
 }

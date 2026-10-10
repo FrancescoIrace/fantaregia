@@ -29,6 +29,7 @@ import Rendimento from '../src/pagine/Rendimento.tsx'
 import Rose from '../src/pagine/Rose.tsx'
 import Scontri from '../src/pagine/Scontri.tsx'
 import Titolari from '../src/pagine/Titolari.tsx'
+import Oggi from '../src/pagine/Oggi.tsx'
 import SquadreLega from '../src/pagine/SquadreLega.tsx'
 import Guscio from '../src/viste/Guscio.tsx'
 import { creaMotore, type Motore } from '../src/domain/motore.ts'
@@ -100,9 +101,13 @@ describe.skipIf(!USCITA)('anteprime delle viste', () => {
 
     // telefono: le viste che hanno un disegno loro lo ricevono, le altre sono le stesse
     const viste = (telefono: boolean): Record<string, ReactElement> => ({
+      // la dashboard esiste solo sul telefono; da scrivania la si rende lo stesso, larga
+      oggi: createElement(Oggi, { legaId: 'l1', motore: m, modo: 'stagione', puoScrivere: true,
+        righe: preferenze({ [g]: m.formazioneAutomatica(g, '3-4-3') }) }),
+      'oggi-asta': createElement(Oggi, { legaId: 'l1', motore: m, modo: 'asta', puoScrivere: true, righe: preferenze({}) }),
       asta: createElement(Asta, { ...base, motore: m }),
       listone: createElement(Listone, { ...base, righe: preferenze({}), motore: m, telefono }),
-      rose: createElement(Rose, { ...base, motore: m }),
+      rose: createElement(Rose, { ...base, motore: m, telefono }),
       formazioni: createElement(Formazioni, {
         legaId: 'l1', utenteId: 'u1', motore: m, motorePrima, telefono,
         righe: preferenze({ [g]: m.formazioneAutomatica(g, '3-4-3') }),
@@ -110,7 +115,7 @@ describe.skipIf(!USCITA)('anteprime delle viste', () => {
       lega: createElement(Scontri, { ...base, motore: m, motorePrima, telefono }),
       rendimento: createElement(Rendimento, { motore: m }),
       titolari: createElement(Titolari, { motore: m }),
-      calendario: createElement(Calendario, { motore: m }),
+      calendario: createElement(Calendario, { motore: m, telefono }),
       infermeria: createElement(Infermeria, { ...base, motore: m }),
       mercato: createElement(Mercato, { ...base, motore: m }),
       squadre: createElement(SquadreLega, {
@@ -118,7 +123,7 @@ describe.skipIf(!USCITA)('anteprime delle viste', () => {
         membri: [{ utente_id: 'u1', nome: 'Francesco' }], puoAssegnare: true, onAllenatore: () => {}, telefono,
       }),
     })
-    const percorso: Record<string, string> = { lega: 'scontri', squadre: '' }
+    const percorso: Record<string, string> = { lega: 'scontri', squadre: 'dati', oggi: '', 'oggi-asta': '' }
 
     const css = readdirSync(WEB + 'dist/assets').find(f => f.endsWith('.css'))
     if (!css) throw new Error('manca il CSS compilato: prima `npm run build`')

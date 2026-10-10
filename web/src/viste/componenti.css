@@ -273,10 +273,10 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
    sotto i 900px, e chi lo decide è `useTelefono()` in viste/telefono.ts.
    Quando queste classi esistono nel documento, siamo già sul telefono.
 
-   La pagina scorre e basta: la testata si appiccica in cima, la barra è
-   fissa in fondo, e in mezzo non c'è nessun contenitore che scorre per
-   conto suo. Gli scroll annidati sul telefono fanno perdere il segno. */
-.guscio{--g-nav-h:58px;display:flex;flex-direction:column;min-height:100dvh}
+   La pagina scorre e basta: la testata si appiccica in cima, e in mezzo
+   non c'è nessun contenitore che scorre per conto suo. Gli scroll
+   annidati sul telefono fanno perdere il segno. */
+.guscio{display:flex;flex-direction:column;min-height:100dvh}
 
 /* ── la testata: una riga sola ── */
 .g-testata{
@@ -304,31 +304,15 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   border:0;background:none;border-radius:var(--fr-r);color:var(--fr-fioco);cursor:pointer;
 }
 .g-tondo:hover{color:var(--fr-ink)}
+/* a filo del bordo: la freccia sta dove il pollice la cerca */
+.g-indietro{margin-left:-6px;color:var(--fr-ink)}
 .g-tondo svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── il corpo ── */
-/* In fondo ci va lo spazio della barra fissa, altrimenti l'ultima riga di
-   ogni pagina resta sotto e non si tocca più. */
 .g-corpo{
   flex:1;min-width:0;
-  padding:var(--fr-pad) var(--fr-riga-x) calc(var(--g-nav-h) + var(--fr-pad) + env(safe-area-inset-bottom));
+  padding:var(--fr-pad) var(--fr-riga-x) calc(var(--fr-pad) + env(safe-area-inset-bottom));
 }
-
-/* ── la barra in basso ── */
-.g-nav{
-  position:fixed;left:0;right:0;bottom:0;z-index:45;
-  display:grid;grid-template-columns:repeat(5,1fr);
-  background:var(--fr-pan);border-top:1px solid var(--fr-filo);
-  padding-bottom:env(safe-area-inset-bottom);
-}
-.g-vai{
-  display:grid;justify-items:center;align-content:center;gap:3px;
-  min-height:var(--g-nav-h);padding:7px 2px 8px;border:0;background:none;cursor:pointer;
-  font-size:var(--fr-t-mini);line-height:1.15;text-align:center;text-decoration:none;color:var(--fr-spento);
-}
-.g-vai svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-/* la scheda attiva è marchio: è identità, non un valore */
-.g-vai.on{color:var(--fr-marchio)}
 
 /* ── il cassetto ── */
 /* Sale dal basso come la scheda giocatore e «Chi schierare», e riusa la
@@ -469,6 +453,78 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 .m-intest span:last-child{width:34px}
 .m-riga.partita{grid-template-columns:minmax(0,1fr) auto 52px}
 .m-coppia{display:grid;gap:2px;text-align:right;font-size:var(--fr-t-base)}
+
+/* ── Oggi: la dashboard ── */
+/* La casa del telefono. In cima il numero che decide la giornata (che
+   giornata è, o quanti crediti hai), sotto caselle che sono link interi —
+   col pollice non si mira — e in fondo un bottone per ogni pagina. Le
+   caselle stanno su una griglia a due: le larghe prendono tutta la riga. */
+.o-testa{padding:18px var(--fr-riga-x) 4px}
+.o-grande{font-size:var(--fr-t-grande);font-weight:var(--fr-peso-num);line-height:1.1}
+.o-sotto{margin-top:4px;font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.o-sotto b{color:var(--fr-ink)}
+/* una cosa da fare: il tratteggio degli avvisi, non un colore */
+.o-avviso{
+  display:flex;justify-content:space-between;align-items:center;gap:var(--fr-gap);flex-wrap:wrap;
+  margin:12px var(--fr-riga-x) 0;min-height:var(--fr-tocco);padding:10px 12px;
+  border:1px dashed var(--fr-fioco);border-radius:var(--fr-r);
+  color:var(--fr-ink);text-decoration:none;font-size:var(--fr-t-piccolo);
+}
+.o-avviso span{color:var(--fr-fioco)}
+.o-griglia{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--fr-gap);padding:12px var(--fr-riga-x) 0}
+.o-casella{
+  display:flex;flex-direction:column;gap:4px;min-width:0;min-height:96px;padding:12px;
+  background:var(--fr-pan);border:1px solid var(--fr-filo);border-radius:var(--fr-r-grande);
+  color:var(--fr-ink);text-decoration:none;
+}
+.o-casella.larga{grid-column:1 / -1}
+.o-casella:active{background:var(--fr-marchio-velo)}
+.o-ctitolo{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:var(--fr-t-et);color:var(--fr-fioco)}
+.o-ctitolo .m-freccia{line-height:1}
+.o-frase{font-size:var(--fr-t-titolo);font-weight:var(--fr-peso-forte);line-height:1.25;overflow-wrap:anywhere}
+/* «manca»: il cerchio vuoto, come nel resto dell'app */
+.o-frase.da-fare::before{content:"○ ";color:var(--fr-fioco);font-weight:var(--fr-peso-testo)}
+.o-numero{font-size:var(--fr-t-grande);font-weight:var(--fr-peso-num);line-height:1.1}
+.o-riga{font-size:var(--fr-t-piccolo);color:var(--fr-fioco);overflow-wrap:anywhere}
+.o-riga b{color:var(--fr-ink)}
+/* da controllare: il peso, non l'ambra */
+.o-riga.attenzione{color:var(--fr-ink);font-weight:var(--fr-peso-forte)}
+.o-casella .m-prob{margin-top:8px}
+/* il duello: nomi ai lati, i due attesi al centro */
+.o-duello{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto minmax(0,1fr);gap:8px;align-items:center;margin-top:4px}
+.o-duello b{font-size:var(--fr-t-grande);line-height:1}
+.o-duello b.fioco{color:var(--fr-fioco)}
+.o-sq{font-weight:var(--fr-peso-forte);font-size:var(--fr-t-piccolo);line-height:1.2;overflow-wrap:anywhere}
+.o-sq.io{box-shadow:inset 3px 0 0 var(--fr-marchio);padding-left:7px}
+.o-sq.destro{text-align:right}
+.o-vs{font-size:var(--fr-t-et);color:var(--fr-spento)}
+.o-classifica{display:flex;align-items:baseline;gap:12px}
+/* i posti per reparto: la lettera col suo filo, come nelle righe */
+.o-reparti{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:6px}
+.o-reparto{position:relative;display:flex;align-items:baseline;gap:6px;padding-left:9px}
+.o-reparto > .fr-filo-ruolo{position:absolute;left:0;top:2px;bottom:2px;height:auto}
+.o-reparto b{font-size:var(--fr-t-num)}
+.o-reparto b i{font-style:normal;font-size:var(--fr-t-piccolo);color:var(--fr-fioco);font-weight:var(--fr-peso-testo)}
+.o-reparto.pieno b{color:var(--fr-fioco)}
+/* un bottone per pagina: tre per riga, icona sopra e nome sotto */
+.o-bottoni{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--fr-gap);padding:0 var(--fr-riga-x) var(--fr-pad)}
+.o-bottone{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  min-height:78px;padding:10px 4px;text-align:center;
+  background:var(--fr-pan);border:1px solid var(--fr-filo);border-radius:var(--fr-r-grande);
+  color:var(--fr-ink);text-decoration:none;font-size:var(--fr-t-piccolo);font-weight:var(--fr-peso-medio);
+}
+.o-bottone:active{background:var(--fr-marchio-velo)}
+.o-bottone svg{width:24px;height:24px;stroke:var(--fr-marchio);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Calendario e Rose: le tabelle diventate righe ── */
+/* posizione, nome con quello che serve sotto, il numero a destra */
+.m-riga.cal, .m-riga.riep{grid-template-columns:22px minmax(0,1fr) auto}
+/* le partite sotto il nome vanno a capo se la finestra è lunga, mai di lato */
+.m-riga.cal .fixstrip{flex-wrap:wrap;margin-top:4px}
+/* una lista dentro una Card (p-4) o un cassetto (.psec, 18px) arriva ai suoi bordi */
+.m-in-card{margin:0 -1rem;border-bottom:0}
+.m-in-cassetto{margin:8px -18px 0}
 
 /* ── Lega e dati: le squadre ── */
 /* Una riga per squadra al posto della tabella da 640px. A sinistra chi è
@@ -690,14 +746,14 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 
 /* ── la barra azione ── */
-/* Sopra la navigazione, appoggiata a lei: l'azione principale della pagina
+/* Appoggiata al bordo in basso: l'azione principale della pagina
    a portata di pollice, con a sinistra quello che serve sapere prima di
    toccarla. C'è solo se la pagina ne ha una (viste/barra-azione.ts). */
 .g-azione{
   position:fixed;left:0;right:0;z-index:44;
-  bottom:calc(var(--g-nav-h) + env(safe-area-inset-bottom));
+  bottom:0;
   display:flex;align-items:center;gap:var(--fr-gap);
-  padding:8px var(--fr-riga-x);background:var(--fr-pan);border-top:1px solid var(--fr-filo);
+  padding:8px var(--fr-riga-x) calc(8px + env(safe-area-inset-bottom));background:var(--fr-pan);border-top:1px solid var(--fr-filo);
 }
 .g-azione-testo{flex:1;min-width:0}
 .g-azione-testo b{display:block;font-weight:var(--fr-peso-forte);font-size:var(--fr-t-piccolo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -710,13 +766,9 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
 }
 .g-principale:disabled{cursor:wait;background:var(--fr-filo);color:var(--fr-fioco)}
 /* con la fascia, l'ultima riga della pagina deve restarle sopra */
-.guscio.con-azione .g-corpo{padding-bottom:calc(var(--g-nav-h) + 62px + var(--fr-pad) + env(safe-area-inset-bottom))}
+.guscio.con-azione .g-corpo{padding-bottom:calc(62px + var(--fr-pad) + env(safe-area-inset-bottom))}
 
 /* ── Infermeria: il file degli indisponibili ── */
-/* La nota sotto il nome: si legge per intero al passaggio del mouse, in riga
-   si taglia per non spingere le colonne. */
-.infn .infnota{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:var(--fr-t-et);color:var(--fr-fioco);font-weight:var(--fr-peso-testo)}
 .indgruppo{border:1px solid var(--fr-filo);border-radius:var(--fr-r);padding:8px 12px}
 /* da sistemare: il tratteggio degli avvisi, non un colore */
 .indgruppo.da-sistemare{border-style:dashed;border-color:var(--fr-fioco)}
@@ -736,5 +788,46 @@ table.list tr.taken .pname{font-weight:var(--fr-peso-medio)}
   .indriga{grid-template-columns:1fr;gap:2px}
 }
 
+/* ── Infermeria: la riga ──
+   Sopra nome e stato, sotto di chi è e il dettaglio, poi la nota; la
+   lettera del ruolo e l'azione prendono tutta l'altezza. Lo stato ha una
+   colonna sua, così le etichette si incolonnano e si scorre guardando
+   solo quelle. */
+.infrow{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;
+  grid-template-areas:"r nome stato az" "r info info az" "r nota nota az";
+  column-gap:10px;row-gap:3px;align-items:center;padding:9px 2px 9px 10px;
+}
+.infrow > .ruolo-lettera{grid-area:r;align-self:start;margin-top:1px}
+.infn{grid-area:nome;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--fr-t-base);font-weight:var(--fr-peso-forte);line-height:var(--fr-interlinea-stretta)}
+/* il dettaglio va a capo invece di tagliarsi: «dalla 4ª · 7 gi…» non si legge */
+.infinfo{grid-area:info;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px;row-gap:1px;
+  font-size:var(--fr-t-piccolo);color:var(--fr-fioco)}
+.infinfo > *{white-space:nowrap}
+.infinfo .pteam{font-size:inherit;color:inherit}
+.infinfo .infcosa{min-width:0}
+.infinfo .infcosa b{color:var(--fr-ink)}
+.infinfo > :not(:last-child)::after{content:'\00B7';margin-left:6px;color:var(--fr-spento)}
+.infchi{max-width:40%;overflow:hidden;text-overflow:ellipsis}
+/* la tua: è identità, quindi marchio */
+.infmia{color:var(--fr-marchio);font-weight:var(--fr-peso-num);text-transform:uppercase;font-size:var(--fr-t-mini);letter-spacing:.04em}
+.infrow.mia .infn{color:var(--fr-marchio)}
+/* la nota: per intero al passaggio del mouse, in riga si taglia */
+.infrow .infnota{grid-area:nota;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--fr-t-et);color:var(--fr-spento);font-style:italic}
+.infaz{grid-area:az}
+.infaz:empty{display:none}
+
+/* lo stato: pieno per chi non può giocare, solo bordo per chi rischia o
+   va deciso, grigio per l'archivio */
+.inftag{
+  grid-area:stato;justify-self:end;white-space:nowrap;
+  padding:2px 8px;border-radius:20px;border:1px solid transparent;
+  font-size:var(--fr-t-mini);font-weight:var(--fr-peso-num);letter-spacing:.04em;text-transform:uppercase;
+}
+.inftag.inf, .inftag.squal{background:var(--fr-giu-velo);color:var(--fr-giu);border-color:var(--fr-giu)}
+.inftag.rosso{color:var(--fr-giu);border-color:var(--fr-giu);border-style:dashed}
+.inftag.diff{color:var(--fr-marchio);border-color:var(--fr-marchio)}
 /* lo storico dei rientri: una riga d'archivio, grigia, non uno stato da guardare */
-.inftag.rientro{color:var(--fr-fioco)}
+.inftag.rientro{color:var(--fr-fioco);border-color:var(--fr-filo)}

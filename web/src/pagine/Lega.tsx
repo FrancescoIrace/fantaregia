@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentProps } from 'react'
+import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react'
 import { Link, NavLink, Route, Routes, useParams } from 'react-router'
 import { supabase } from '../lib/supabase.ts'
 import { useLega } from '../data/useLega.ts'
@@ -20,7 +20,8 @@ import Mercato from './Mercato.tsx'
 import Listone from './Listone.tsx'
 import Rose from './Rose.tsx'
 import Asta from './Asta.tsx'
-import { ORDINE, PRIME, SCHEDE, modoAuto, modoSalvato, salvaModo, type Modo } from '../viste/modo.ts'
+import Oggi from './Oggi.tsx'
+import { ORDINE, PANORAMICA, PRIME, SCHEDE, modoAuto, modoSalvato, salvaModo, type Modo } from '../viste/modo.ts'
 import { usaTinta } from '../viste/colore-squadra.ts'
 import { useTelefono } from '../viste/telefono.ts'
 import Guscio from '../viste/Guscio.tsx'
@@ -84,8 +85,12 @@ export default function Lega({ utenteId, email }: { utenteId: string; email?: st
      intorno — la testata e il modo di passare da una pagina all'altra. */
   const rotte = (
     <Routes>
+      {/* sul telefono la casa è Oggi, la dashboard; la Panoramica sta su `dati`,
+          che da scrivania porta alla stessa Panoramica dell'index */}
       <Route index element={<Casa id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io}
-        saltato={saltaAvvio} onSalta={() => setSaltaAvvio(true)} />} />
+        saltato={saltaAvvio} onSalta={() => setSaltaAvvio(true)}
+        dashboard={telefono ? <Oggi legaId={id} righe={righe} motore={motore} modo={modo} puoScrivere={!!io && io.ruolo !== 'lettore'} /> : null} />} />
+      <Route path={PANORAMICA.path} element={<Panoramica id={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica} membri={membri} io={io} />} />
       <Route path="listone" element={<Listone legaId={id} utenteId={utenteId} righe={righe} motore={motore} ricarica={ricarica}
         puoScrivere={!!io && io.ruolo !== 'lettore'} />} />
       <Route path="asta" element={<Asta legaId={id} motore={motore} ricarica={ricarica}
@@ -154,13 +159,17 @@ export default function Lega({ utenteId, email }: { utenteId: string; email?: st
    salvando il listone il realtime aggiorna il motore, e la Panoramica
    comparirebbe da sotto i piedi prima che l'avvio abbia detto com'è andata.
    Tornandoci dopo, invece, il montaggio è nuovo e la risposta è cambiata. */
-function Casa({ saltato, onSalta, ...p }: ComponentProps<typeof Panoramica> & { saltato: boolean; onSalta: () => void }) {
+function Casa({ saltato, onSalta, dashboard, ...p }: ComponentProps<typeof Panoramica> & {
+  saltato: boolean; onSalta: () => void
+  /** sul telefono la casa è la dashboard Oggi, non la Panoramica */
+  dashboard: ReactNode
+}) {
   const [vuota] = useState(() => !p.motore.PL.length)
   if (vuota && !saltato) return (
     <Avvio legaId={p.id} righe={p.righe} puoScrivere={!!p.io && p.io.ruolo !== 'lettore'}
       onEntra={() => { onSalta(); p.ricarica() }} onSalta={onSalta} />
   )
-  return <Panoramica {...p} />
+  return dashboard ?? <Panoramica {...p} />
 }
 
 function Panoramica({ id, utenteId, righe, motore, ricarica, membri, io }: {
